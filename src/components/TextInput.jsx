@@ -13,9 +13,9 @@ function TextInput({ onAnalyze, loading }) {
 
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="text-input" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="text-input" className="block text-sm font-medium text-foreground mb-2">
             Paste text content
           </label>
           <textarea
@@ -23,19 +23,23 @@ function TextInput({ onAnalyze, loading }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste email content, message text, or any suspicious text here..."
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-red-500 resize-none"
-            rows={10}
+            className="w-full px-4 py-4 bg-secondary border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground resize-none transition-all duration-200"
+            rows={8}
             disabled={loading}
           />
-          <p className="mt-2 text-sm text-gray-500">
-            Tip: Paste the full text content including sender information, links, and message body for best analysis.
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tip: Include the full text with sender info and links for best results.
           </p>
         </div>
         
         <button
           type="submit"
           disabled={loading || !text.trim()}
-          className="w-full bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
+          className={`w-full font-medium py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${
+            loading || !text.trim()
+              ? 'bg-secondary text-muted-foreground cursor-not-allowed'
+              : 'gradient-button text-primary-foreground shadow-lg hover:shadow-primary/25 hover:scale-[1.02]'
+          }`}
         >
           {loading ? (
             <>
@@ -47,7 +51,7 @@ function TextInput({ onAnalyze, loading }) {
             </>
           ) : (
             <>
-              Check now
+              Check Now
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
