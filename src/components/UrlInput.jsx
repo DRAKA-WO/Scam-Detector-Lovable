@@ -12,7 +12,6 @@ function UrlInput({ onAnalyze }) {
       return false
     }
 
-    // Basic URL validation
     let urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/
     if (!urlPattern.test(urlToValidate.trim())) {
       setError('Please enter a valid URL (e.g., example.com or https://example.com)')
@@ -36,9 +35,9 @@ function UrlInput({ onAnalyze }) {
 
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="url-input" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="url-input" className="block text-sm font-medium text-foreground mb-2">
             Enter website URL
           </label>
           <input
@@ -46,22 +45,22 @@ function UrlInput({ onAnalyze }) {
             type="text"
             value={url}
             onChange={handleChange}
-            placeholder="https://example.com or example.com"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            placeholder="https://example.com"
+            className="w-full px-4 py-4 bg-secondary border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground transition-all duration-200"
           />
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-destructive text-sm">{error}</p>
           </div>
         )}
 
         {/* Tip Notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+        <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
             <svg
-              className="w-4 h-4 text-white"
+              className="w-4 h-4 text-primary-foreground"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -73,15 +72,15 @@ function UrlInput({ onAnalyze }) {
             </svg>
           </div>
           <div className="flex-1">
-            <p className="text-blue-900 text-sm leading-relaxed">
-              <span className="font-semibold">Tip:</span> We'll take a full-page screenshot of the website, including the footer, to analyze all elements including contact information, pricing, payment methods, and trust indicators.
+            <p className="text-foreground text-sm leading-relaxed">
+              <span className="font-semibold">Tip:</span> We'll analyze the website for common scam indicators including suspicious patterns, trust signals, and more.
             </p>
           </div>
         </div>
 
         <button
           type="submit"
-          className="w-full bg-[#FF6B6B] hover:bg-[#FF5252] text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm hover:shadow-md"
+          className="w-full gradient-button text-primary-foreground font-medium py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-primary/25 hover:scale-[1.02]"
         >
           Check Now
           <svg

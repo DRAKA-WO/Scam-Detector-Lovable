@@ -6,16 +6,15 @@ function ImageUpload({ onUpload }) {
   const [error, setError] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [cameraActive, setCameraActive] = useState(false)
-  const [facingMode, setFacingMode] = useState('environment') // 'user' for front, 'environment' for back
+  const [facingMode, setFacingMode] = useState('environment')
   const [cameraError, setCameraError] = useState(null)
   const fileInputRef = useRef(null)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
   const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-  const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+  const MAX_SIZE = 10 * 1024 * 1024
 
-  // Cleanup camera stream on unmount
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -41,7 +40,6 @@ function ImageUpload({ onUpload }) {
       setCameraError(null)
       setError(null)
       
-      // Stop existing stream if any
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
       }
@@ -78,10 +76,8 @@ function ImageUpload({ onUpload }) {
     const newFacingMode = facingMode === 'user' ? 'environment' : 'user'
     setFacingMode(newFacingMode)
     
-    // Restart camera with new facing mode
     if (cameraActive) {
       stopCamera()
-      // Small delay to ensure stream is fully stopped
       setTimeout(() => {
         startCamera()
       }, 100)
@@ -126,13 +122,11 @@ function ImageUpload({ onUpload }) {
   const validateFile = (file) => {
     setError(null)
 
-    // Check file type
     if (!ALLOWED_TYPES.includes(file.type)) {
       setError('Invalid file type. Please upload a PNG, JPG, GIF, or WEBP image.')
       return false
     }
 
-    // Check file size
     if (file.size > MAX_SIZE) {
       setError('File size exceeds 10MB limit. Please upload a smaller image.')
       return false
@@ -146,10 +140,8 @@ function ImageUpload({ onUpload }) {
       return
     }
 
-    // Store the file
     setSelectedFile(file)
 
-    // Create preview
     const reader = new FileReader()
     reader.onload = (e) => {
       setPreview(e.target.result)
@@ -196,12 +188,12 @@ function ImageUpload({ onUpload }) {
   return (
     <div className="w-full">
       {!cameraActive && !preview && (
-        <div className="bg-white rounded-lg p-6">
+        <div>
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${
               dragActive
-                ? 'border-red-500 bg-pink-100'
-                : 'border-red-500 bg-pink-50 hover:bg-pink-100'
+                ? 'border-primary bg-primary/10'
+                : 'border-border hover:border-primary/50 hover:bg-secondary/50'
             }`}
             onClick={handleClick}
             onDragEnter={handleDrag}
@@ -217,32 +209,34 @@ function ImageUpload({ onUpload }) {
               className="hidden"
             />
 
-            <div>
-              <svg
-                className="mx-auto h-12 w-12 text-gray-600 mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <p className="text-gray-700 mb-2 font-medium">
-                Drag and drop your images here
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                <svg
+                  className="h-8 w-8 text-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+              </div>
+              <p className="text-foreground font-medium mb-1">
+                Drag and drop your image here
               </p>
-              <p className="text-gray-500 text-sm mb-4">
-                or click and browse
+              <p className="text-muted-foreground text-sm mb-4">
+                or click to browse
               </p>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   handleTakePhoto()
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 text-sm transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 text-muted-foreground hover:text-foreground text-sm transition-colors bg-secondary rounded-lg hover:bg-secondary/80"
               >
                 <svg
                   className="w-4 h-4"
@@ -268,78 +262,59 @@ function ImageUpload({ onUpload }) {
             </div>
           </div>
 
-          {/* Check Now Button */}
-          {selectedFile ? (
-            <button
-              onClick={handleCheckNow}
-              className="mt-4 w-full bg-[#FF6B6B] hover:bg-[#FF5252] text-white font-medium py-3 px-6 rounded-full flex items-center justify-center gap-2 transition-colors"
+          <button
+            onClick={selectedFile ? handleCheckNow : handleClick}
+            className={`mt-6 w-full font-medium py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${
+              selectedFile
+                ? 'gradient-button text-primary-foreground shadow-lg hover:shadow-primary/25 hover:scale-[1.02]'
+                : 'bg-secondary text-muted-foreground cursor-pointer hover:bg-secondary/80'
+            }`}
+          >
+            Check Now
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              Check now
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-          ) : (
-            <button
-              onClick={handleClick}
-              className="mt-4 w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-6 rounded-full flex items-center justify-center gap-2 transition-colors"
-            >
-              Check now
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-          )}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
         </div>
       )}
 
       {cameraActive && (
-        <div className="border-2 border-gray-300 rounded-lg p-4 bg-black">
+        <div className="border border-border rounded-xl p-4 bg-card">
           <div className="relative">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               className="w-full rounded-lg"
-              style={{ maxHeight: '500px', objectFit: 'contain' }}
+              style={{ maxHeight: '400px', objectFit: 'contain' }}
             />
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-3">
               <button
                 onClick={stopCamera}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={capturePhoto}
-                className="w-16 h-16 bg-white rounded-full border-4 border-gray-300 hover:border-gray-400 transition-colors flex items-center justify-center"
+                className="w-14 h-14 gradient-button rounded-full border-4 border-background flex items-center justify-center shadow-lg"
               >
-                <div className="w-12 h-12 bg-white rounded-full border-2 border-gray-400"></div>
+                <div className="w-10 h-10 bg-primary-foreground rounded-full"></div>
               </button>
               {navigator.mediaDevices && navigator.mediaDevices.enumerateDevices && (
                 <button
                   onClick={switchCamera}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded-lg transition-colors"
                   title="Switch camera"
                 >
                   <svg
@@ -360,20 +335,20 @@ function ImageUpload({ onUpload }) {
             </div>
           </div>
           {cameraError && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm">{cameraError}</p>
+            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <p className="text-destructive text-sm">{cameraError}</p>
             </div>
           )}
         </div>
       )}
 
       {preview && !cameraActive && (
-        <div className="bg-white rounded-lg p-6">
-          <div className="border-2 border-gray-300 rounded-lg p-4 mb-4">
+        <div>
+          <div className="border border-border rounded-xl p-4 mb-4 bg-card">
             <img
               src={preview}
               alt="Preview"
-              className="w-full max-h-96 mx-auto rounded-lg object-contain"
+              className="w-full max-h-80 mx-auto rounded-lg object-contain"
             />
           </div>
           
@@ -386,17 +361,16 @@ function ImageUpload({ onUpload }) {
                 fileInputRef.current.value = ''
               }
             }}
-            className="text-gray-600 hover:text-gray-800 underline text-sm mb-4 block mx-auto text-center"
+            className="text-muted-foreground hover:text-foreground underline text-sm mb-4 block mx-auto text-center transition-colors"
           >
             Choose a different image
           </button>
 
-          {/* Check Now Button */}
           <button
             onClick={handleCheckNow}
-            className="w-full bg-[#FF6B6B] hover:bg-[#FF5252] text-white font-medium py-3 px-6 rounded-full flex items-center justify-center gap-2 transition-colors"
+            className="w-full gradient-button text-primary-foreground font-medium py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-primary/25 hover:scale-[1.02]"
           >
-            Check now
+            Check Now
             <svg
               className="w-5 h-5"
               fill="none"
@@ -415,8 +389,8 @@ function ImageUpload({ onUpload }) {
       )}
 
       {error && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">{error}</p>
+        <div className="mt-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+          <p className="text-destructive text-sm">{error}</p>
         </div>
       )}
     </div>
@@ -424,4 +398,3 @@ function ImageUpload({ onUpload }) {
 }
 
 export default ImageUpload
-
