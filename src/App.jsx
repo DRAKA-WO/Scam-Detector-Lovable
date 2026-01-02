@@ -1,0 +1,315 @@
+import { useState } from 'react'
+import ImageUpload from './components/ImageUpload'
+import UrlInput from './components/UrlInput'
+import TextInput from './components/TextInput'
+import ResultCard from './components/ResultCard'
+import ReportModal from './components/ReportModal'
+import AnalyzingSteps from './components/AnalyzingSteps'
+import { API_ENDPOINTS } from './config'
+
+function App() {
+  const [activeTab, setActiveTab] = useState('image') // 'image', 'url', or 'text'
+  const [image, setImage] = useState(null)
+  const [url, setUrl] = useState(null)
+  const [text, setText] = useState(null)
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+
+  const handleImageUpload = async (file) => {
+    setImage(file)
+    setUrl(null)
+    setText(null)
+    setResult(null)
+    setError(null)
+    setLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+
+      const response = await fetch(API_ENDPOINTS.analyze, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to analyze image')
+      }
+
+      const data = await response.json()
+      setResult(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUrlAnalyze = async (urlToAnalyze) => {
+    setUrl(urlToAnalyze)
+    setImage(null)
+    setText(null)
+    setResult(null)
+    setError(null)
+    setLoading(true)
+
+    try {
+      const response = await fetch(API_ENDPOINTS.analyzeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: urlToAnalyze }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to analyze URL')
+      }
+
+      const data = await response.json()
+      setResult(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTextAnalyze = async (textContent) => {
+    setText(textContent)
+    setImage(null)
+    setUrl(null)
+    setResult(null)
+    setError(null)
+    setLoading(true)
+
+    try {
+      const response = await fetch(API_ENDPOINTS.analyzeText, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: textContent }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to analyze text')
+      }
+
+      const data = await response.json()
+      setResult(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleNewAnalysis = () => {
+    setImage(null)
+    setUrl(null)
+    setText(null)
+    setResult(null)
+    setError(null)
+  }
+
+  const handleReportScam = () => {
+    setShowReportModal(true)
+  }
+
+  const handleConfirmReport = async (userConsent) => {
+    if ((!image && !url && !text) || !result) {
+      alert('Error: Missing source or analysis data')
+      return
+    }
+
+    setIsSubmittingReport(true)
+
+    try {
+      // Prepare form data
+      const formData = new FormData()
+      if (image) {
+        formData.append('image', image)
+      } else if (url) {
+        // For URL reports, we'll need to re-screenshot or use the source_url
+        formData.append('source_type', 'url')
+        formData.append('source_url', url)
+      } else if (text) {
+        // For text reports, we'll store the text content
+        formData.append('source_type', 'text')
+        formData.append('source_text', text)
+      }
+      
+      // Prepare analysis data
+      const analysisData = {
+        classification: result.classification,
+        content_type: result.content_type,
+        scam_type: result.scam_type || 'Unknown',
+        reasons: result.reasons || [],
+        explanation: result.explanation || '',
+        timestamp: new Date().toISOString()
+      }
+      
+      formData.append('data', JSON.stringify(analysisData))
+      formData.append('user_consent', userConsent.toString())
+
+      // Send to backend
+      const response = await fetch(API_ENDPOINTS.report, {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to submit report')
+      }
+
+      const data = await response.json()
+      
+      // Show success message
+      alert('Thank you for reporting! Your report has been submitted successfully.')
+      setShowReportModal(false)
+    } catch (err) {
+      alert(`Error submitting report: ${err.message}`)
+    } finally {
+      setIsSubmittingReport(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 className="text-5xl font-serif font-bold text-black text-center mb-8">
+          Scam Checker
+        </h1>
+
+        {!result && !loading && (
+          <div className="w-full">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 mb-6">
+              <button
+                onClick={() => setActiveTab('image')}
+                className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
+                  activeTab === 'image'
+                    ? 'text-red-600 border-b-2 border-red-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  Image
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('url')}
+                className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
+                  activeTab === 'url'
+                    ? 'text-red-600 border-b-2 border-red-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101"
+                    />
+                  </svg>
+                  URL
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('text')}
+                className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
+                  activeTab === 'text'
+                    ? 'text-red-600 border-b-2 border-red-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Text
+                </span>
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'image' && <ImageUpload onUpload={handleImageUpload} />}
+            {activeTab === 'url' && <UrlInput onAnalyze={handleUrlAnalyze} />}
+            {activeTab === 'text' && <TextInput onAnalyze={handleTextAnalyze} loading={loading} />}
+          </div>
+        )}
+
+               {loading && <AnalyzingSteps type={activeTab} />}
+
+        {error && (
+          <div className="bg-white rounded-lg border border-red-200 p-6 mb-4">
+            <p className="text-red-600">{error}</p>
+            <button
+              onClick={handleNewAnalysis}
+              className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {result && (
+          <ResultCard
+            result={result}
+            onNewAnalysis={handleNewAnalysis}
+            onReportScam={handleReportScam}
+          />
+        )}
+      </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onConfirm={handleConfirmReport}
+        isSubmitting={isSubmittingReport}
+      />
+    </div>
+  )
+}
+
+export default App
+
