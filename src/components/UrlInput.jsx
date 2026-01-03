@@ -1,31 +1,21 @@
 import { useState } from 'react'
+import { validateUrl } from '../utils/urlValidator'
 
 function UrlInput({ onAnalyze }) {
   const [url, setUrl] = useState('')
   const [error, setError] = useState(null)
 
-  const validateUrl = (urlToValidate) => {
-    setError(null)
-    
-    if (!urlToValidate || !urlToValidate.trim()) {
-      setError('Please enter a URL')
-      return false
-    }
-
-    let urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/
-    if (!urlPattern.test(urlToValidate.trim())) {
-      setError('Please enter a valid URL (e.g., example.com or https://example.com)')
-      return false
-    }
-
-    return true
-  }
-
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (validateUrl(url)) {
-      onAnalyze(url.trim())
+    setError(null)
+    
+    const validation = validateUrl(url)
+    if (!validation.isValid) {
+      setError(validation.error)
+      return
     }
+    
+    onAnalyze(url.trim())
   }
 
   const handleChange = (e) => {

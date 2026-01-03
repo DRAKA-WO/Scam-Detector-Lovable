@@ -7,6 +7,7 @@ import ResultCard from '../ResultCard'
 import ReportModal from '../ReportModal'
 import AnalyzingSteps from '../AnalyzingSteps'
 import { API_ENDPOINTS } from '../../config'
+import { handleApiError, getUserFriendlyError } from '../../utils/errorHandler'
 
 function DetectorSection() {
   const [activeTab, setActiveTab] = useState('image')
@@ -38,13 +39,13 @@ function DetectorSection() {
         body: formData,
       })
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to analyze image')
+        const errorMessage = await handleApiError(response, 'image')
+        throw new Error(errorMessage)
       }
       const data = await response.json()
       setResult(data)
     } catch (err) {
-      setError(err.message)
+      setError(getUserFriendlyError(err.message, 'image'))
     } finally {
       setLoading(false)
     }
@@ -65,13 +66,13 @@ function DetectorSection() {
         body: JSON.stringify({ url: urlToAnalyze }),
       })
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to analyze URL')
+        const errorMessage = await handleApiError(response, 'url')
+        throw new Error(errorMessage)
       }
       const data = await response.json()
       setResult(data)
     } catch (err) {
-      setError(err.message)
+      setError(getUserFriendlyError(err.message, 'url'))
     } finally {
       setLoading(false)
     }
@@ -92,13 +93,13 @@ function DetectorSection() {
         body: JSON.stringify({ text: textContent }),
       })
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to analyze text')
+        const errorMessage = await handleApiError(response, 'text')
+        throw new Error(errorMessage)
       }
       const data = await response.json()
       setResult(data)
     } catch (err) {
-      setError(err.message)
+      setError(getUserFriendlyError(err.message, 'text'))
     } finally {
       setLoading(false)
     }
@@ -148,13 +149,13 @@ function DetectorSection() {
         body: formData
       })
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to submit report')
+        const errorMessage = await handleApiError(response, 'report')
+        throw new Error(errorMessage)
       }
       alert('Thank you for reporting! Your report has been submitted successfully.')
       setShowReportModal(false)
     } catch (err) {
-      alert(`Error submitting report: ${err.message}`)
+      alert(getUserFriendlyError(err.message, 'report'))
     } finally {
       setIsSubmittingReport(false)
     }
