@@ -5,6 +5,7 @@ import FeaturesSection from './components/landing/FeaturesSection'
 import HowItWorksSection from './components/landing/HowItWorksSection'
 import FAQSection from './components/landing/FAQSection'
 import Footer from './components/landing/Footer'
+import ScrollToAnalyze from './components/landing/ScrollToAnalyze'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <FAQSection />
       </main>
       <Footer />
+      <ScrollToAnalyze />
     </div>
   )
 }
