@@ -279,7 +279,7 @@ function ImageUpload({ onUpload }) {
             </div>
             <div className="flex-1">
               <p className="text-foreground text-sm leading-relaxed">
-                <span className="font-semibold">Tip:</span> For best results, capture as much content as possible from the image. Include the full message, sender information, URLs, phone numbers, and any visible context. Screenshots of complete conversations or full email headers provide the clearest analysis.
+                <span className="font-semibold">Tip:</span> Capture as much content as possible, including the full message, sender details, URLs, phone numbers, and visible context, to improve analysis accuracy.
               </p>
             </div>
           </div>
