@@ -36,7 +36,7 @@ function UrlInput({ onAnalyze }) {
             value={url}
             onChange={handleChange}
             placeholder="https://example.com"
-            className="w-full px-4 py-4 bg-secondary border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground transition-all duration-200"
+            className="w-full px-4 py-4 dark-input rounded-xl transition-all duration-200"
           />
         </div>
 
