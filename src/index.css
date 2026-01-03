@@ -137,6 +137,11 @@
     backdrop-filter: blur(16px);
     background: hsl(var(--background) / 0.8);
   }
+
+  .tip-box {
+    background: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary) / 0.2);
+  }
 }
 
 @layer utilities {
