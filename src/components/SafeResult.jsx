@@ -2,12 +2,12 @@ function SafeResult({ result, onNewAnalysis }) {
   const { reasons, explanation } = result
 
   return (
-    <div className="bg-card backdrop-blur-xl rounded-2xl border border-border p-6 md:p-8 glow-effect">
+    <div className="bg-card backdrop-blur-xl rounded-xl sm:rounded-2xl border border-border p-4 sm:p-6 md:p-8 glow-effect">
       {/* Safe Banner */}
-      <div className="bg-green-500/20 border border-green-500/40 rounded-xl p-4 mb-6 flex items-center gap-3">
-        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+      <div className="bg-green-500/20 border border-green-500/40 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
           <svg
-            className="w-5 h-5 text-white"
+            className="w-4 h-4 sm:w-5 sm:h-5 text-white"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -20,11 +20,11 @@ function SafeResult({ result, onNewAnalysis }) {
             />
           </svg>
         </div>
-        <p className="text-white font-bold text-lg">This looks safe</p>
+        <p className="text-white font-bold text-base sm:text-lg">This looks safe</p>
       </div>
 
       {/* Verification Steps */}
-      <div className={`space-y-6 mb-6 ${reasons.length < 3 ? 'flex flex-col items-center' : ''}`}>
+      <div className={`space-y-4 sm:space-y-6 mb-4 sm:mb-6 ${reasons.length < 3 ? 'flex flex-col items-center' : ''}`}>
         {reasons.slice(0, 3).map((reason, index) => {
           const parts = reason.split(':')
           let heading = parts.length > 1 ? parts[0].trim() : 'Verification Step'
@@ -39,11 +39,11 @@ function SafeResult({ result, onNewAnalysis }) {
           }
           
           return (
-            <div key={index} className={`flex gap-4 ${reasons.length < 3 ? 'w-full max-w-2xl' : ''}`}>
+            <div key={index} className={`flex gap-3 sm:gap-4 ${reasons.length < 3 ? 'w-full max-w-2xl' : ''}`}>
               <div className="w-1 bg-green-500 rounded-full flex-shrink-0"></div>
               <div className="flex-1">
-                <h3 className="font-semibold text-white mb-2">{heading}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{description}</p>
+                <h3 className="font-semibold text-white text-sm sm:text-base mb-1 sm:mb-2">{heading}</h3>
+                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">{description}</p>
               </div>
             </div>
           )
@@ -51,14 +51,14 @@ function SafeResult({ result, onNewAnalysis }) {
       </div>
 
       {/* Disclaimer */}
-      <p className="text-sm text-gray-500 mb-6 border-t border-gray-700 pt-6">
+      <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 border-t border-gray-700 pt-4 sm:pt-6">
         Remember: Scam Checker is a free tool to be used alongside your own research and best judgement.
       </p>
 
       {/* Action Button */}
       <button
         onClick={onNewAnalysis}
-        className="w-full gradient-button text-white font-medium py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+        className="w-full gradient-button text-white font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
       >
         Start New Analysis
         <svg

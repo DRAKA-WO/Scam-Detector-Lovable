@@ -2,12 +2,12 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
   const { reasons, explanation, verification_steps } = result
 
   return (
-    <div className="bg-card backdrop-blur-xl rounded-2xl border border-border p-6 md:p-8 glow-effect">
+    <div className="bg-card backdrop-blur-xl rounded-xl sm:rounded-2xl border border-border p-4 sm:p-6 md:p-8 glow-effect">
       {/* Suspicious Banner */}
-      <div className="bg-orange-500/20 border border-orange-500/40 rounded-xl p-4 mb-6 flex items-center gap-3">
-        <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+      <div className="bg-orange-500/20 border border-orange-500/40 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
           <svg
-            className="w-5 h-5 text-white"
+            className="w-4 h-4 sm:w-5 sm:h-5 text-white"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -20,11 +20,11 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
             />
           </svg>
         </div>
-        <p className="text-white font-bold text-lg">This looks suspicious</p>
+        <p className="text-white font-bold text-base sm:text-lg">This looks suspicious</p>
       </div>
 
       {/* Warning Indicators */}
-      <div className={`space-y-6 mb-6 ${reasons.length < 3 ? 'flex flex-col items-center' : ''}`}>
+      <div className={`space-y-4 sm:space-y-6 mb-4 sm:mb-6 ${reasons.length < 3 ? 'flex flex-col items-center' : ''}`}>
         {reasons.slice(0, 3).map((reason, index) => {
           const parts = reason.split(':')
           let heading = parts.length > 1 ? parts[0].trim() : `Warning ${index + 1}`
@@ -39,11 +39,11 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
           }
           
           return (
-            <div key={index} className={`flex gap-4 ${reasons.length < 3 ? 'w-full max-w-2xl' : ''}`}>
+            <div key={index} className={`flex gap-3 sm:gap-4 ${reasons.length < 3 ? 'w-full max-w-2xl' : ''}`}>
               <div className="w-1 bg-orange-500 rounded-full flex-shrink-0"></div>
               <div className="flex-1">
-                <h3 className="font-semibold text-white mb-2">{heading}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{description}</p>
+                <h3 className="font-semibold text-white text-sm sm:text-base mb-1 sm:mb-2">{heading}</h3>
+                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">{description}</p>
               </div>
             </div>
           )
@@ -52,11 +52,11 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
 
       {/* What to Do Next - Verification Steps */}
       {verification_steps && verification_steps.length > 0 && (
-        <div className="mb-6 border-t border-gray-700 pt-6">
-          <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
-            <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+        <div className="mb-4 sm:mb-6 border-t border-gray-700 pt-4 sm:pt-6">
+          <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg sm:rounded-xl p-3 sm:p-4">
+            <h4 className="font-semibold text-white text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
               <svg
-                className="w-5 h-5 text-orange-500"
+                className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -70,9 +70,9 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
               </svg>
               What to Do Next
             </h4>
-            <ol className="space-y-2 list-decimal list-inside">
+            <ol className="space-y-1.5 sm:space-y-2 list-decimal list-inside">
               {verification_steps.slice(0, 3).map((step, index) => (
-                <li key={index} className="text-gray-400 text-sm leading-relaxed">
+                <li key={index} className="text-gray-400 text-xs sm:text-sm leading-relaxed">
                   {step}
                 </li>
               ))}
@@ -82,21 +82,21 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
       )}
 
       {/* Disclaimer */}
-      <p className="text-sm text-gray-500 mb-6 border-t border-gray-700 pt-6">
+      <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 border-t border-gray-700 pt-4 sm:pt-6">
         Remember: Scam Checker is a free tool to be used alongside your own research and best judgement.
       </p>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <button
           onClick={onReportScam}
-          className="flex-1 border-2 border-orange-500 text-orange-500 hover:bg-orange-500/10 font-medium py-3 px-6 rounded-xl transition-colors"
+          className="flex-1 border-2 border-orange-500 text-orange-500 hover:bg-orange-500/10 font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base transition-colors"
         >
           Report this scam
         </button>
         <button
           onClick={onNewAnalysis}
-          className="flex-1 gradient-button text-white font-medium py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+          className="flex-1 gradient-button text-white font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
         >
           Start New Analysis
           <svg
