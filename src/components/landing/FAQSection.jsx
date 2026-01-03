@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { useScrollAnimation } from '../../hooks/useScrollAnimation'
 
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState(null)
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: faqRef, isVisible: faqVisible } = useScrollAnimation()
 
   const faqs = [
     {
@@ -34,7 +37,12 @@ function FAQSection() {
     <section id="faq" className="py-20 relative">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center mb-16 max-w-2xl mx-auto">
+        <div 
+          ref={headerRef}
+          className={`text-center mb-16 max-w-2xl mx-auto transition-all duration-700 ${
+            headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+          }`}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
             Frequently Asked <span className="gradient-text">Questions</span>
           </h2>
@@ -44,11 +52,17 @@ function FAQSection() {
         </div>
 
         {/* FAQ List */}
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div 
+          ref={faqRef}
+          className="max-w-3xl mx-auto space-y-4"
+        >
           {faqs.map((faq, index) => (
             <div
               key={index}
-              className="bg-card/80 backdrop-blur-xl border border-border rounded-xl overflow-hidden transition-all duration-200 hover:border-primary/30"
+              className={`bg-card/80 backdrop-blur-xl border border-border rounded-xl overflow-hidden transition-all duration-500 hover:border-primary/30 ${
+                faqVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+              }`}
+              style={{ transitionDelay: faqVisible ? `${index * 100}ms` : '0ms' }}
             >
               <button
                 onClick={() => toggleFAQ(index)}
@@ -69,13 +83,17 @@ function FAQSection() {
                 </svg>
               </button>
               
-              {openIndex === index && (
+              <div 
+                className={`overflow-hidden transition-all duration-300 ${
+                  openIndex === index ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
                 <div className="px-6 pb-5">
                   <p className="text-muted-foreground leading-relaxed">
                     {faq.answer}
                   </p>
                 </div>
-              )}
+              </div>
             </div>
           ))}
         </div>

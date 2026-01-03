@@ -1,4 +1,9 @@
+import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+
 function HowItWorksSection() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: stepsRef, isVisible: stepsVisible } = useScrollAnimation()
+
   const steps = [
     {
       number: '01',
@@ -31,7 +36,12 @@ function HowItWorksSection() {
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center mb-16 max-w-2xl mx-auto">
+        <div 
+          ref={headerRef}
+          className={`text-center mb-16 max-w-2xl mx-auto transition-all duration-700 ${
+            headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+          }`}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
             How It <span className="gradient-text">Works</span>
           </h2>
@@ -41,13 +51,27 @@ function HowItWorksSection() {
         </div>
 
         {/* Steps */}
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto" ref={stepsRef}>
           <div className="grid md:grid-cols-3 gap-8">
             {steps.map((step, index) => (
-              <div key={index} className="relative text-center">
+              <div 
+                key={index} 
+                className={`relative text-center transition-all duration-700 ${
+                  stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                }`}
+                style={{ transitionDelay: stepsVisible ? `${index * 150}ms` : '0ms' }}
+              >
                 {/* Connector Line */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-gradient-to-r from-primary/50 to-transparent" />
+                  <div 
+                    className={`hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-gradient-to-r from-primary/50 to-transparent transition-all duration-1000 ${
+                      stepsVisible ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+                    }`}
+                    style={{ 
+                      transitionDelay: stepsVisible ? `${(index + 1) * 200}ms` : '0ms',
+                      transformOrigin: 'left'
+                    }}
+                  />
                 )}
                 
                 {/* Number */}

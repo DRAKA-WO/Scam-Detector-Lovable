@@ -1,4 +1,9 @@
+import { useScrollAnimation, useStaggeredAnimation } from '../../hooks/useScrollAnimation'
+
 function FeaturesSection() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: gridRef, isVisible: gridVisible } = useStaggeredAnimation()
+
   const features = [
     {
       icon: (
@@ -60,7 +65,12 @@ function FeaturesSection() {
     <section id="features" className="py-20 relative">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center mb-16 max-w-2xl mx-auto">
+        <div 
+          ref={headerRef}
+          className={`text-center mb-16 max-w-2xl mx-auto transition-all duration-700 ${
+            headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+          }`}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
             Powerful <span className="gradient-text">Features</span>
           </h2>
@@ -70,11 +80,17 @@ function FeaturesSection() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div 
+          ref={gridRef}
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto"
+        >
           {features.map((feature, index) => (
             <div
               key={index}
-              className="feature-card rounded-2xl p-6"
+              className={`feature-card rounded-2xl p-6 transition-all duration-500 ${
+                gridVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              }`}
+              style={{ transitionDelay: gridVisible ? `${index * 100}ms` : '0ms' }}
             >
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
                 {feature.icon}

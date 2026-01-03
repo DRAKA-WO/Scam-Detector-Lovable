@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useScrollAnimation } from '../../hooks/useScrollAnimation'
 import ImageUpload from '../ImageUpload'
 import UrlInput from '../UrlInput'
 import TextInput from '../TextInput'
@@ -17,6 +18,9 @@ function DetectorSection() {
   const [error, setError] = useState(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
 
   const handleImageUpload = async (file) => {
     setImage(file)
@@ -189,7 +193,12 @@ function DetectorSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-2xl mx-auto">
           {/* Section Header */}
-          <div className="text-center mb-10">
+          <div 
+            ref={headerRef}
+            className={`text-center mb-10 transition-all duration-700 ${
+              headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}
+          >
             <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
               <span className="gradient-text">Analyze</span> Any Content
             </h2>
@@ -199,7 +208,12 @@ function DetectorSection() {
           </div>
 
           {!result && !loading && (
-            <div className="bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-6 md:p-8 glow-effect gradient-border">
+            <div 
+              ref={cardRef}
+              className={`bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-6 md:p-8 glow-effect gradient-border transition-all duration-700 delay-150 ${
+                cardVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+              }`}
+            >
               {/* Tabs */}
               <div className="flex bg-secondary rounded-xl p-1 mb-6">
                 {tabs.map((tab) => (
@@ -230,7 +244,7 @@ function DetectorSection() {
           {loading && <AnalyzingSteps type={activeTab} />}
 
           {error && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 backdrop-blur-xl">
+            <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 backdrop-blur-xl animate-fade-in">
               <p className="text-destructive mb-4">{error}</p>
               <button
                 onClick={handleNewAnalysis}
@@ -242,11 +256,13 @@ function DetectorSection() {
           )}
 
           {result && (
-            <ResultCard
-              result={result}
-              onNewAnalysis={handleNewAnalysis}
-              onReportScam={handleReportScam}
-            />
+            <div className="animate-fade-in">
+              <ResultCard
+                result={result}
+                onNewAnalysis={handleNewAnalysis}
+                onReportScam={handleReportScam}
+              />
+            </div>
           )}
         </div>
       </div>
