@@ -15,19 +15,16 @@ function TextInput({ onAnalyze, loading }) {
     <div className="w-full">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="text-input" className="block text-sm font-medium text-foreground mb-2">
-            Paste text content
-          </label>
           <textarea
             id="text-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste email content, message text, or any suspicious text here..."
-            className="w-full px-4 py-4 bg-secondary border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground resize-none transition-all duration-200"
+            className="w-full px-4 py-4 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary resize-none transition-all duration-200 dark-input"
             rows={8}
             disabled={loading}
           />
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="tip-box">
             Tip: Include the full text with sender info and links for best results.
           </p>
         </div>
