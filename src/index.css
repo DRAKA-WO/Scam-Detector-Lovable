@@ -47,12 +47,14 @@
     border-color: hsl(var(--border));
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
 
-  body {
-    background-color: hsl(var(--background));
+body {
+  background-color: hsl(var(--background));
+  overflow-x: hidden;
     color: hsl(var(--foreground));
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;

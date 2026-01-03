@@ -8,7 +8,7 @@ function HeroSection() {
   const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation()
 
   return (
-    <section className="relative pt-32 pb-16 overflow-hidden">
+    <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div 
@@ -98,21 +98,21 @@ function HeroSection() {
           {/* Stats */}
           <div 
             ref={statsRef}
-            className={`mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto transition-all duration-700 delay-500 ${
+            className={`mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto transition-all duration-700 delay-500 ${
               statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
             }`}
           >
-            <div>
-              <div className="font-display text-3xl sm:text-4xl font-bold gradient-text">50K+</div>
-              <div className="text-sm text-muted-foreground mt-1">Scans Performed</div>
+            <div className="text-center">
+              <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">50K+</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-1">Scans Performed</div>
             </div>
-            <div>
-              <div className="font-display text-3xl sm:text-4xl font-bold gradient-text">99%</div>
-              <div className="text-sm text-muted-foreground mt-1">Detection Rate</div>
+            <div className="text-center">
+              <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">99%</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-1">Detection Rate</div>
             </div>
-            <div>
-              <div className="font-display text-3xl sm:text-4xl font-bold gradient-text">Free</div>
-              <div className="text-sm text-muted-foreground mt-1">To Use</div>
+            <div className="text-center">
+              <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">Free</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-1">To Use</div>
             </div>
           </div>
         </div>
