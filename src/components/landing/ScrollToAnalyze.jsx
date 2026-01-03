@@ -5,7 +5,11 @@ function ScrollToAnalyze() {
 
   useEffect(() => {
     const toggleVisibility = () => {
-      setIsVisible(window.scrollY > 400)
+      const detectorSection = document.getElementById('detector')
+      if (detectorSection) {
+        const rect = detectorSection.getBoundingClientRect()
+        setIsVisible(rect.bottom < 0)
+      }
     }
 
     window.addEventListener('scroll', toggleVisibility)
