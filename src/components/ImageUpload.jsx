@@ -263,7 +263,7 @@ function ImageUpload({ onUpload }) {
           </div>
 
           {/* Tip Notice */}
-          <div className="mt-6 bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
+          <div className="mt-6 tip-box rounded-xl p-4 flex items-start gap-3">
             <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg
                 className="w-4 h-4 text-primary-foreground"
