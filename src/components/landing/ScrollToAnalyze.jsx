@@ -8,7 +8,8 @@ function ScrollToAnalyze() {
       const detectorSection = document.getElementById('detector')
       if (detectorSection) {
         const rect = detectorSection.getBoundingClientRect()
-        setIsVisible(rect.bottom < 0)
+        // Show button when bottom of detector section passes viewport top
+        setIsVisible(rect.bottom < window.innerHeight * 0.3)
       }
     }
 
