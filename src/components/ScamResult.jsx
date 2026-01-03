@@ -5,7 +5,7 @@ function ScamResult({ result, onNewAnalysis, onReportScam }) {
   const nextSteps = next_steps && next_steps.length > 0 ? next_steps : getScamNextSteps(scam_type)
 
   return (
-    <div className="bg-card backdrop-blur-xl rounded-xl sm:rounded-2xl border border-border p-4 sm:p-6 md:p-8 glow-effect">
+    <div className="bg-card backdrop-blur-xl rounded-xl sm:rounded-2xl border border-border p-4 sm:p-6 md:p-8 glow-effect animate-fade-in">
       {/* Scam Banner */}
       <div className="bg-red-500/20 border border-red-500/40 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
         <div className="w-7 h-7 sm:w-8 sm:h-8 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
