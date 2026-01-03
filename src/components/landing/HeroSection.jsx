@@ -1,4 +1,12 @@
+import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+
 function HeroSection() {
+  const { ref: badgeRef, isVisible: badgeVisible } = useScrollAnimation()
+  const { ref: headingRef, isVisible: headingVisible } = useScrollAnimation()
+  const { ref: subtitleRef, isVisible: subtitleVisible } = useScrollAnimation()
+  const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation()
+  const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation()
+
   return (
     <section className="relative pt-32 pb-16 overflow-hidden">
       {/* Background Effects */}
@@ -26,13 +34,23 @@ function HeroSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8">
+          <div 
+            ref={badgeRef}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8 transition-all duration-700 ${
+              badgeVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-sm text-muted-foreground">AI-Powered Protection</span>
           </div>
 
           {/* Main Heading */}
-          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
+          <h1 
+            ref={headingRef}
+            className={`font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 transition-all duration-700 delay-100 ${
+              headingVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}
+          >
             Detect Scams{' '}
             <span className="gradient-text">Before</span>
             <br />
@@ -40,16 +58,26 @@ function HeroSection() {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p 
+            ref={subtitleRef}
+            className={`text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed transition-all duration-700 delay-200 ${
+              subtitleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}
+          >
             Upload suspicious images, paste URLs, or enter text messages to instantly identify 
             phishing attempts, fraud schemes, and online scams with advanced AI analysis.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div 
+            ref={ctaRef}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-300 ${
+              ctaVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}
+          >
             <a
               href="#detector"
-              className="gradient-button text-primary-foreground px-8 py-4 rounded-xl text-lg font-semibold inline-flex items-center gap-3 shadow-lg"
+              className="gradient-button text-primary-foreground px-8 py-4 rounded-xl text-lg font-semibold inline-flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"
             >
               Start Scanning
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,7 +96,12 @@ function HeroSection() {
           </div>
 
           {/* Stats */}
-          <div className="mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto">
+          <div 
+            ref={statsRef}
+            className={`mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto transition-all duration-700 delay-500 ${
+              statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}
+          >
             <div>
               <div className="font-display text-3xl sm:text-4xl font-bold gradient-text">50K+</div>
               <div className="text-sm text-muted-foreground mt-1">Scans Performed</div>

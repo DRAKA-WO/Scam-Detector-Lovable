@@ -1,6 +1,15 @@
+import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+
 function Footer() {
+  const { ref: footerRef, isVisible: footerVisible } = useScrollAnimation()
+
   return (
-    <footer className="py-12 border-t border-border">
+    <footer 
+      ref={footerRef}
+      className={`py-12 border-t border-border transition-all duration-700 ${
+        footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+      }`}
+    >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo */}
