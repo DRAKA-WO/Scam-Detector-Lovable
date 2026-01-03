@@ -139,8 +139,28 @@
   }
 
   .tip-box {
-    background: hsl(var(--primary) / 0.1);
-    border: 1px solid hsl(var(--primary) / 0.2);
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background-color: hsla(270, 100%, 60%, 0.1);
+    border: 1px solid hsla(270, 100%, 60%, 0.2);
+    color: hsla(270, 100%, 75%, 1);
+  }
+
+  .dark-input {
+    background-color: hsl(240, 10%, 10%);
+    border: 1px solid hsla(270, 100%, 60%, 0.3);
+    color: hsl(0, 0%, 95%);
+  }
+
+  .dark-input::placeholder {
+    color: hsla(0, 0%, 70%, 0.6);
+  }
+
+  .dark-input:focus {
+    border-color: hsla(270, 100%, 60%, 0.6);
+    outline: none;
   }
 }
 
