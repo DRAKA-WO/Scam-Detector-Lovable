@@ -262,6 +262,28 @@ function ImageUpload({ onUpload }) {
             </div>
           </div>
 
+          {/* Tip Notice */}
+          <div className="mt-6 bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
+            <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg
+                className="w-4 h-4 text-primary-foreground"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-foreground text-sm leading-relaxed">
+                <span className="font-semibold">Tip:</span> For best results, capture as much content as possible from the image. Include the full message, sender information, URLs, phone numbers, and any visible context. Screenshots of complete conversations or full email headers provide the clearest analysis.
+              </p>
+            </div>
+          </div>
+
           <button
             onClick={selectedFile ? handleCheckNow : handleClick}
             className={`mt-6 w-full font-medium py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${
