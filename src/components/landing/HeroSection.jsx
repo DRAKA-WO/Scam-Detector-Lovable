@@ -1,4 +1,5 @@
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+import { Shield, Eye, Lock } from 'lucide-react'
 
 function HeroSection() {
   const { ref: badgeRef, isVisible: badgeVisible } = useScrollAnimation()
@@ -36,12 +37,22 @@ function HeroSection() {
           {/* Badge */}
           <div 
             ref={badgeRef}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8 transition-all duration-700 ${
+            className={`inline-flex items-center gap-3 px-4 py-2 rounded-full bg-secondary border border-border mb-8 transition-all duration-700 ${
               badgeVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}
           >
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm text-muted-foreground">AI-Powered Protection</span>
+            <div className="flex -space-x-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-2 ring-background">
+                <Shield className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center ring-2 ring-background">
+                <Eye className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center ring-2 ring-background">
+                <Lock className="w-3.5 h-3.5 text-white" />
+              </div>
+            </div>
+            <span className="text-sm font-medium text-foreground">AI-Powered Protection</span>
           </div>
 
           {/* Main Heading */}
