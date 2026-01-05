@@ -1,5 +1,5 @@
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
-import { Shield, Eye, Lock } from 'lucide-react'
+import { User, UserRound, Users } from 'lucide-react'
 
 function HeroSection() {
   const { ref: badgeRef, isVisible: badgeVisible } = useScrollAnimation()
@@ -43,16 +43,16 @@ function HeroSection() {
           >
             <div className="flex -space-x-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-2 ring-background">
-                <Shield className="w-3.5 h-3.5 text-white" />
+                <User className="w-3.5 h-3.5 text-white" />
               </div>
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center ring-2 ring-background">
-                <Eye className="w-3.5 h-3.5 text-white" />
+                <UserRound className="w-3.5 h-3.5 text-white" />
               </div>
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center ring-2 ring-background">
-                <Lock className="w-3.5 h-3.5 text-white" />
+                <Users className="w-3.5 h-3.5 text-white" />
               </div>
             </div>
-            <span className="text-sm font-medium text-foreground">AI-Powered Protection</span>
+            <span className="text-sm font-medium text-foreground">Trusted by All Ages</span>
           </div>
 
           {/* Main Heading */}
