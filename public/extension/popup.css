@@ -388,3 +388,190 @@ body {
 .hidden {
   display: none;
 }
+
+/* ========================================
+   Analysis Steps Modal
+   ======================================== */
+.analysis-modal {
+  padding: 24px 20px;
+}
+
+.analysis-modal h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: hsl(0, 0%, 95%);
+  margin-bottom: 24px;
+}
+
+.analysis-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid hsl(260, 30%, 20%);
+}
+
+.analysis-step:last-of-type {
+  border-bottom: none;
+}
+
+.step-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-icon.completed {
+  background: linear-gradient(135deg, hsl(280, 70%, 50%) 0%, hsl(320, 70%, 45%) 100%);
+}
+
+.step-icon.completed svg {
+  width: 14px;
+  height: 14px;
+  color: white;
+}
+
+.step-icon.loading {
+  border: 2px solid hsl(260, 30%, 25%);
+  border-top: 2px solid hsl(280, 70%, 55%);
+  animation: spin 1s linear infinite;
+}
+
+.step-icon.pending {
+  background: hsl(260, 30%, 20%);
+  border: 1px solid hsl(260, 30%, 30%);
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(0, 0%, 92%);
+  margin-bottom: 4px;
+}
+
+.step-content p {
+  font-size: 12px;
+  color: hsl(260, 20%, 55%);
+  line-height: 1.4;
+}
+
+.cancel-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 20px;
+  background: linear-gradient(135deg, hsl(280, 70%, 50%) 0%, hsl(320, 70%, 45%) 100%);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px hsla(280, 70%, 50%, 0.25);
+}
+
+.cancel-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px hsla(280, 70%, 50%, 0.35);
+}
+
+/* ========================================
+   Toast Notifications (Browser Notifications Style)
+   ======================================== */
+.toast-notification {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 320px;
+  padding: 16px;
+  background: hsl(260, 35%, 15%);
+  border: 1px solid hsl(260, 30%, 25%);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px hsla(260, 50%, 10%, 0.5);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-icon.loading {
+  border: 2px solid hsl(260, 30%, 25%);
+  border-top: 2px solid hsl(280, 70%, 55%);
+  animation: spin 1s linear infinite;
+}
+
+.toast-icon.success {
+  background: linear-gradient(135deg, hsl(160, 60%, 40%) 0%, hsl(160, 70%, 35%) 100%);
+}
+
+.toast-icon.success svg {
+  width: 14px;
+  height: 14px;
+  color: white;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(0, 0%, 95%);
+  margin-bottom: 4px;
+}
+
+.toast-content p {
+  font-size: 12px;
+  color: hsl(260, 20%, 60%);
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: hsl(260, 20%, 50%);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s ease;
+}
+
+.toast-close:hover {
+  color: hsl(260, 20%, 75%);
+}
+
+.toast-close svg {
+  width: 16px;
+  height: 16px;
+}
