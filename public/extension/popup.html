@@ -119,11 +119,78 @@
       <p>Analyzing content...</p>
     </div>
 
+    <!-- Analysis Steps Modal -->
+    <div id="analysis-modal" class="analysis-modal hidden">
+      <h2>Analysing...</h2>
+      
+      <div class="analysis-step" id="step-capture">
+        <div class="step-icon pending" id="step-capture-icon"></div>
+        <div class="step-content">
+          <h3>Capturing selection</h3>
+          <p>Processing the selected area you've chosen.</p>
+        </div>
+      </div>
+
+      <div class="analysis-step" id="step-analyze">
+        <div class="step-icon pending" id="step-analyze-icon"></div>
+        <div class="step-content">
+          <h3>Analyzing content</h3>
+          <p>Examining text, URLs, sender information, and visual elements.</p>
+        </div>
+      </div>
+
+      <div class="analysis-step" id="step-flags">
+        <div class="step-icon pending" id="step-flags-icon"></div>
+        <div class="step-content">
+          <h3>Checking for red flags</h3>
+          <p>Identifying markers of scams, phishing, and impersonation attempts.</p>
+        </div>
+      </div>
+
+      <div class="analysis-step" id="step-report">
+        <div class="step-icon pending" id="step-report-icon"></div>
+        <div class="step-content">
+          <h3>Generating report</h3>
+          <p>Preparing your detailed analysis and recommendations.</p>
+        </div>
+      </div>
+
+      <button class="cancel-btn" id="cancel-analysis-btn">Cancel Analysis</button>
+    </div>
+
     <!-- Results -->
     <div id="results" class="results hidden"></div>
 
     <!-- Error Message -->
     <div id="error" class="error hidden"></div>
+  </div>
+
+  <!-- Toast Notification: In Progress -->
+  <div id="toast-progress" class="toast-notification hidden">
+    <div class="toast-icon loading"></div>
+    <div class="toast-content">
+      <h4>Analysis in progress</h4>
+      <p>We will notify you once results are ready</p>
+    </div>
+  </div>
+
+  <!-- Toast Notification: Complete -->
+  <div id="toast-complete" class="toast-notification hidden">
+    <div class="toast-icon success">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div class="toast-content">
+      <h4>Analysis complete!</h4>
+      <p>Click the extension icon to view results</p>
+    </div>
+    <button class="toast-close" id="toast-close-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
   </div>
 
   <script src="popup.js"></script>
