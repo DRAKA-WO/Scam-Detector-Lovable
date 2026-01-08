@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import React from 'react'
+
+const { useEffect, useRef, useState } = React
 
 export function useScrollAnimation(options = {}) {
   const ref = useRef(null)
