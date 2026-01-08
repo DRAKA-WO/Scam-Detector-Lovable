@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
 import ImageUpload from '../ImageUpload'
 import UrlInput from '../UrlInput'
 import TextInput from '../TextInput'
 import ResultCard from '../ResultCard'
 import ReportModal from '../ReportModal'
+import SignupModal from '../SignupModal'
 import AnalyzingSteps from '../AnalyzingSteps'
 import { API_ENDPOINTS } from '../../config'
 import { handleApiError, getUserFriendlyError } from '../../utils/errorHandler'
+import { getRemainingFreeChecks, useFreeCheck, isUserLoggedIn } from '../../utils/checkLimits'
+import { supabase } from '@/integrations/supabase/client'
 
 function DetectorSection() {
   const [activeTab, setActiveTab] = useState('image')
@@ -18,12 +21,90 @@ function DetectorSection() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [showSignupModal, setShowSignupModal] = useState(false)
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+  const [remainingChecks, setRemainingChecks] = useState(getRemainingFreeChecks())
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
   const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
 
+  // Check authentication status on mount and when it changes
+  useEffect(() => {
+    const checkAuth = async () => {
+      const loggedIn = await isUserLoggedIn()
+      setIsLoggedIn(loggedIn)
+      if (!loggedIn) {
+        setRemainingChecks(getRemainingFreeChecks())
+      }
+    }
+    
+    checkAuth()
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session)
+      if (session) {
+        setShowSignupModal(false)
+      } else {
+        setRemainingChecks(getRemainingFreeChecks())
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // Check if user can perform analysis
+  const canPerformAnalysis = () => {
+    if (isLoggedIn) {
+      // Logged-in users have unlimited or subscription-based checks
+      // TODO: Check subscription status from backend
+      return true
+    }
+    return remainingChecks > 0
+  }
+
+  // Show signup modal if needed
+  const checkAndShowSignup = () => {
+    if (!isLoggedIn && remainingChecks === 0) {
+      setShowSignupModal(true)
+      return false
+    }
+    return true
+  }
+
+  // Handle signup/login
+  const handleSignup = async (method) => {
+    try {
+      if (method === 'google') {
+        // Google OAuth signup
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + window.location.pathname + '#detector'
+          }
+        })
+        if (error) throw error
+      } else if (method === 'email') {
+        // TODO: Show email signup form or redirect to signup page
+        // For now, redirect to a signup page or show email form
+        alert('Email signup coming soon! Please use Google signup for now.')
+      } else if (method === 'login') {
+        // TODO: Show login form or redirect to login page
+        alert('Login page coming soon! Please use Google signup for now.')
+      }
+    } catch (error) {
+      console.error('Signup error:', error)
+      alert('Error during signup. Please try again.')
+    }
+  }
+
   const handleImageUpload = async (file) => {
+    // Check if user can perform analysis
+    if (!checkAndShowSignup()) return
+
     setImage(file)
     setUrl(null)
     setText(null)
@@ -32,6 +113,12 @@ function DetectorSection() {
     setLoading(true)
 
     try {
+      // Use a free check if not logged in
+      if (!isLoggedIn) {
+        useFreeCheck()
+        setRemainingChecks(getRemainingFreeChecks())
+      }
+
       const formData = new FormData()
       formData.append('image', file)
       const response = await fetch(API_ENDPOINTS.analyze, {
@@ -52,6 +139,9 @@ function DetectorSection() {
   }
 
   const handleUrlAnalyze = async (urlToAnalyze) => {
+    // Check if user can perform analysis
+    if (!checkAndShowSignup()) return
+
     setUrl(urlToAnalyze)
     setImage(null)
     setText(null)
@@ -60,6 +150,12 @@ function DetectorSection() {
     setLoading(true)
 
     try {
+      // Use a free check if not logged in
+      if (!isLoggedIn) {
+        useFreeCheck()
+        setRemainingChecks(getRemainingFreeChecks())
+      }
+
       const response = await fetch(API_ENDPOINTS.analyzeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,6 +175,9 @@ function DetectorSection() {
   }
 
   const handleTextAnalyze = async (textContent) => {
+    // Check if user can perform analysis
+    if (!checkAndShowSignup()) return
+
     setText(textContent)
     setImage(null)
     setUrl(null)
@@ -87,6 +186,12 @@ function DetectorSection() {
     setLoading(true)
 
     try {
+      // Use a free check if not logged in
+      if (!isLoggedIn) {
+        useFreeCheck()
+        setRemainingChecks(getRemainingFreeChecks())
+      }
+
       const response = await fetch(API_ENDPOINTS.analyzeText, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,6 +313,20 @@ function DetectorSection() {
             </p>
           </div>
 
+          {/* Show remaining checks banner if not logged in */}
+          {!isLoggedIn && (
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6 animate-fade-in">
+              <p className="text-blue-800 dark:text-blue-200 text-center text-sm">
+                <strong>Free checks remaining: {remainingChecks}</strong>
+                {remainingChecks === 0 && (
+                  <span className="ml-2 text-blue-600 dark:text-blue-300">
+                    Sign up to continue analyzing
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
           {!result && !loading && (
             <div 
               ref={cardRef}
@@ -273,6 +392,13 @@ function DetectorSection() {
         onClose={() => setShowReportModal(false)}
         onConfirm={handleConfirmReport}
         isSubmitting={isSubmittingReport}
+      />
+
+      <SignupModal
+        isOpen={showSignupModal}
+        onClose={() => setShowSignupModal(false)}
+        onSignup={handleSignup}
+        remainingChecks={remainingChecks}
       />
     </section>
   )
