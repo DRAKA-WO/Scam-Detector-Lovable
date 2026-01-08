@@ -33,9 +33,12 @@ function DetectorSection() {
   useEffect(() => {
     const checkAuth = async () => {
       const loggedIn = await isUserLoggedIn()
+      console.log('🔐 Auth check on mount:', { loggedIn })
       setIsLoggedIn(loggedIn)
       if (!loggedIn) {
-        setRemainingChecks(getRemainingFreeChecks())
+        const checks = getRemainingFreeChecks()
+        console.log('📊 Initial remaining checks:', checks)
+        setRemainingChecks(checks)
       }
     }
     
@@ -43,11 +46,15 @@ function DetectorSection() {
     
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session)
+      const loggedIn = !!session
+      console.log('🔐 Auth state changed:', { event: _event, loggedIn })
+      setIsLoggedIn(loggedIn)
       if (session) {
         setShowSignupModal(false)
       } else {
-        setRemainingChecks(getRemainingFreeChecks())
+        const checks = getRemainingFreeChecks()
+        console.log('📊 Remaining checks after logout:', checks)
+        setRemainingChecks(checks)
       }
     })
 
