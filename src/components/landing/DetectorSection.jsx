@@ -68,10 +68,20 @@ function DetectorSection() {
 
   // Show signup modal if needed
   const checkAndShowSignup = () => {
-    if (!isLoggedIn && remainingChecks === 0) {
+    if (isLoggedIn) {
+      return true // Logged-in users can always proceed
+    }
+    
+    // Check localStorage directly to get the most current value
+    const currentRemaining = getRemainingFreeChecks()
+    
+    // If no checks remaining, show modal and block
+    if (currentRemaining === 0) {
       setShowSignupModal(true)
+      setRemainingChecks(0) // Sync state
       return false
     }
+    
     return true
   }
 
@@ -102,7 +112,7 @@ function DetectorSection() {
   }
 
   const handleImageUpload = async (file) => {
-    // Check if user can perform analysis
+    // Check BEFORE using check - if no checks remaining, show modal and block
     if (!checkAndShowSignup()) return
 
     setImage(file)
@@ -113,10 +123,12 @@ function DetectorSection() {
     setLoading(true)
 
     try {
-      // Use a free check if not logged in
+      // Use a free check if not logged in (this decrements the counter)
       if (!isLoggedIn) {
         useFreeCheck()
-        setRemainingChecks(getRemainingFreeChecks())
+        // Immediately update state with new remaining count
+        const newRemaining = getRemainingFreeChecks()
+        setRemainingChecks(newRemaining)
       }
 
       const formData = new FormData()
@@ -139,7 +151,7 @@ function DetectorSection() {
   }
 
   const handleUrlAnalyze = async (urlToAnalyze) => {
-    // Check if user can perform analysis
+    // Check BEFORE using check - if no checks remaining, show modal and block
     if (!checkAndShowSignup()) return
 
     setUrl(urlToAnalyze)
@@ -150,10 +162,12 @@ function DetectorSection() {
     setLoading(true)
 
     try {
-      // Use a free check if not logged in
+      // Use a free check if not logged in (this decrements the counter)
       if (!isLoggedIn) {
         useFreeCheck()
-        setRemainingChecks(getRemainingFreeChecks())
+        // Immediately update state with new remaining count
+        const newRemaining = getRemainingFreeChecks()
+        setRemainingChecks(newRemaining)
       }
 
       const response = await fetch(API_ENDPOINTS.analyzeUrl, {
@@ -175,7 +189,7 @@ function DetectorSection() {
   }
 
   const handleTextAnalyze = async (textContent) => {
-    // Check if user can perform analysis
+    // Check BEFORE using check - if no checks remaining, show modal and block
     if (!checkAndShowSignup()) return
 
     setText(textContent)
@@ -186,10 +200,12 @@ function DetectorSection() {
     setLoading(true)
 
     try {
-      // Use a free check if not logged in
+      // Use a free check if not logged in (this decrements the counter)
       if (!isLoggedIn) {
         useFreeCheck()
-        setRemainingChecks(getRemainingFreeChecks())
+        // Immediately update state with new remaining count
+        const newRemaining = getRemainingFreeChecks()
+        setRemainingChecks(newRemaining)
       }
 
       const response = await fetch(API_ENDPOINTS.analyzeText, {
