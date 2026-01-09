@@ -138,12 +138,12 @@ function Dashboard() {
         // Check session immediately first
         const hasSession = await checkSessionImmediately()
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:after-checkSession',message:'After checkSessionImmediately',data:{hasSession,mounted:mountedRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:after-checkSession',message:'After checkSessionImmediately',data:{hasSession,effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
-        if (hasSession && mountedRef.current) {
+        if (hasSession && currentEffectId === effectIdRef.current) {
           // We already have a session, we're done
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:early-return',message:'Early return - session found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:early-return',message:'Early return - session found',data:{effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
           // #endregion
           return
         }
@@ -156,39 +156,41 @@ function Dashboard() {
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
           if (!session) {
-            if (mountedRef.current && _event === 'SIGNED_OUT') {
+            if (_event === 'SIGNED_OUT') {
               console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
-            } else if (mountedRef.current && loadingRef.current) {
+            } else if (loading) {
               // If we're loading and have no session, redirect
               navigate('/')
             }
           } else {
             // We have a session - update user data
-            // Check mounted right before calling to avoid stale closures
-            if (mountedRef.current) {
-              updateUserData(session)
-            }
+            updateUserData(session)
           }
         })
         subscription = data
         
         // If we still don't have a session, check again after a short delay
         // This handles the case where Supabase is still processing
-        if (!hasSession && mountedRef.current) {
+        if (!hasSession) {
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:setting-timeout',message:'Setting timeout for retry',data:{loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:setting-timeout',message:'Setting timeout for retry',data:{effectId:currentEffectId,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
           // #endregion
           setTimeout(async () => {
-            if (mountedRef.current && loadingRef.current) {
+            // Check if this effect is still active
+            if (currentEffectId !== effectIdRef.current) {
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{mounted:mountedRef.current,loading:loadingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-stale',message:'Timeout callback - effect is stale',data:{effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
-              const hasSessionNow = await checkSessionImmediately()
-              if (!hasSessionNow && mountedRef.current) {
-                console.log('📊 Dashboard: No session found after delay, redirecting')
-                navigate('/')
-              }
+              return
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{effectId:currentEffectId,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
+            const hasSessionNow = await checkSessionImmediately()
+            if (!hasSessionNow && currentEffectId === effectIdRef.current) {
+              console.log('📊 Dashboard: No session found after delay, redirecting')
+              navigate('/')
             }
           }, 1000)
         }
@@ -196,28 +198,28 @@ function Dashboard() {
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:error',message:'Error in setupAuthListener',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:error',message:'Error in setupAuthListener',data:{error:error?.message,effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
-        if (mountedRef.current) {
-          // On error, try one more time after a delay
-          setTimeout(async () => {
-            if (mountedRef.current && loadingRef.current) {
-              const hasSession = await checkSessionImmediately()
-              if (!hasSession && mountedRef.current) {
-                setLoading(false)
-                loadingRef.current = false
-                navigate('/')
-              }
-            }
-          }, 1500)
-        }
+        // On error, try one more time after a delay
+        setTimeout(async () => {
+          if (currentEffectId !== effectIdRef.current) return
+          const hasSession = await checkSessionImmediately()
+          if (!hasSession && currentEffectId === effectIdRef.current) {
+            setLoading(false)
+            navigate('/')
+          }
+        }, 1500)
       }
     }
 
     setupAuthListener()
     
     return () => {
-      mountedRef.current = false
+      // Increment effect ID to invalidate any pending async operations
+      effectIdRef.current++
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:cleanup',message:'useEffect cleanup',data:{effectId:currentEffectId,newEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       if (subscription) {
         subscription.unsubscribe()
       }
