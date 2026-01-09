@@ -7,6 +7,7 @@ function UrlInput({ onAnalyze }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    console.log('🔗 UrlInput handleSubmit called', { url, hasOnAnalyze: !!onAnalyze })
     setError(null)
     
     const validation = validateUrl(url)
@@ -15,6 +16,7 @@ function UrlInput({ onAnalyze }) {
       return
     }
     
+    console.log('✅ URL validated, calling onAnalyze')
     onAnalyze(url.trim())
   }
 

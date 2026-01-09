@@ -126,8 +126,8 @@ function DetectorSection() {
       const userChecks = getRemainingUserChecks(userId)
       console.log('📊 User checks:', userChecks)
       if (userChecks === 0) {
-        console.log('🚫 No user checks remaining')
-        // Logged-in users with no checks - could show upgrade modal
+        console.log('🚫 No user checks remaining - showing upgrade message')
+        alert('You have no checks remaining. Please upgrade your account for more checks.')
         return false
       }
       console.log('✅ User has checks, allowing analysis')

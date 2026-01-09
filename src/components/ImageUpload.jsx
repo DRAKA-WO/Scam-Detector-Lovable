@@ -150,8 +150,12 @@ function ImageUpload({ onUpload }) {
   }
 
   const handleCheckNow = () => {
+    console.log('🖼️ ImageUpload handleCheckNow called', { selectedFile, hasOnUpload: !!onUpload })
     if (selectedFile && validateFile(selectedFile)) {
+      console.log('✅ File validated, calling onUpload')
       onUpload(selectedFile)
+    } else {
+      console.warn('⚠️ File validation failed or no file selected')
     }
   }
 
