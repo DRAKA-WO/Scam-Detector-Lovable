@@ -155,8 +155,15 @@ function Dashboard() {
         
         // Set up listener for future changes
         const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+          // Check if this effect is still active before processing
+          if (currentEffectId !== effectIdRef.current) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:onAuthStateChange:stale',message:'Auth state change - effect is stale, ignoring',data:{event:_event,effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            return
+          }
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:onAuthStateChange:event',message:'Auth state change event fired',data:{event:_event,hasSession:!!session,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:onAuthStateChange:event',message:'Auth state change event fired',data:{event:_event,hasSession:!!session,userId:session?.user?.id,effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
           // #endregion
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
