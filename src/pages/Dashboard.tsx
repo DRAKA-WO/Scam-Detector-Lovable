@@ -180,17 +180,33 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background" style={{ backgroundColor: '#0a0a0a', color: '#ffffff' }}>
+    <div 
+      className="min-h-screen bg-background" 
+      style={{ 
+        minHeight: '100vh',
+        backgroundColor: '#0a0a0a', 
+        color: '#ffffff',
+        paddingTop: '64px'
+      }}
+    >
       <Header />
-      <main className="container mx-auto px-4 py-8 max-w-7xl" style={{ paddingTop: '80px' }}>
+      <main 
+        className="container mx-auto px-4 py-8 max-w-7xl" 
+        style={{ 
+          maxWidth: '1280px',
+          margin: '0 auto',
+          padding: '32px 16px',
+          color: '#ffffff'
+        }}
+      >
         {/* Welcome Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div>
-              <h1 className="text-4xl font-bold mb-2">
+              <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff' }}>
                 Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! 👋
               </h1>
-              <p className="text-muted-foreground">
+              <p style={{ color: '#a1a1aa' }}>
                 Manage your scam detection activity and track your protection stats
               </p>
             </div>
