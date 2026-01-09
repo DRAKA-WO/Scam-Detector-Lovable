@@ -24,6 +24,9 @@ function Dashboard() {
     let subscription = null
     let sessionReceived = false
     
+    // Check if we're coming from OAuth redirect (has hash fragments)
+    const isOAuthRedirect = window.location.hash && window.location.hash.includes('access_token')
+    
     // Helper to update user data
     const updateUserData = (session) => {
       if (!mounted || !session?.user) return
@@ -43,16 +46,22 @@ function Dashboard() {
       
       setLoading(false)
       sessionReceived = true
+      
+      // Clear hash if it exists
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname)
+      }
     }
     
     // Set up auth listener FIRST - this is the most reliable way
     const setupAuthListener = async () => {
       try {
-        console.log('📊 Dashboard: Setting up auth listener...')
+        console.log('📊 Dashboard: Setting up auth listener...', { isOAuthRedirect })
         const { supabase } = await import('@/integrations/supabase/client')
         
-        // Wait a bit for Supabase to initialize
-        await new Promise(resolve => setTimeout(resolve, 200))
+        // If coming from OAuth redirect, wait longer for Supabase to process hash
+        const initialDelay = isOAuthRedirect ? 800 : 200
+        await new Promise(resolve => setTimeout(resolve, initialDelay))
         
         const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
@@ -69,8 +78,9 @@ function Dashboard() {
         })
         subscription = data
         
-        // Also check session directly after a short delay
-        // This handles cases where the auth state change doesn't fire immediately
+        // Also check session directly after a delay
+        // Longer delay if coming from OAuth redirect
+        const checkDelay = isOAuthRedirect ? 1000 : 500
         setTimeout(async () => {
           if (!sessionReceived && mounted) {
             try {
@@ -80,8 +90,23 @@ function Dashboard() {
               
               if (error) {
                 console.error('❌ Dashboard: Session error', error)
-                if (mounted) {
-                  setLoading(false)
+                // If OAuth redirect, wait a bit more and retry
+                if (isOAuthRedirect && mounted) {
+                  console.log('📊 Dashboard: OAuth redirect detected, retrying...')
+                  setTimeout(async () => {
+                    if (mounted && !sessionReceived) {
+                      const { data: { session: retrySession } } = await supabase.auth.getSession()
+                      if (retrySession) {
+                        updateUserData(retrySession)
+                      } else {
+                        setLoading(false)
+                      }
+                    }
+                  }, 1000)
+                } else {
+                  if (mounted) {
+                    setLoading(false)
+                  }
                 }
                 return
               }
@@ -90,9 +115,25 @@ function Dashboard() {
                 console.log('📊 Dashboard: Session found directly')
                 updateUserData(session)
               } else {
-                console.log('📊 Dashboard: No session found, redirecting')
-                if (mounted) {
-                  navigate('/')
+                // If OAuth redirect, wait more before giving up
+                if (isOAuthRedirect && mounted) {
+                  console.log('📊 Dashboard: OAuth redirect but no session yet, waiting more...')
+                  setTimeout(async () => {
+                    if (mounted && !sessionReceived) {
+                      const { data: { session: finalSession } } = await supabase.auth.getSession()
+                      if (finalSession) {
+                        updateUserData(finalSession)
+                      } else {
+                        console.log('📊 Dashboard: Still no session after OAuth redirect, redirecting')
+                        navigate('/')
+                      }
+                    }
+                  }, 1500)
+                } else {
+                  console.log('📊 Dashboard: No session found, redirecting')
+                  if (mounted) {
+                    navigate('/')
+                  }
                 }
               }
             } catch (error) {
@@ -102,7 +143,7 @@ function Dashboard() {
               }
             }
           }
-        }, 500)
+        }, checkDelay)
         
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
