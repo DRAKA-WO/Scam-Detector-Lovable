@@ -1,35 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Header from '@/components/landing/Header'
 import Footer from '@/components/landing/Footer'
 import { getRemainingUserChecks, getUserStats } from '@/utils/checkLimits'
-
-// Import UI components with error handling
-let Button, Card, CardContent, CardDescription, CardHeader, CardTitle
-try {
-  const buttonModule = require('@/components/ui/button')
-  Button = buttonModule.Button
-  const cardModule = require('@/components/ui/card')
-  Card = cardModule.Card
-  CardContent = cardModule.CardContent
-  CardDescription = cardModule.CardDescription
-  CardHeader = cardModule.CardHeader
-  CardTitle = cardModule.CardTitle
-} catch (error) {
-  console.warn('UI components not available, using fallbacks:', error)
-  // Fallback components
-  Button = ({ children, onClick, className, ...props }) => (
-    <button onClick={onClick} className={className} {...props} style={{ padding: '8px 16px', backgroundColor: '#9333ea', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-      {children}
-    </button>
-  )
-  Card = ({ children, className }) => <div className={className} style={{ backgroundColor: '#1a1a1a', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>{children}</div>
-  CardHeader = ({ children, className }) => <div className={className} style={{ marginBottom: '12px' }}>{children}</div>
-  CardTitle = ({ children, className }) => <h3 className={className} style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>{children}</h3>
-  CardDescription = ({ children, className }) => <p className={className} style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '8px' }}>{children}</p>
-  CardContent = ({ children, className }) => <div className={className}>{children}</div>
-}
 
 function Dashboard() {
   const navigate = useNavigate()
