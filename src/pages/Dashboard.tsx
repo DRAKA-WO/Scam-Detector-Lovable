@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, startTransition, flushSync } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,195 +18,83 @@ function Dashboard() {
     suspiciousResults: 0
   })
   const [loading, setLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  // Helper to update user data - use useCallback to ensure it's stable
-  const updateUserData = useCallback((session) => {
-    if (!session?.user) return false
-    
-    console.log('📊 Dashboard: Updating user data', session.user.email)
-    
-    // Get user's remaining checks
-    const checks = getRemainingUserChecks(session.user.id)
-    console.log('📊 Dashboard: User checks', checks)
-    
-    // Get user stats
-    const userStats = getUserStats(session.user.id)
-    console.log('📊 Dashboard: User stats', userStats)
-    
-    // Use flushSync to force React to process these updates immediately
-    flushSync(() => {
-      setUser(session.user)
-      setRemainingChecks(checks)
-      setStats(userStats)
-      setLoading(false)
-      setInitialized(true)
-    })
-    
-    // Clear hash if it exists
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname)
-    }
-    
-    return true
-  }, [])
-
-  // Mark component as mounted
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
-    if (!mounted) return
-    
     let isMounted = true
     let subscription = null
     
-    // Check session immediately and synchronously
-    const checkSessionImmediately = async () => {
+    const loadUserData = async () => {
       try {
-        console.log('📊 Dashboard: Checking session immediately...')
         const { supabase } = await import('@/integrations/supabase/client')
         
-        // Wait a tiny bit for Supabase to be fully ready
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
+        // Get current session
         const { data: { session }, error } = await supabase.auth.getSession()
         
-        if (error) {
-          console.error('❌ Dashboard: Session error', error)
-          return false
-        }
-        
-        if (session?.user) {
-          console.log('📊 Dashboard: Session found immediately', session.user.email)
+        if (error || !session) {
+          // Not logged in, redirect to home
           if (isMounted) {
-            updateUserData(session)
+            navigate('/')
           }
-          return true
-        }
-        
-        console.log('📊 Dashboard: No session found')
-        return false
-      } catch (error) {
-        console.error('❌ Dashboard: Error checking session', error)
-        return false
-      }
-    }
-    
-    // Set up auth listener
-    const setupAuthListener = async () => {
-      try {
-        console.log('📊 Dashboard: Setting up auth listener...')
-        const { supabase } = await import('@/integrations/supabase/client')
-        
-        // Check session immediately first - don't wait
-        const hasSession = await checkSessionImmediately()
-        if (hasSession && isMounted) {
-          // We already have a session, mark as initialized
-          console.log('📊 Dashboard: Session found, dashboard should be visible')
-          setInitialized(true)
           return
         }
-        
-        // Mark as initialized even if no session (so we can show error/redirect)
+
         if (isMounted) {
-          setInitialized(true)
-        }
-        
-        // Set up listener for future changes
-        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-          console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
+          setUser(session.user)
           
+          // Get user's remaining checks
+          const checks = getRemainingUserChecks(session.user.id)
+          setRemainingChecks(checks)
+          
+          // Get user stats
+          const userStats = getUserStats(session.user.id)
+          setStats(userStats)
+          
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error)
+        if (isMounted) {
+          navigate('/')
+        }
+      }
+    }
+
+    loadUserData()
+
+    // Listen for auth changes
+    const setupAuthListener = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
           if (!session) {
-            if (isMounted && _event === 'SIGNED_OUT') {
-              console.log('📊 Dashboard: User signed out, redirecting')
-              navigate('/')
-            } else if (isMounted && loading) {
-              // If we're still loading and have no session, redirect
-              setLoading(false)
+            if (isMounted) {
               navigate('/')
             }
           } else {
-            // We have a session - update user data
             if (isMounted) {
-              updateUserData(session)
+              setUser(session.user)
+              const checks = getRemainingUserChecks(session.user.id)
+              setRemainingChecks(checks)
+              const userStats = getUserStats(session.user.id)
+              setStats(userStats)
             }
           }
         })
         subscription = data
-        
-        // If we still don't have a session, check multiple times before giving up
-        // This handles the case where Supabase is still processing (especially after OAuth)
-        if (!hasSession && isMounted) {
-          let attempts = 0
-          const maxAttempts = 5
-          
-          const retryCheck = async () => {
-            if (!isMounted || !loading) return
-            
-            attempts++
-            console.log(`📊 Dashboard: Re-checking session (attempt ${attempts}/${maxAttempts})...`)
-            
-            const hasSessionNow = await checkSessionImmediately()
-            
-            if (hasSessionNow) {
-              // Session found, we're done
-              return
-            }
-            
-            if (attempts < maxAttempts && isMounted && loading) {
-              // Try again after a delay
-              setTimeout(retryCheck, 500)
-            } else if (isMounted) {
-              // No session after all attempts, redirect
-              console.log('📊 Dashboard: No session found after all attempts, redirecting')
-              setLoading(false)
-              navigate('/')
-            }
-          }
-          
-          // Start retrying after a short delay
-          setTimeout(retryCheck, 300)
-        }
-        
       } catch (error) {
-        console.error('❌ Dashboard: Error setting up auth listener:', error)
-        if (isMounted) {
-          // On error, try one more time after a delay
-          setTimeout(async () => {
-            if (isMounted && loading) {
-              const hasSession = await checkSessionImmediately()
-              if (!hasSession && isMounted) {
-                setLoading(false)
-                navigate('/')
-              }
-            }
-          }, 1000)
-        }
+        console.error('Error setting up auth listener:', error)
       }
     }
 
-    // Start immediately, but also add a small delay to ensure React has fully mounted
     setupAuthListener()
-    
-    // Also check after a tiny delay to catch any edge cases
-    const timeoutId = setTimeout(() => {
-      if (isMounted && loading) {
-        console.log('📊 Dashboard: Re-checking after mount delay...')
-        checkSessionImmediately()
-      }
-    }, 50)
     
     return () => {
       isMounted = false
-      clearTimeout(timeoutId)
       if (subscription) {
         subscription.unsubscribe()
       }
     }
-  }, [navigate, loading, updateUserData, mounted])
+  }, [navigate])
 
   const handleLogout = async () => {
     try {
@@ -251,8 +139,8 @@ function Dashboard() {
     )
   }
 
-  // Fallback if user is not set but loading is false and we've initialized
-  if (!loading && initialized && !user) {
+  // Fallback if user is not set but loading is false
+  if (!loading && !user) {
     return (
       <div style={{ 
         minHeight: '100vh', 
