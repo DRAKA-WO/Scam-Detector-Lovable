@@ -296,6 +296,9 @@ function Dashboard() {
 
   // Fallback if user is not set but loading is false
   if (!loading && !user) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:no-user-fallback',message:'Rendering no-user fallback',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -324,6 +327,10 @@ function Dashboard() {
       </div>
     )
   }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:main-render',message:'Rendering main dashboard content',data:{loading,hasUser:!!user,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
 
   return (
     <div 
