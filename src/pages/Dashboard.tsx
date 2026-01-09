@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -21,22 +21,23 @@ function Dashboard() {
     suspiciousResults: 0
   })
   const [loading, setLoading] = useState(true)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:entry',message:'useEffect started',data:{loading,hasUser:!!user,url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
     // #endregion
-    let mounted = true
+    mountedRef.current = true
     let subscription = null
     
     // Helper to update user data
     const updateUserData = (session) => {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:entry',message:'updateUserData called',data:{mounted,hasSession:!!session,hasUser:!!session?.user,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:entry',message:'updateUserData called',data:{mounted:mountedRef.current,hasSession:!!session,hasUser:!!session?.user,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
-      if (!mounted || !session?.user) {
+      if (!mountedRef.current || !session?.user) {
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:early-return',message:'Early return from updateUserData',data:{mounted,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:early-return',message:'Early return from updateUserData',data:{mounted:mountedRef.current,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
         // #endregion
         return false
       }
@@ -127,9 +128,9 @@ function Dashboard() {
         // Check session immediately first
         const hasSession = await checkSessionImmediately()
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:after-checkSession',message:'After checkSessionImmediately',data:{hasSession,mounted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:after-checkSession',message:'After checkSessionImmediately',data:{hasSession,mounted:mountedRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
-        if (hasSession && mounted) {
+        if (hasSession && mountedRef.current) {
           // We already have a session, we're done
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:early-return',message:'Early return - session found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
@@ -145,11 +146,11 @@ function Dashboard() {
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
           if (!session) {
-            if (mounted && _event === 'SIGNED_OUT') {
+            if (mountedRef.current && _event === 'SIGNED_OUT') {
               console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
-            } else if (mounted && !loading) {
-              // If we're not loading and have no session, redirect
+            } else if (mountedRef.current && loading) {
+              // If we're loading and have no session, redirect
               navigate('/')
             }
           } else {
@@ -161,17 +162,17 @@ function Dashboard() {
         
         // If we still don't have a session, check again after a short delay
         // This handles the case where Supabase is still processing
-        if (!hasSession && mounted) {
+        if (!hasSession && mountedRef.current) {
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:setting-timeout',message:'Setting timeout for retry',data:{loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
           // #endregion
           setTimeout(async () => {
-            if (mounted && loading) {
+            if (mountedRef.current && loading) {
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{mounted,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{mounted:mountedRef.current,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               const hasSessionNow = await checkSessionImmediately()
-              if (!hasSessionNow && mounted) {
+              if (!hasSessionNow && mountedRef.current) {
                 console.log('📊 Dashboard: No session found after delay, redirecting')
                 navigate('/')
               }
@@ -184,12 +185,12 @@ function Dashboard() {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:error',message:'Error in setupAuthListener',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
-        if (mounted) {
+        if (mountedRef.current) {
           // On error, try one more time after a delay
           setTimeout(async () => {
-            if (mounted && loading) {
+            if (mountedRef.current && loading) {
               const hasSession = await checkSessionImmediately()
-              if (!hasSession && mounted) {
+              if (!hasSession && mountedRef.current) {
                 setLoading(false)
                 navigate('/')
               }
@@ -202,12 +203,12 @@ function Dashboard() {
     setupAuthListener()
     
     return () => {
-      mounted = false
+      mountedRef.current = false
       if (subscription) {
         subscription.unsubscribe()
       }
     }
-  }, [navigate, loading])
+  }, [navigate])
 
   const handleLogout = async () => {
     try {
