@@ -124,27 +124,55 @@ function DetectorSection() {
         // Google OAuth signup - load Supabase dynamically
         try {
           const { supabase } = await import('@/integrations/supabase/client')
-          const { error } = await supabase.auth.signInWithOAuth({
+          
+          // Check if Supabase is properly configured
+          if (!supabase) {
+            throw new Error('Supabase client not initialized')
+          }
+          
+          const { error, data } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-              redirectTo: window.location.origin + window.location.pathname + '#detector'
+              redirectTo: `${window.location.origin}${window.location.pathname}#detector`
             }
           })
-          if (error) throw error
+          
+          if (error) {
+            console.error('Supabase OAuth error:', error)
+            // Check for specific error types
+            if (error.message?.includes('provider is not enabled') || 
+                error.message?.includes('Unsupported provider')) {
+              alert('Google signup is not enabled yet. Please enable Google OAuth in your Supabase project settings, or use email signup instead.')
+            } else {
+              alert(`Signup error: ${error.message || 'Please try again later.'}`)
+            }
+            return
+          }
+          
+          // If successful, the redirect will happen automatically
+          console.log('OAuth redirect initiated:', data)
         } catch (supabaseError) {
-          console.error('Supabase not available:', supabaseError)
-          alert('Google signup is not configured yet. Please contact support.')
+          console.error('Supabase error:', supabaseError)
+          // Check if it's a configuration error
+          if (supabaseError.message?.includes('provider is not enabled') ||
+              supabaseError.message?.includes('Unsupported provider')) {
+            alert('Google signup is not configured. Please enable Google OAuth in Supabase project settings.\n\nFor now, you can continue using free checks or contact support.')
+          } else if (supabaseError.message?.includes('VITE_SUPABASE')) {
+            alert('Authentication is not configured. Please set up Supabase environment variables.\n\nYou can continue using free checks for now.')
+          } else {
+            alert('Google signup is temporarily unavailable. Please try again later or use email signup.')
+          }
         }
       } else if (method === 'email') {
         // TODO: Show email signup form or redirect to signup page
-        alert('Email signup coming soon! Please use Google signup for now.')
+        alert('Email signup coming soon! For now, you can continue using your free checks.')
       } else if (method === 'login') {
         // TODO: Show login form or redirect to login page
-        alert('Login page coming soon! Please use Google signup for now.')
+        alert('Login page coming soon! For now, you can continue using your free checks.')
       }
     } catch (error) {
       console.error('Signup error:', error)
-      alert('Error during signup. Please try again.')
+      alert('An unexpected error occurred. Please try again or contact support.')
     }
   }
 
@@ -389,11 +417,19 @@ function DetectorSection() {
 
           {/* Show remaining checks banner if not logged in */}
           {!isLoggedIn && (
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6 animate-fade-in">
-              <p className="text-blue-800 dark:text-blue-200 text-center text-sm">
+            <div className={`rounded-xl p-4 mb-6 animate-fade-in border ${
+              remainingChecks === 0 
+                ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/50 dark:border-orange-400/30' 
+                : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-500/50 dark:border-blue-400/30'
+            }`}>
+              <p className={`text-center text-sm font-medium ${
+                remainingChecks === 0 
+                  ? 'text-orange-700 dark:text-orange-300' 
+                  : 'text-blue-700 dark:text-blue-300'
+              }`}>
                 <strong>Free checks remaining: {remainingChecks}</strong>
                 {remainingChecks === 0 && (
-                  <span className="ml-2 text-blue-600 dark:text-blue-300">
+                  <span className="ml-2 block mt-1 text-xs opacity-90">
                     Sign up to continue analyzing
                   </span>
                 )}
