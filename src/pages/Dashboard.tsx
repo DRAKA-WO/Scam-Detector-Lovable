@@ -19,6 +19,7 @@ function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // Helper to update user data - use useCallback to ensure it's stable
   const updateUserData = useCallback((session) => {
@@ -51,8 +52,15 @@ function Dashboard() {
     return true
   }, [])
 
+  // Mark component as mounted
   useEffect(() => {
-    let mounted = true
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    
+    let isMounted = true
     let subscription = null
     
     // Check session immediately and synchronously
@@ -69,7 +77,7 @@ function Dashboard() {
         
         if (session?.user) {
           console.log('📊 Dashboard: Session found immediately')
-          if (mounted) {
+          if (isMounted) {
             updateUserData(session)
           }
           return true
@@ -90,7 +98,7 @@ function Dashboard() {
         
         // Check session immediately first - don't wait
         const hasSession = await checkSessionImmediately()
-        if (hasSession && mounted) {
+        if (hasSession && isMounted) {
           // We already have a session, mark as initialized
           console.log('📊 Dashboard: Session found, dashboard should be visible')
           setInitialized(true)
@@ -98,7 +106,7 @@ function Dashboard() {
         }
         
         // Mark as initialized even if no session (so we can show error/redirect)
-        if (mounted) {
+        if (isMounted) {
           setInitialized(true)
         }
         
@@ -107,17 +115,17 @@ function Dashboard() {
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
           if (!session) {
-            if (mounted && _event === 'SIGNED_OUT') {
+            if (isMounted && _event === 'SIGNED_OUT') {
               console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
-            } else if (mounted && loading) {
+            } else if (isMounted && loading) {
               // If we're still loading and have no session, redirect
               setLoading(false)
               navigate('/')
             }
           } else {
             // We have a session - update user data
-            if (mounted) {
+            if (isMounted) {
               updateUserData(session)
             }
           }
@@ -126,12 +134,12 @@ function Dashboard() {
         
         // If we still don't have a session, check again after a short delay
         // This handles the case where Supabase is still processing
-        if (!hasSession && mounted) {
+        if (!hasSession && isMounted) {
           setTimeout(async () => {
-            if (mounted && loading) {
+            if (isMounted && loading) {
               console.log('📊 Dashboard: Re-checking session after delay...')
               const hasSessionNow = await checkSessionImmediately()
-              if (!hasSessionNow && mounted) {
+              if (!hasSessionNow && isMounted) {
                 console.log('📊 Dashboard: No session found after delay, redirecting')
                 setLoading(false)
                 navigate('/')
@@ -142,12 +150,12 @@ function Dashboard() {
         
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
-        if (mounted) {
+        if (isMounted) {
           // On error, try one more time after a delay
           setTimeout(async () => {
-            if (mounted && loading) {
+            if (isMounted && loading) {
               const hasSession = await checkSessionImmediately()
-              if (!hasSession && mounted) {
+              if (!hasSession && isMounted) {
                 setLoading(false)
                 navigate('/')
               }
@@ -162,20 +170,20 @@ function Dashboard() {
     
     // Also check after a tiny delay to catch any edge cases
     const timeoutId = setTimeout(() => {
-      if (mounted && loading) {
+      if (isMounted && loading) {
         console.log('📊 Dashboard: Re-checking after mount delay...')
         checkSessionImmediately()
       }
     }, 50)
     
     return () => {
-      mounted = false
+      isMounted = false
       clearTimeout(timeoutId)
       if (subscription) {
         subscription.unsubscribe()
       }
     }
-  }, [navigate, loading, updateUserData])
+  }, [navigate, loading, updateUserData, mounted])
 
   const handleLogout = async () => {
     try {
