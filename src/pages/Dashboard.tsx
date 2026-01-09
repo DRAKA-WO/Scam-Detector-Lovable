@@ -331,7 +331,7 @@ function Dashboard() {
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:render-check',message:'Render check',data:{loading,hasUser:!!user,remainingChecks,stats,hasLoaded:hasLoadedRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:render-check',message:'Render check',data:{loading,hasUser:!!user,remainingChecks,stats,hasLoaded:hasLoadedRef.current,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
   // #endregion
   
   // If we've already loaded the user, don't show loading screen even if loading is true
@@ -373,22 +373,26 @@ function Dashboard() {
   }
 
   // Fallback if user is not set but loading is false
-  // BUT: If we just came from OAuth (hash in URL or recent navigation), wait a bit longer
+  // BUT: Always check localStorage first before showing fallback (OAuth might still be processing)
   const [showFallback, setShowFallback] = useState(false)
   const oauthCheckRef = useRef(false)
   
   useEffect(() => {
-    // Check if we're coming from OAuth (hash in URL or just navigated)
-    if (!loading && !user && !oauthCheckRef.current) {
+    // Always check localStorage when we don't have a user, regardless of loading state
+    // This handles the case where OAuthCallback redirected before localStorage was written
+    if (!user && !oauthCheckRef.current) {
       oauthCheckRef.current = true
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check',message:'Checking for OAuth session in localStorage',data:{hasHash:!!window.location.hash,url:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check',message:'Checking for OAuth session in localStorage',data:{loading,hasHash:!!window.location.hash,url:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
       // #endregion
       
       // Wait a bit to see if session appears in localStorage (OAuth callback might still be processing)
       const checkForSession = (attempt = 0) => {
         // Check if user was set (might have been set by another effect)
         if (user) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check-cancelled',message:'User was set, cancelling OAuth check',data:{attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
           return
         }
         
@@ -401,7 +405,7 @@ function Dashboard() {
               const sessionUser = storedSession?.currentSession?.user || storedSession?.user
               if (sessionUser) {
                 // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-session-found',message:'Found session in localStorage, setting user',data:{userId:sessionUser.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-session-found',message:'Found session in localStorage, setting user',data:{userId:sessionUser.id,attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
                 // #endregion
                 setUser(sessionUser)
                 const checks = getRemainingUserChecks(sessionUser.id)
@@ -414,25 +418,30 @@ function Dashboard() {
               }
             }
           } catch (e) {
-            // Ignore errors
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check-error',message:'Error parsing localStorage session',data:{error:e?.message,attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
           }
         }
         
-        // Retry up to 15 times (3 seconds total)
-        if (attempt < 15) {
+        // Retry up to 20 times (4 seconds total) - increased for OAuth processing time
+        if (attempt < 20) {
           setTimeout(() => checkForSession(attempt + 1), 200)
         } else {
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-timeout',message:'No session found after waiting, showing fallback',data:{attempts:attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-timeout',message:'No session found after waiting, showing fallback',data:{attempts:attempt,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
           // #endregion
-          setShowFallback(true)
+          // Only show fallback if loading is also false
+          if (!loading) {
+            setShowFallback(true)
+          }
         }
       }
       
-      // Start checking
+      // Start checking immediately
       checkForSession()
-    } else if (!loading && !user && !oauthCheckRef.current) {
-      // Not from OAuth, show fallback immediately
+    } else if (!loading && !user && oauthCheckRef.current) {
+      // We've already checked, and still no user - show fallback
       setShowFallback(true)
     }
   }, [loading, user, getRemainingUserChecks, getUserStats])
