@@ -348,6 +348,9 @@ function Dashboard() {
   
   // If we've already loaded the user, don't show loading screen even if loading is true
   // This prevents React Strict Mode from resetting the UI
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:check-loading-condition',message:'Checking loading condition',data:{loading,hasLoaded:hasLoadedRef.current,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   if (loading && !hasLoadedRef.current) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:loading-render',message:'Rendering loading state',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
@@ -461,6 +464,9 @@ function Dashboard() {
     }
   }, [loading, user, getRemainingUserChecks, getUserStats])
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:check-fallback-condition',message:'Checking fallback condition',data:{loading,hasUser:!!user,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   if (!loading && !user && showFallback) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:no-user-fallback',message:'Rendering no-user fallback',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
@@ -495,6 +501,9 @@ function Dashboard() {
   }
   
   // If we're waiting for OAuth session, show loading
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:check-oauth-waiting',message:'Checking OAuth waiting condition',data:{loading,hasUser:!!user,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   if (!loading && !user && !showFallback) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-waiting',message:'Waiting for OAuth session to appear in localStorage',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
