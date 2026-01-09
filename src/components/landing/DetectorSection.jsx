@@ -10,7 +10,7 @@ import AnalyzingSteps from '../AnalyzingSteps'
 import { API_ENDPOINTS } from '../../config'
 import { handleApiError, getUserFriendlyError } from '../../utils/errorHandler'
 import { getRemainingFreeChecks, useFreeCheck, isUserLoggedIn } from '../../utils/checkLimits'
-import { supabase } from '@/integrations/supabase/client'
+// Supabase import removed - will be loaded dynamically to avoid build errors
 
 function DetectorSection() {
   const [activeTab, setActiveTab] = useState('image')
@@ -44,22 +44,35 @@ function DetectorSection() {
     
     checkAuth()
     
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const loggedIn = !!session
-      console.log('🔐 Auth state changed:', { event: _event, loggedIn })
-      setIsLoggedIn(loggedIn)
-      if (session) {
-        setShowSignupModal(false)
-      } else {
-        const checks = getRemainingFreeChecks()
-        console.log('📊 Remaining checks after logout:', checks)
-        setRemainingChecks(checks)
+    // Listen for auth state changes - make Supabase optional
+    let subscription = null
+    const setupAuthListener = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+          const loggedIn = !!session
+          console.log('🔐 Auth state changed:', { event: _event, loggedIn })
+          setIsLoggedIn(loggedIn)
+          if (session) {
+            setShowSignupModal(false)
+          } else {
+            const checks = getRemainingFreeChecks()
+            console.log('📊 Remaining checks after logout:', checks)
+            setRemainingChecks(checks)
+          }
+        })
+        subscription = data
+      } catch (error) {
+        console.warn('Supabase not available, auth features disabled:', error)
       }
-    })
+    }
+    
+    setupAuthListener()
 
     return () => {
-      subscription.unsubscribe()
+      if (subscription) {
+        subscription.unsubscribe()
+      }
     }
   }, [])
 
@@ -108,17 +121,22 @@ function DetectorSection() {
   const handleSignup = async (method) => {
     try {
       if (method === 'google') {
-        // Google OAuth signup
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin + window.location.pathname + '#detector'
-          }
-        })
-        if (error) throw error
+        // Google OAuth signup - load Supabase dynamically
+        try {
+          const { supabase } = await import('@/integrations/supabase/client')
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: window.location.origin + window.location.pathname + '#detector'
+            }
+          })
+          if (error) throw error
+        } catch (supabaseError) {
+          console.error('Supabase not available:', supabaseError)
+          alert('Google signup is not configured yet. Please contact support.')
+        }
       } else if (method === 'email') {
         // TODO: Show email signup form or redirect to signup page
-        // For now, redirect to a signup page or show email form
         alert('Email signup coming soon! Please use Google signup for now.')
       } else if (method === 'login') {
         // TODO: Show login form or redirect to login page
