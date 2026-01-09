@@ -33,26 +33,63 @@ const OAuthCallback = () => {
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           console.log('🔐 Auth state change event:', event, session ? 'Session received' : 'No session');
           
-          if (event === 'SIGNED_IN' && session?.user && mounted) {
+            if (event === 'SIGNED_IN' && session?.user && mounted) {
             sessionReceived = true;
             
-            // Initialize user checks (give 5 checks on signup)
-            const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-            const existingChecks = getRemainingUserChecks(session.user.id);
-            console.log('📊 Existing checks:', existingChecks);
+            // Wait for Supabase to write session to localStorage
+            const waitForLocalStorage = (attempt = 0) => {
+              const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'));
+              if (supabaseKeys.length > 0) {
+                try {
+                  const sessionStr = localStorage.getItem(supabaseKeys[0]);
+                  if (sessionStr) {
+                    const storedSession = JSON.parse(sessionStr);
+                    if (storedSession?.currentSession?.user || storedSession?.user) {
+                      console.log('✅ OAuthCallback: Session confirmed in localStorage');
+                      proceedWithRedirect();
+                      return;
+                    }
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+              
+              if (attempt < 10 && mounted) {
+                setTimeout(() => waitForLocalStorage(attempt + 1), 200);
+              } else {
+                console.log('⚠️ OAuthCallback: Proceeding without localStorage confirmation');
+                proceedWithRedirect();
+              }
+            };
             
-            if (existingChecks === 0) {
-              // New user - give them 5 checks
-              initializeUserChecks(session.user.id);
-              console.log('✅ Initialized 5 checks for new user');
-            }
+            const proceedWithRedirect = async () => {
+              // Initialize user checks (give 5 checks on signup)
+              const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+              const existingChecks = getRemainingUserChecks(session.user.id);
+              console.log('📊 Existing checks:', existingChecks);
+              
+              if (existingChecks === 0) {
+                // New user - give them 5 checks
+                initializeUserChecks(session.user.id);
+                console.log('✅ Initialized 5 checks for new user');
+              }
+              
+              // Clear hash from URL
+              window.history.replaceState(null, '', window.location.pathname);
+              
+              // Small delay to ensure everything is settled
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Redirect to dashboard
+              if (mounted) {
+                console.log('✅ Redirecting to dashboard...');
+                navigate('/dashboard', { replace: true });
+              }
+            };
             
-            // Clear hash from URL
-            window.history.replaceState(null, '', window.location.pathname);
-            
-            // Redirect to dashboard
-            console.log('✅ Redirecting to dashboard...');
-            navigate('/dashboard', { replace: true });
+            // Start waiting for localStorage
+            waitForLocalStorage();
           }
         });
         
@@ -77,24 +114,58 @@ const OAuthCallback = () => {
               console.log('✅ Session found directly');
               sessionReceived = true;
               
-              // Initialize user checks
-              const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-              const existingChecks = getRemainingUserChecks(session.user.id);
+              // Wait for Supabase to write session to localStorage
+              const waitForLocalStorage = (attempt = 0) => {
+                const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'));
+                if (supabaseKeys.length > 0) {
+                  try {
+                    const sessionStr = localStorage.getItem(supabaseKeys[0]);
+                    if (sessionStr) {
+                      const storedSession = JSON.parse(sessionStr);
+                      if (storedSession?.currentSession?.user || storedSession?.user) {
+                        console.log('✅ OAuthCallback: Session confirmed in localStorage');
+                        proceedWithRedirect();
+                        return;
+                      }
+                    }
+                  } catch (e) {
+                    // Ignore parse errors
+                  }
+                }
+                
+                if (attempt < 10 && mounted) {
+                  setTimeout(() => waitForLocalStorage(attempt + 1), 200);
+                } else {
+                  console.log('⚠️ OAuthCallback: Proceeding without localStorage confirmation');
+                  proceedWithRedirect();
+                }
+              };
               
-              if (existingChecks === 0) {
-                initializeUserChecks(session.user.id);
-                console.log('✅ Initialized 5 checks for new user');
-              }
+              const proceedWithRedirect = async () => {
+                // Initialize user checks
+                const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+                const existingChecks = getRemainingUserChecks(session.user.id);
+                
+                if (existingChecks === 0) {
+                  initializeUserChecks(session.user.id);
+                  console.log('✅ Initialized 5 checks for new user');
+                }
+                
+                // Wait a bit more to ensure everything is processed
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                // Clear hash from URL
+                window.history.replaceState(null, '', window.location.pathname);
+                
+                // Redirect to dashboard
+                if (mounted) {
+                  console.log('✅ Redirecting to dashboard...');
+                  navigate('/dashboard', { replace: true });
+                }
+              };
               
-              // Wait a bit more to ensure everything is processed
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-              // Clear hash from URL
-              window.history.replaceState(null, '', window.location.pathname);
-              
-              // Redirect to dashboard
-              console.log('✅ Redirecting to dashboard...');
-              navigate('/dashboard', { replace: true });
+              // Start waiting for localStorage
+              waitForLocalStorage();
             } else if (!session && mounted && attempt < 5) {
               // Wait longer for Supabase to process the hash (up to 5 attempts)
               console.log(`⏳ Waiting for session... (attempt ${attempt + 1}/5)`);
