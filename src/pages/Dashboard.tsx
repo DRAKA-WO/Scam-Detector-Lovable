@@ -22,12 +22,14 @@ function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
+  const loadingRef = useRef(true)
 
   useEffect(() => {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:entry',message:'useEffect started',data:{loading,hasUser:!!user,url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
     // #endregion
     mountedRef.current = true
+    loadingRef.current = loading
     let subscription = null
     
     // Helper to update user data
@@ -61,7 +63,15 @@ function Dashboard() {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setLoading',message:'Before setLoading(false)',data:{checks,stats:userStats},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
+      // Check mounted right before setState to avoid stale closures
+      if (!mountedRef.current) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setLoading-check',message:'Component unmounted before setLoading',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        return false
+      }
       setLoading(false)
+      loadingRef.current = false
       
       // Clear hash if it exists
       if (window.location.hash) {
@@ -149,13 +159,16 @@ function Dashboard() {
             if (mountedRef.current && _event === 'SIGNED_OUT') {
               console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
-            } else if (mountedRef.current && loading) {
+            } else if (mountedRef.current && loadingRef.current) {
               // If we're loading and have no session, redirect
               navigate('/')
             }
           } else {
             // We have a session - update user data
-            updateUserData(session)
+            // Check mounted right before calling to avoid stale closures
+            if (mountedRef.current) {
+              updateUserData(session)
+            }
           }
         })
         subscription = data
@@ -167,9 +180,9 @@ function Dashboard() {
           fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:setting-timeout',message:'Setting timeout for retry',data:{loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
           // #endregion
           setTimeout(async () => {
-            if (mountedRef.current && loading) {
+            if (mountedRef.current && loadingRef.current) {
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{mounted:mountedRef.current,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{mounted:mountedRef.current,loading:loadingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               const hasSessionNow = await checkSessionImmediately()
               if (!hasSessionNow && mountedRef.current) {
@@ -188,10 +201,11 @@ function Dashboard() {
         if (mountedRef.current) {
           // On error, try one more time after a delay
           setTimeout(async () => {
-            if (mountedRef.current && loading) {
+            if (mountedRef.current && loadingRef.current) {
               const hasSession = await checkSessionImmediately()
               if (!hasSession && mountedRef.current) {
                 setLoading(false)
+                loadingRef.current = false
                 navigate('/')
               }
             }
@@ -203,9 +217,18 @@ function Dashboard() {
     setupAuthListener()
     
     return () => {
-      mountedRef.current = false
+      // Only set to false on actual unmount, not on dependency changes
+      // This prevents React Strict Mode from breaking the component
+      const timeoutId = setTimeout(() => {
+        mountedRef.current = false
+      }, 0)
+      
       if (subscription) {
         subscription.unsubscribe()
+      }
+      
+      return () => {
+        clearTimeout(timeoutId)
       }
     }
   }, [navigate])
