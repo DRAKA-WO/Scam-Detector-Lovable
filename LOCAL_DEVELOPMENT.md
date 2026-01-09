@@ -1,7 +1,7 @@
 # Local Development Guide for Lovable
 
 ## Current Situation
-- ✅ Code is on GitHub: `DRAKA-WO/Scam-Checker-Lovable`
+- ✅ Code is on GitHub: `DRAKA-WO/Scam-Detector-Lovable`
 - ✅ Repository is clean and up to date
 - ❌ Lovable sync from GitHub is not working
 
