@@ -387,6 +387,11 @@ function Dashboard() {
       
       // Wait a bit to see if session appears in localStorage (OAuth callback might still be processing)
       const checkForSession = (attempt = 0) => {
+        // Check if user was set (might have been set by another effect)
+        if (user) {
+          return
+        }
+        
         const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'))
         if (supabaseKeys.length > 0) {
           try {
@@ -414,7 +419,7 @@ function Dashboard() {
         }
         
         // Retry up to 15 times (3 seconds total)
-        if (attempt < 15 && !user) {
+        if (attempt < 15) {
           setTimeout(() => checkForSession(attempt + 1), 200)
         } else {
           // #region agent log
@@ -426,11 +431,11 @@ function Dashboard() {
       
       // Start checking
       checkForSession()
-    } else if (!loading && !user) {
+    } else if (!loading && !user && !oauthCheckRef.current) {
       // Not from OAuth, show fallback immediately
       setShowFallback(true)
     }
-  }, [loading, user])
+  }, [loading, user, getRemainingUserChecks, getUserStats])
   
   if (!loading && !user && showFallback) {
     // #region agent log
