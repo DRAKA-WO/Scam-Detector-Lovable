@@ -22,14 +22,10 @@ function Dashboard() {
   useEffect(() => {
     let mounted = true
     let subscription = null
-    let sessionReceived = false
-    
-    // Check if we're coming from OAuth redirect (has hash fragments)
-    const isOAuthRedirect = window.location.hash && window.location.hash.includes('access_token')
     
     // Helper to update user data
     const updateUserData = (session) => {
-      if (!mounted || !session?.user) return
+      if (!mounted || !session?.user) return false
       
       console.log('📊 Dashboard: Updating user data', session.user.email)
       setUser(session.user)
@@ -45,30 +41,62 @@ function Dashboard() {
       setStats(userStats)
       
       setLoading(false)
-      sessionReceived = true
       
       // Clear hash if it exists
       if (window.location.hash) {
         window.history.replaceState(null, '', window.location.pathname)
       }
+      
+      return true
     }
     
-    // Set up auth listener FIRST - this is the most reliable way
+    // Check session immediately and synchronously
+    const checkSessionImmediately = async () => {
+      try {
+        console.log('📊 Dashboard: Checking session immediately...')
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('❌ Dashboard: Session error', error)
+          return false
+        }
+        
+        if (session?.user) {
+          console.log('📊 Dashboard: Session found immediately')
+          return updateUserData(session)
+        }
+        
+        return false
+      } catch (error) {
+        console.error('❌ Dashboard: Error checking session', error)
+        return false
+      }
+    }
+    
+    // Set up auth listener
     const setupAuthListener = async () => {
       try {
-        console.log('📊 Dashboard: Setting up auth listener...', { isOAuthRedirect })
+        console.log('📊 Dashboard: Setting up auth listener...')
         const { supabase } = await import('@/integrations/supabase/client')
         
-        // If coming from OAuth redirect, wait longer for Supabase to process hash
-        const initialDelay = isOAuthRedirect ? 800 : 200
-        await new Promise(resolve => setTimeout(resolve, initialDelay))
+        // Check session immediately first
+        const hasSession = await checkSessionImmediately()
+        if (hasSession && mounted) {
+          // We already have a session, we're done
+          return
+        }
         
+        // Set up listener for future changes
         const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
           if (!session) {
             if (mounted && _event === 'SIGNED_OUT') {
               console.log('📊 Dashboard: User signed out, redirecting')
+              navigate('/')
+            } else if (mounted && !loading) {
+              // If we're not loading and have no session, redirect
               navigate('/')
             }
           } else {
@@ -78,77 +106,33 @@ function Dashboard() {
         })
         subscription = data
         
-        // Also check session directly after a delay
-        // Longer delay if coming from OAuth redirect
-        const checkDelay = isOAuthRedirect ? 1000 : 500
-        setTimeout(async () => {
-          if (!sessionReceived && mounted) {
-            try {
-              console.log('📊 Dashboard: Checking session directly...')
-              const { supabase } = await import('@/integrations/supabase/client')
-              const { data: { session }, error } = await supabase.auth.getSession()
-              
-              if (error) {
-                console.error('❌ Dashboard: Session error', error)
-                // If OAuth redirect, wait a bit more and retry
-                if (isOAuthRedirect && mounted) {
-                  console.log('📊 Dashboard: OAuth redirect detected, retrying...')
-                  setTimeout(async () => {
-                    if (mounted && !sessionReceived) {
-                      const { data: { session: retrySession } } = await supabase.auth.getSession()
-                      if (retrySession) {
-                        updateUserData(retrySession)
-                      } else {
-                        setLoading(false)
-                      }
-                    }
-                  }, 1000)
-                } else {
-                  if (mounted) {
-                    setLoading(false)
-                  }
-                }
-                return
-              }
-              
-              if (session) {
-                console.log('📊 Dashboard: Session found directly')
-                updateUserData(session)
-              } else {
-                // If OAuth redirect, wait more before giving up
-                if (isOAuthRedirect && mounted) {
-                  console.log('📊 Dashboard: OAuth redirect but no session yet, waiting more...')
-                  setTimeout(async () => {
-                    if (mounted && !sessionReceived) {
-                      const { data: { session: finalSession } } = await supabase.auth.getSession()
-                      if (finalSession) {
-                        updateUserData(finalSession)
-                      } else {
-                        console.log('📊 Dashboard: Still no session after OAuth redirect, redirecting')
-                        navigate('/')
-                      }
-                    }
-                  }, 1500)
-                } else {
-                  console.log('📊 Dashboard: No session found, redirecting')
-                  if (mounted) {
-                    navigate('/')
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('❌ Dashboard: Error checking session', error)
-              if (mounted) {
-                setLoading(false)
+        // If we still don't have a session, check again after a short delay
+        // This handles the case where Supabase is still processing
+        if (!hasSession && mounted) {
+          setTimeout(async () => {
+            if (mounted && loading) {
+              const hasSessionNow = await checkSessionImmediately()
+              if (!hasSessionNow && mounted) {
+                console.log('📊 Dashboard: No session found after delay, redirecting')
+                navigate('/')
               }
             }
-          }
-        }, checkDelay)
+          }, 1000)
+        }
         
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
         if (mounted) {
-          setLoading(false)
+          // On error, try one more time after a delay
+          setTimeout(async () => {
+            if (mounted && loading) {
+              const hasSession = await checkSessionImmediately()
+              if (!hasSession && mounted) {
+                setLoading(false)
+                navigate('/')
+              }
+            }
+          }, 1500)
         }
       }
     }
@@ -161,7 +145,7 @@ function Dashboard() {
         subscription.unsubscribe()
       }
     }
-  }, [navigate])
+  }, [navigate, loading])
 
   const handleLogout = async () => {
     try {
