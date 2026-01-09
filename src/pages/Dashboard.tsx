@@ -352,6 +352,10 @@ function Dashboard() {
   fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:main-render',message:'Rendering main dashboard content',data:{loading,hasUser:!!user,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
   // #endregion
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:before-return',message:'About to return main dashboard JSX',data:{loading,hasUser:!!user,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+  
   return (
     <div 
       className="min-h-screen bg-background" 
@@ -362,6 +366,9 @@ function Dashboard() {
         paddingTop: '64px'
       }}
     >
+      {/* #region agent log */}
+      {(() => { fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:rendering-header',message:'Rendering Header component',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{}); return null; })()}
+      {/* #endregion */}
       <Header />
       <main 
         className="container mx-auto px-4 py-8 max-w-7xl" 
@@ -372,6 +379,23 @@ function Dashboard() {
           color: '#ffffff'
         }}
       >
+        {/* #region agent log */}
+        {(() => { fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:rendering-main-content',message:'Rendering main content section',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{}); return null; })()}
+        {/* #endregion */}
+        {/* Test element to verify rendering */}
+        <div style={{ 
+          position: 'fixed', 
+          top: '100px', 
+          left: '20px', 
+          zIndex: 9999, 
+          backgroundColor: 'red', 
+          color: 'white', 
+          padding: '10px',
+          fontSize: '14px'
+        }}>
+          DASHBOARD RENDERED - User: {user?.email || 'none'}
+        </div>
+        
         {/* Welcome Section */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
