@@ -20,33 +20,50 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+    let subscription = null
+    
     const loadUserData = async () => {
       try {
+        console.log('📊 Dashboard: Loading user data...')
         const { supabase } = await import('@/integrations/supabase/client')
         
         // Get current session
         const { data: { session }, error } = await supabase.auth.getSession()
         
+        console.log('📊 Dashboard: Session check', { hasSession: !!session, error })
+        
         if (error || !session) {
+          console.log('📊 Dashboard: No session, redirecting to home')
           // Not logged in, redirect to home
-          navigate('/')
+          if (mounted) {
+            navigate('/')
+          }
           return
         }
 
-        setUser(session.user)
-        
-        // Get user's remaining checks
-        const checks = getRemainingUserChecks(session.user.id)
-        setRemainingChecks(checks)
-        
-        // Get user stats
-        const userStats = getUserStats(session.user.id)
-        setStats(userStats)
-        
-        setLoading(false)
+        console.log('📊 Dashboard: User found', session.user.email)
+        if (mounted) {
+          setUser(session.user)
+          
+          // Get user's remaining checks
+          const checks = getRemainingUserChecks(session.user.id)
+          console.log('📊 Dashboard: User checks', checks)
+          setRemainingChecks(checks)
+          
+          // Get user stats
+          const userStats = getUserStats(session.user.id)
+          console.log('📊 Dashboard: User stats', userStats)
+          setStats(userStats)
+          
+          setLoading(false)
+        }
       } catch (error) {
-        console.error('Error loading user data:', error)
-        navigate('/')
+        console.error('❌ Dashboard: Error loading user data:', error)
+        if (mounted) {
+          setLoading(false)
+          // Don't redirect on error, just show the dashboard with error state
+        }
       }
     }
 
@@ -54,25 +71,38 @@ function Dashboard() {
 
     // Listen for auth changes
     const setupAuthListener = async () => {
-      const { supabase } = await import('@/integrations/supabase/client')
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (!session) {
-          navigate('/')
-        } else {
-          setUser(session.user)
-          const checks = getRemainingUserChecks(session.user.id)
-          setRemainingChecks(checks)
-          const userStats = getUserStats(session.user.id)
-          setStats(userStats)
-        }
-      })
-
-      return () => {
-        subscription.unsubscribe()
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+          console.log('📊 Dashboard: Auth state changed', _event)
+          if (!session) {
+            if (mounted) {
+              navigate('/')
+            }
+          } else {
+            if (mounted) {
+              setUser(session.user)
+              const checks = getRemainingUserChecks(session.user.id)
+              setRemainingChecks(checks)
+              const userStats = getUserStats(session.user.id)
+              setStats(userStats)
+            }
+          }
+        })
+        subscription = data
+      } catch (error) {
+        console.error('❌ Dashboard: Error setting up auth listener:', error)
       }
     }
 
     setupAuthListener()
+    
+    return () => {
+      mounted = false
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [navigate])
 
   const handleLogout = async () => {
@@ -118,10 +148,41 @@ function Dashboard() {
     )
   }
 
+  // Fallback if user is not set but loading is false
+  if (!loading && !user) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        backgroundColor: '#0a0a0a', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: '#ffffff'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: '#a1a1aa', marginBottom: '16px' }}>Unable to load dashboard</p>
+          <button
+            onClick={() => navigate('/')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#9333ea',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            Go to Home
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={{ backgroundColor: '#0a0a0a', color: '#ffffff' }}>
       <Header />
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
+      <main className="container mx-auto px-4 py-8 max-w-7xl" style={{ paddingTop: '80px' }}>
         {/* Welcome Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
