@@ -158,11 +158,20 @@ function Dashboard() {
       }
     }
 
-    // Start immediately
+    // Start immediately, but also add a small delay to ensure React has fully mounted
     setupAuthListener()
+    
+    // Also check after a tiny delay to catch any edge cases
+    const timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.log('📊 Dashboard: Re-checking after mount delay...')
+        checkSessionImmediately()
+      }
+    }, 50)
     
     return () => {
       mounted = false
+      clearTimeout(timeoutId)
       if (subscription) {
         subscription.unsubscribe()
       }
