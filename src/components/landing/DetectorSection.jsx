@@ -122,6 +122,8 @@ function DetectorSection() {
       remainingChecks,
     })
     
+    // IMPORTANT: Only check user checks if we're actually logged in AND have a userId
+    // Double-check login status to avoid false positives
     if (isLoggedIn && userId) {
       const userChecks = getRemainingUserChecks(userId)
       console.log('📊 User checks:', userChecks)
@@ -134,19 +136,20 @@ function DetectorSection() {
       return true
     }
     
-    // Anonymous user - check free checks
+    // Anonymous user - ALWAYS check free checks (not affected by login state)
+    // This ensures anonymous users always get 2 free checks
     const currentRemaining = getRemainingFreeChecks()
-    console.log('📊 Current remaining free checks:', currentRemaining)
+    console.log('📊 Anonymous user - remaining free checks:', currentRemaining)
     
     // If no checks remaining, show modal and block
     if (currentRemaining === 0) {
-      console.log('🚫 No checks remaining, showing signup modal')
+      console.log('🚫 No free checks remaining, showing signup modal')
       setShowSignupModal(true)
       setRemainingChecks(0) // Sync state
       return false
     }
     
-    console.log('✅ Checks available, allowing analysis')
+    console.log('✅ Free checks available, allowing analysis')
     return true
   }
 

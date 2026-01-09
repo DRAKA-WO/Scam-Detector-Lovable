@@ -57,15 +57,31 @@ function Header() {
             </a>
           </nav>
 
-          {/* CTA Button / Dashboard Link */}
+          {/* CTA Button / Dashboard Link / Logout */}
           <div className="hidden md:flex items-center gap-4">
             {isLoggedIn ? (
-              <Link
-                to="/dashboard"
-                className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  to="/dashboard"
+                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  onClick={async () => {
+                    try {
+                      const { supabase } = await import('@/integrations/supabase/client')
+                      await supabase.auth.signOut()
+                      window.location.href = '/'
+                    } catch (error) {
+                      console.error('Logout error:', error)
+                    }
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                >
+                  Logout
+                </button>
+              </>
             ) : null}
             <a
               href="#detector"
@@ -109,12 +125,28 @@ function Header() {
                 FAQ
               </a>
               {isLoggedIn && (
-                <Link
-                  to="/dashboard"
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
-                >
-                  Dashboard
-                </Link>
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { supabase } = await import('@/integrations/supabase/client')
+                        await supabase.auth.signOut()
+                        window.location.href = '/'
+                      } catch (error) {
+                        console.error('Logout error:', error)
+                      }
+                    }}
+                    className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium text-left"
+                  >
+                    Logout
+                  </button>
+                </>
               )}
               <a
                 href="#detector"

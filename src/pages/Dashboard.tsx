@@ -87,10 +87,32 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
+      <div style={{ 
+        minHeight: '100vh', 
+        backgroundColor: '#0a0a0a', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: '#ffffff'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div 
+            style={{
+              animation: 'spin 1s linear infinite',
+              width: '48px',
+              height: '48px',
+              border: '2px solid #9333ea',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              margin: '0 auto 16px'
+            }}
+          />
+          <p style={{ color: '#a1a1aa' }}>Loading dashboard...</p>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       </div>
     )
