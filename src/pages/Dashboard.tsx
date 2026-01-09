@@ -12,23 +12,56 @@ function Dashboard() {
   fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:component-render',message:'Dashboard component rendering',data:{url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
   // #endregion
   const navigate = useNavigate()
-  const [user, setUser] = useState(null)
-  const [remainingChecks, setRemainingChecks] = useState(0)
-  const [stats, setStats] = useState({
-    totalScans: 0,
-    scamsDetected: 0,
-    safeResults: 0,
-    suspiciousResults: 0
-  })
-  // Initialize loading state - check if we already have a session
-  const [loading, setLoading] = useState(() => {
-    // Check synchronously if we have a session in localStorage
+  
+  // Initialize user state synchronously from localStorage if available
+  const [user, setUser] = useState(() => {
     try {
       const sessionStr = localStorage.getItem('sb-tpmynhukocnyggqkxckh-auth-token')
       if (sessionStr) {
         const session = JSON.parse(sessionStr)
-        if (session?.access_token) {
-          // We have a session, start with loading false
+        if (session?.user) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state',message:'Initialized user from localStorage',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+          return session.user
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    return null
+  })
+  
+  const [remainingChecks, setRemainingChecks] = useState(() => {
+    if (user?.id) {
+      const { getRemainingUserChecks } = require('@/utils/checkLimits')
+      return getRemainingUserChecks(user.id)
+    }
+    return 0
+  })
+  const [stats, setStats] = useState(() => {
+    if (user?.id) {
+      const { getUserStats } = require('@/utils/checkLimits')
+      return getUserStats(user.id)
+    }
+    return {
+      totalScans: 0,
+      scamsDetected: 0,
+      safeResults: 0,
+      suspiciousResults: 0
+    }
+  })
+  // Initialize loading state - check if we already have a session
+  const [loading, setLoading] = useState(() => {
+    // If we have a user from localStorage, start with loading false
+    try {
+      const sessionStr = localStorage.getItem('sb-tpmynhukocnyggqkxckh-auth-token')
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr)
+        if (session?.user) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-loading-state',message:'Initialized loading=false from localStorage',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
           return false
         }
       }
@@ -38,7 +71,7 @@ function Dashboard() {
     return true
   })
   const effectIdRef = useRef(0)
-  const hasLoadedRef = useRef(false)
+  const hasLoadedRef = useRef(!!user)
 
   useEffect(() => {
     // #region agent log
