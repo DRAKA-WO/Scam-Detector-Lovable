@@ -59,14 +59,16 @@ const OAuthCallback = () => {
         subscription = data;
         
         // Also try to get session directly (in case it's already processed)
-        const checkSession = async () => {
+        const checkSession = async (attempt = 0) => {
           try {
             const { data: { session }, error } = await supabase.auth.getSession();
             
             if (error) {
               console.error('❌ OAuth callback error:', error);
-              if (mounted) {
+              if (mounted && attempt >= 3) {
                 navigate('/', { replace: true });
+              } else if (mounted) {
+                setTimeout(() => checkSession(attempt + 1), 500);
               }
               return;
             }
@@ -84,26 +86,35 @@ const OAuthCallback = () => {
                 console.log('✅ Initialized 5 checks for new user');
               }
               
+              // Wait a bit more to ensure everything is processed
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
               // Clear hash from URL
               window.history.replaceState(null, '', window.location.pathname);
               
               // Redirect to dashboard
+              console.log('✅ Redirecting to dashboard...');
               navigate('/dashboard', { replace: true });
+            } else if (!session && mounted && attempt < 5) {
+              // Wait longer for Supabase to process the hash (up to 5 attempts)
+              console.log(`⏳ Waiting for session... (attempt ${attempt + 1}/5)`);
+              setTimeout(() => checkSession(attempt + 1), 600);
             } else if (!session && mounted) {
-              // Wait a bit longer for Supabase to process the hash
-              console.log('⏳ Waiting for session...');
-              setTimeout(checkSession, 500);
+              console.error('❌ No session after multiple attempts');
+              navigate('/', { replace: true });
             }
           } catch (err) {
             console.error('Error checking session:', err);
-            if (mounted) {
+            if (mounted && attempt >= 3) {
               navigate('/', { replace: true });
+            } else if (mounted) {
+              setTimeout(() => checkSession(attempt + 1), 500);
             }
           }
         };
         
-        // Check session after a short delay
-        setTimeout(checkSession, 300);
+        // Check session after a longer delay to give Supabase time to process hash
+        setTimeout(() => checkSession(0), 500);
         
         // Timeout fallback - redirect to home if no session after 5 seconds
         setTimeout(() => {
