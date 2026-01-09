@@ -395,6 +395,10 @@ function Dashboard() {
   const [showFallback, setShowFallback] = useState(false)
   const oauthCheckRef = useRef(false)
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:render-check',message:'Render check',data:{loading,hasUser:!!user,remainingChecks:remainingChecks??'undefined',hasStats:!!stats,hasLoaded:hasLoadedRef.current,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+  
   useEffect(() => {
     // Always check localStorage when we don't have a user, regardless of loading state
     // This handles the case where OAuthCallback redirected before localStorage was written
