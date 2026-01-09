@@ -8,6 +8,9 @@ import Footer from '@/components/landing/Footer'
 import { getRemainingUserChecks, getUserStats } from '@/utils/checkLimits'
 
 function Dashboard() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:component-render',message:'Dashboard component rendering',data:{url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [remainingChecks, setRemainingChecks] = useState(0)
@@ -20,102 +23,191 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let isMounted = true
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:entry',message:'useEffect started',data:{loading,hasUser:!!user,url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
+    // #endregion
+    let mounted = true
     let subscription = null
     
-    const loadUserData = async () => {
+    // Helper to update user data
+    const updateUserData = (session) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:entry',message:'updateUserData called',data:{mounted,hasSession:!!session,hasUser:!!session?.user,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      if (!mounted || !session?.user) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:early-return',message:'Early return from updateUserData',data:{mounted,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        return false
+      }
+      
+      console.log('📊 Dashboard: Updating user data', session.user.email)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setState',message:'Before setState calls',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      setUser(session.user)
+      
+      // Get user's remaining checks
+      const checks = getRemainingUserChecks(session.user.id)
+      console.log('📊 Dashboard: User checks', checks)
+      setRemainingChecks(checks)
+      
+      // Get user stats
+      const userStats = getUserStats(session.user.id)
+      console.log('📊 Dashboard: User stats', userStats)
+      setStats(userStats)
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setLoading',message:'Before setLoading(false)',data:{checks,stats:userStats},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      setLoading(false)
+      
+      // Clear hash if it exists
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:exit',message:'updateUserData completed',data:{success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      return true
+    }
+    
+    // Check session immediately and synchronously
+    const checkSessionImmediately = async () => {
       try {
-        // Small delay to ensure Supabase is ready
-        await new Promise(resolve => setTimeout(resolve, 200))
-        
+        console.log('📊 Dashboard: Checking session immediately...')
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:before-import',message:'Before Supabase import',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const { supabase } = await import('@/integrations/supabase/client')
-        
-        // Get current session
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:after-import',message:'After Supabase import',data:{hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const { data: { session }, error } = await supabase.auth.getSession()
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:after-getSession',message:'After getSession call',data:{hasSession:!!session,hasError:!!error,error:error?.message,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+        // #endregion
         
         if (error) {
-          console.error('Dashboard: Session error', error)
-          // Don't redirect on error, just show loading state
-          if (isMounted) {
-            setLoading(false)
-          }
+          console.error('❌ Dashboard: Session error', error)
+          return false
+        }
+        
+        if (session?.user) {
+          console.log('📊 Dashboard: Session found immediately')
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:session-found',message:'Session found, calling updateUserData',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+          // #endregion
+          return updateUserData(session)
+        }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:no-session',message:'No session found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+        // #endregion
+        return false
+      } catch (error) {
+        console.error('❌ Dashboard: Error checking session', error)
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:error',message:'Error in checkSessionImmediately',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        return false
+      }
+    }
+    
+    // Set up auth listener
+    const setupAuthListener = async () => {
+      try {
+        console.log('📊 Dashboard: Setting up auth listener...')
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:entry',message:'setupAuthListener started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        const { supabase } = await import('@/integrations/supabase/client')
+        
+        // Check session immediately first
+        const hasSession = await checkSessionImmediately()
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:after-checkSession',message:'After checkSessionImmediately',data:{hasSession,mounted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        if (hasSession && mounted) {
+          // We already have a session, we're done
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:early-return',message:'Early return - session found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
           return
         }
         
-        if (!session) {
-          console.log('Dashboard: No session found')
-          // Not logged in, redirect to home
-          if (isMounted) {
-            setLoading(false)
-            // Small delay before redirect to avoid flash
-            setTimeout(() => {
-              if (isMounted) {
-                navigate('/')
-              }
-            }, 100)
-          }
-          return
-        }
-
-        console.log('Dashboard: Session found', session.user.email)
-        if (isMounted) {
-          setUser(session.user)
+        // Set up listener for future changes
+        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:onAuthStateChange:event',message:'Auth state change event fired',data:{event:_event,hasSession:!!session,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
-          // Get user's remaining checks
-          const checks = getRemainingUserChecks(session.user.id)
-          setRemainingChecks(checks)
-          
-          // Get user stats
-          const userStats = getUserStats(session.user.id)
-          setStats(userStats)
-          
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error)
-        // Don't redirect on error, just stop loading
-        if (isMounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadUserData()
-
-    // Listen for auth changes
-    const setupAuthListener = async () => {
-      try {
-        const { supabase } = await import('@/integrations/supabase/client')
-        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
           if (!session) {
-            if (isMounted) {
+            if (mounted && _event === 'SIGNED_OUT') {
+              console.log('📊 Dashboard: User signed out, redirecting')
+              navigate('/')
+            } else if (mounted && !loading) {
+              // If we're not loading and have no session, redirect
               navigate('/')
             }
           } else {
-            if (isMounted) {
-              setUser(session.user)
-              const checks = getRemainingUserChecks(session.user.id)
-              setRemainingChecks(checks)
-              const userStats = getUserStats(session.user.id)
-              setStats(userStats)
-            }
+            // We have a session - update user data
+            updateUserData(session)
           }
         })
         subscription = data
+        
+        // If we still don't have a session, check again after a short delay
+        // This handles the case where Supabase is still processing
+        if (!hasSession && mounted) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:setting-timeout',message:'Setting timeout for retry',data:{loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
+          setTimeout(async () => {
+            if (mounted && loading) {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{mounted,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              const hasSessionNow = await checkSessionImmediately()
+              if (!hasSessionNow && mounted) {
+                console.log('📊 Dashboard: No session found after delay, redirecting')
+                navigate('/')
+              }
+            }
+          }, 1000)
+        }
+        
       } catch (error) {
-        console.error('Error setting up auth listener:', error)
+        console.error('❌ Dashboard: Error setting up auth listener:', error)
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:error',message:'Error in setupAuthListener',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        if (mounted) {
+          // On error, try one more time after a delay
+          setTimeout(async () => {
+            if (mounted && loading) {
+              const hasSession = await checkSessionImmediately()
+              if (!hasSession && mounted) {
+                setLoading(false)
+                navigate('/')
+              }
+            }
+          }, 1500)
+        }
       }
     }
 
     setupAuthListener()
     
     return () => {
-      isMounted = false
+      mounted = false
       if (subscription) {
         subscription.unsubscribe()
       }
     }
-  }, [navigate])
+  }, [navigate, loading])
 
   const handleLogout = async () => {
     try {
