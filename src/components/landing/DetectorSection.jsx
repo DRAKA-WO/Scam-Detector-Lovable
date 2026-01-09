@@ -9,7 +9,14 @@ import SignupModal from '../SignupModal'
 import AnalyzingSteps from '../AnalyzingSteps'
 import { API_ENDPOINTS } from '../../config'
 import { handleApiError, getUserFriendlyError } from '../../utils/errorHandler'
-import { getRemainingFreeChecks, useFreeCheck, isUserLoggedIn } from '../../utils/checkLimits'
+import { 
+  getRemainingFreeChecks, 
+  useFreeCheck, 
+  isUserLoggedIn,
+  getRemainingUserChecks,
+  useUserCheck,
+  updateUserStats
+} from '../../utils/checkLimits'
 // Supabase import removed - will be loaded dynamically to avoid build errors
 
 function DetectorSection() {
@@ -25,6 +32,7 @@ function DetectorSection() {
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const [remainingChecks, setRemainingChecks] = useState(getRemainingFreeChecks())
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userId, setUserId] = useState(null)
 
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
   const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
@@ -35,7 +43,21 @@ function DetectorSection() {
       const loggedIn = await isUserLoggedIn()
       console.log('🔐 Auth check on mount:', { loggedIn })
       setIsLoggedIn(loggedIn)
-      if (!loggedIn) {
+      
+      if (loggedIn) {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client')
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.user) {
+            setUserId(session.user.id)
+            const checks = getRemainingUserChecks(session.user.id)
+            console.log('📊 User checks:', checks)
+            setRemainingChecks(checks)
+          }
+        } catch (error) {
+          console.error('Error getting user session:', error)
+        }
+      } else {
         const checks = getRemainingFreeChecks()
         console.log('📊 Initial remaining checks:', checks)
         setRemainingChecks(checks)
@@ -55,9 +77,13 @@ function DetectorSection() {
           const loggedIn = !!session
           console.log('🔐 Auth state changed:', { event: _event, loggedIn })
           setIsLoggedIn(loggedIn)
-          if (session) {
+          if (session?.user) {
+            setUserId(session.user.id)
             setShowSignupModal(false)
+            const checks = getRemainingUserChecks(session.user.id)
+            setRemainingChecks(checks)
           } else {
+            setUserId(null)
             const checks = getRemainingFreeChecks()
             console.log('📊 Remaining checks after logout:', checks)
             setRemainingChecks(checks)
@@ -80,10 +106,9 @@ function DetectorSection() {
 
   // Check if user can perform analysis
   const canPerformAnalysis = () => {
-    if (isLoggedIn) {
-      // Logged-in users have unlimited or subscription-based checks
-      // TODO: Check subscription status from backend
-      return true
+    if (isLoggedIn && userId) {
+      const userChecks = getRemainingUserChecks(userId)
+      return userChecks > 0
     }
     return remainingChecks > 0
   }
@@ -91,21 +116,27 @@ function DetectorSection() {
   // Show signup modal if needed
   const checkAndShowSignup = () => {
     // Debug logging
-    const currentRemaining = getRemainingFreeChecks()
     console.log('🔍 checkAndShowSignup:', {
       isLoggedIn,
+      userId,
       remainingChecks,
-      currentRemaining,
-      localStorageValue: localStorage.getItem('scam_checker_free_checks')
     })
     
-    if (isLoggedIn) {
-      console.log('✅ User is logged in, allowing analysis')
-      return true // Logged-in users can always proceed
+    if (isLoggedIn && userId) {
+      const userChecks = getRemainingUserChecks(userId)
+      console.log('📊 User checks:', userChecks)
+      if (userChecks === 0) {
+        console.log('🚫 No user checks remaining')
+        // Logged-in users with no checks - could show upgrade modal
+        return false
+      }
+      console.log('✅ User has checks, allowing analysis')
+      return true
     }
     
-    // Check localStorage directly to get the most current value
-    console.log('📊 Current remaining checks from localStorage:', currentRemaining)
+    // Anonymous user - check free checks
+    const currentRemaining = getRemainingFreeChecks()
+    console.log('📊 Current remaining free checks:', currentRemaining)
     
     // If no checks remaining, show modal and block
     if (currentRemaining === 0) {
@@ -135,7 +166,7 @@ function DetectorSection() {
           const { error, data } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-              redirectTo: `${window.location.origin}${window.location.pathname}#detector`
+              redirectTo: `${window.location.origin}/auth/callback`
             }
           })
           
@@ -194,14 +225,20 @@ function DetectorSection() {
     setLoading(true)
 
     try {
-      // Use a free check if not logged in (this decrements the counter)
-      if (!isLoggedIn) {
+      // Use a check (user check if logged in, free check if not)
+      if (isLoggedIn && userId) {
+        const before = getRemainingUserChecks(userId)
+        console.log(`💳 Before using user check: ${before}`)
+        useUserCheck(userId)
+        const after = getRemainingUserChecks(userId)
+        console.log(`💳 After using user check: ${after}`)
+        setRemainingChecks(after)
+      } else {
         const before = getRemainingFreeChecks()
-        console.log(`💳 Before using check: ${before}`)
+        console.log(`💳 Before using free check: ${before}`)
         useFreeCheck()
         const after = getRemainingFreeChecks()
-        console.log(`💳 After using check: ${after}`)
-        // Immediately update state with new remaining count
+        console.log(`💳 After using free check: ${after}`)
         setRemainingChecks(after)
       }
 
@@ -217,6 +254,12 @@ function DetectorSection() {
       }
       const data = await response.json()
       setResult(data)
+      
+      // Update user stats if logged in
+      if (isLoggedIn && userId && data) {
+        const resultType = data.type === 'scam' ? 'scam' : data.type === 'safe' ? 'safe' : 'suspicious'
+        updateUserStats(userId, resultType)
+      }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'image'))
     } finally {
@@ -240,14 +283,20 @@ function DetectorSection() {
     setLoading(true)
 
     try {
-      // Use a free check if not logged in (this decrements the counter)
-      if (!isLoggedIn) {
+      // Use a check (user check if logged in, free check if not)
+      if (isLoggedIn && userId) {
+        const before = getRemainingUserChecks(userId)
+        console.log(`💳 Before using user check: ${before}`)
+        useUserCheck(userId)
+        const after = getRemainingUserChecks(userId)
+        console.log(`💳 After using user check: ${after}`)
+        setRemainingChecks(after)
+      } else {
         const before = getRemainingFreeChecks()
-        console.log(`💳 Before using check: ${before}`)
+        console.log(`💳 Before using free check: ${before}`)
         useFreeCheck()
         const after = getRemainingFreeChecks()
-        console.log(`💳 After using check: ${after}`)
-        // Immediately update state with new remaining count
+        console.log(`💳 After using free check: ${after}`)
         setRemainingChecks(after)
       }
 
@@ -262,6 +311,12 @@ function DetectorSection() {
       }
       const data = await response.json()
       setResult(data)
+      
+      // Update user stats if logged in
+      if (isLoggedIn && userId && data) {
+        const resultType = data.type === 'scam' ? 'scam' : data.type === 'safe' ? 'safe' : 'suspicious'
+        updateUserStats(userId, resultType)
+      }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'url'))
     } finally {
@@ -285,14 +340,20 @@ function DetectorSection() {
     setLoading(true)
 
     try {
-      // Use a free check if not logged in (this decrements the counter)
-      if (!isLoggedIn) {
+      // Use a check (user check if logged in, free check if not)
+      if (isLoggedIn && userId) {
+        const before = getRemainingUserChecks(userId)
+        console.log(`💳 Before using user check: ${before}`)
+        useUserCheck(userId)
+        const after = getRemainingUserChecks(userId)
+        console.log(`💳 After using user check: ${after}`)
+        setRemainingChecks(after)
+      } else {
         const before = getRemainingFreeChecks()
-        console.log(`💳 Before using check: ${before}`)
+        console.log(`💳 Before using free check: ${before}`)
         useFreeCheck()
         const after = getRemainingFreeChecks()
-        console.log(`💳 After using check: ${after}`)
-        // Immediately update state with new remaining count
+        console.log(`💳 After using free check: ${after}`)
         setRemainingChecks(after)
       }
 
@@ -307,6 +368,12 @@ function DetectorSection() {
       }
       const data = await response.json()
       setResult(data)
+      
+      // Update user stats if logged in
+      if (isLoggedIn && userId && data) {
+        const resultType = data.type === 'scam' ? 'scam' : data.type === 'safe' ? 'safe' : 'suspicious'
+        updateUserStats(userId, resultType)
+      }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'text'))
     } finally {
@@ -417,8 +484,8 @@ function DetectorSection() {
             </p>
           </div>
 
-          {/* Show remaining checks banner if not logged in */}
-          {!isLoggedIn && (
+          {/* Show remaining checks banner */}
+          {(!isLoggedIn || (isLoggedIn && remainingChecks > 0)) && (
             <div className={`rounded-xl p-4 mb-6 animate-fade-in border ${
               remainingChecks === 0 
                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/50 dark:border-orange-400/30' 
@@ -429,10 +496,18 @@ function DetectorSection() {
                   ? 'text-orange-700 dark:text-orange-300' 
                   : 'text-blue-700 dark:text-blue-300'
               }`}>
-                <strong>Free checks remaining: {remainingChecks}</strong>
-                {remainingChecks === 0 && (
+                <strong>
+                  {isLoggedIn ? 'Your checks remaining: ' : 'Free checks remaining: '}
+                  {remainingChecks}
+                </strong>
+                {remainingChecks === 0 && !isLoggedIn && (
                   <span className="ml-2 block mt-1 text-xs opacity-90">
                     Sign up to continue analyzing
+                  </span>
+                )}
+                {remainingChecks === 0 && isLoggedIn && (
+                  <span className="ml-2 block mt-1 text-xs opacity-90">
+                    Upgrade for more checks
                   </span>
                 )}
               </p>

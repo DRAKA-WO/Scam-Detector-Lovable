@@ -1,7 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { isUserLoggedIn } from '../../utils/checkLimits'
 
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const loggedIn = await isUserLoggedIn()
+      setIsLoggedIn(loggedIn)
+    }
+    
+    checkAuth()
+    
+    // Listen for auth changes
+    const setupAuthListener = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          setIsLoggedIn(!!session)
+        })
+        return () => subscription.unsubscribe()
+      } catch (error) {
+        // Supabase not available
+      }
+    }
+    
+    setupAuthListener()
+  }, [])
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 nav-blur border-b border-border">
@@ -30,8 +57,16 @@ function Header() {
             </a>
           </nav>
 
-          {/* CTA Button */}
-          <div className="hidden md:block">
+          {/* CTA Button / Dashboard Link */}
+          <div className="hidden md:flex items-center gap-4">
+            {isLoggedIn ? (
+              <Link
+                to="/dashboard"
+                className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+              >
+                Dashboard
+              </Link>
+            ) : null}
             <a
               href="#detector"
               className="gradient-button text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
@@ -73,6 +108,14 @@ function Header() {
               <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
                 FAQ
               </a>
+              {isLoggedIn && (
+                <Link
+                  to="/dashboard"
+                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                >
+                  Dashboard
+                </Link>
+              )}
               <a
                 href="#detector"
                 className="gradient-button text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2 w-fit"
