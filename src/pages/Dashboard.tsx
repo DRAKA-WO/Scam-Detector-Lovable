@@ -20,8 +20,25 @@ function Dashboard() {
     safeResults: 0,
     suspiciousResults: 0
   })
-  const [loading, setLoading] = useState(true)
+  // Initialize loading state - check if we already have a session
+  const [loading, setLoading] = useState(() => {
+    // Check synchronously if we have a session in localStorage
+    try {
+      const sessionStr = localStorage.getItem('sb-tpmynhukocnyggqkxckh-auth-token')
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr)
+        if (session?.access_token) {
+          // We have a session, start with loading false
+          return false
+        }
+      }
+    } catch (e) {
+      // Ignore errors, default to loading true
+    }
+    return true
+  })
   const effectIdRef = useRef(0)
+  const hasLoadedRef = useRef(false)
 
   useEffect(() => {
     // #region agent log
@@ -83,6 +100,7 @@ function Dashboard() {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:after-setLoading-call',message:'Called setLoading(false)',data:{effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
+      hasLoadedRef.current = true
       
       // Clear hash if it exists
       if (window.location.hash) {
@@ -255,10 +273,12 @@ function Dashboard() {
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:render-check',message:'Render check',data:{loading,hasUser:!!user,remainingChecks,stats},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:render-check',message:'Render check',data:{loading,hasUser:!!user,remainingChecks,stats,hasLoaded:hasLoadedRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
   // #endregion
   
-  if (loading) {
+  // If we've already loaded the user, don't show loading screen even if loading is true
+  // This prevents React Strict Mode from resetting the UI
+  if (loading && !hasLoadedRef.current) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:loading-render',message:'Rendering loading state',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
     // #endregion
