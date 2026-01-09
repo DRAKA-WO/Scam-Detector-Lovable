@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, startTransition } from 'react'
+import { useEffect, useState, useCallback, startTransition, flushSync } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -26,17 +26,16 @@ function Dashboard() {
     
     console.log('📊 Dashboard: Updating user data', session.user.email)
     
-    // Use startTransition to ensure React processes these updates
-    startTransition(() => {
-      // Get user's remaining checks
-      const checks = getRemainingUserChecks(session.user.id)
-      console.log('📊 Dashboard: User checks', checks)
-      
-      // Get user stats
-      const userStats = getUserStats(session.user.id)
-      console.log('📊 Dashboard: User stats', userStats)
-      
-      // Update all state in a batch - React will batch these automatically
+    // Get user's remaining checks
+    const checks = getRemainingUserChecks(session.user.id)
+    console.log('📊 Dashboard: User checks', checks)
+    
+    // Get user stats
+    const userStats = getUserStats(session.user.id)
+    console.log('📊 Dashboard: User stats', userStats)
+    
+    // Use flushSync to force React to process these updates immediately
+    flushSync(() => {
       setUser(session.user)
       setRemainingChecks(checks)
       setStats(userStats)
