@@ -16,33 +16,58 @@ function Dashboard() {
   // Initialize user state synchronously from localStorage if available
   const [user, setUser] = useState(() => {
     try {
-      const sessionStr = localStorage.getItem('sb-tpmynhukocnyggqkxckh-auth-token')
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr)
-        if (session?.user) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state',message:'Initialized user from localStorage',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
-          return session.user
+      // Supabase stores session in localStorage with key: sb-<project-ref>-auth-token
+      // Try to find the session key
+      const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'))
+      if (supabaseKeys.length > 0) {
+        const sessionStr = localStorage.getItem(supabaseKeys[0])
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr)
+          if (session?.currentSession?.user) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state',message:'Initialized user from localStorage',data:{userId:session.currentSession.user.id,email:session.currentSession.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+            return session.currentSession.user
+          } else if (session?.user) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state',message:'Initialized user from localStorage (alt format)',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+            return session.user
+          }
         }
       }
     } catch (e) {
-      // Ignore errors
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state-error',message:'Error initializing user from localStorage',data:{error:e?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
     }
     return null
   })
   
   const [remainingChecks, setRemainingChecks] = useState(() => {
     if (user?.id) {
-      const { getRemainingUserChecks } = require('@/utils/checkLimits')
-      return getRemainingUserChecks(user.id)
+      try {
+        const checks = getRemainingUserChecks(user.id)
+        return checks
+      } catch (e) {
+        return 0
+      }
     }
     return 0
   })
   const [stats, setStats] = useState(() => {
     if (user?.id) {
-      const { getUserStats } = require('@/utils/checkLimits')
-      return getUserStats(user.id)
+      try {
+        const userStats = getUserStats(user.id)
+        return userStats
+      } catch (e) {
+        return {
+          totalScans: 0,
+          scamsDetected: 0,
+          safeResults: 0,
+          suspiciousResults: 0
+        }
+      }
     }
     return {
       totalScans: 0,
