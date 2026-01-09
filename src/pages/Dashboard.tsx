@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -26,22 +26,23 @@ function Dashboard() {
     
     console.log('📊 Dashboard: Updating user data', session.user.email)
     
-    // Update all state at once to ensure React batches the updates
-    setUser(session.user)
-    
-    // Get user's remaining checks
-    const checks = getRemainingUserChecks(session.user.id)
-    console.log('📊 Dashboard: User checks', checks)
-    setRemainingChecks(checks)
-    
-    // Get user stats
-    const userStats = getUserStats(session.user.id)
-    console.log('📊 Dashboard: User stats', userStats)
-    setStats(userStats)
-    
-    // Force a re-render by updating loading state and initialized flag
-    setLoading(false)
-    setInitialized(true)
+    // Use startTransition to ensure React processes these updates
+    startTransition(() => {
+      // Get user's remaining checks
+      const checks = getRemainingUserChecks(session.user.id)
+      console.log('📊 Dashboard: User checks', checks)
+      
+      // Get user stats
+      const userStats = getUserStats(session.user.id)
+      console.log('📊 Dashboard: User stats', userStats)
+      
+      // Update all state in a batch - React will batch these automatically
+      setUser(session.user)
+      setRemainingChecks(checks)
+      setStats(userStats)
+      setLoading(false)
+      setInitialized(true)
+    })
     
     // Clear hash if it exists
     if (window.location.hash) {
