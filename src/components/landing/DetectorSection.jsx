@@ -68,7 +68,7 @@ function DetectorSection() {
     }
     
     setupAuthListener()
-
+//what the fuck
     return () => {
       if (subscription) {
         subscription.unsubscribe()
