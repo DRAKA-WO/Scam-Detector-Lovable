@@ -48,7 +48,9 @@ function DetectorSection() {
     let subscription = null
     const setupAuthListener = async () => {
       try {
+        console.log('📦 Loading Supabase client...')
         const { supabase } = await import('@/integrations/supabase/client')
+        console.log('✅ Supabase client loaded successfully')
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
           const loggedIn = !!session
           console.log('🔐 Auth state changed:', { event: _event, loggedIn })

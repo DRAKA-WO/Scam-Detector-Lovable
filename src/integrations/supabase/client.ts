@@ -5,13 +5,14 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Debug logging (only in development)
-if (import.meta.env.DEV) {
-  console.log('🔧 Supabase Config:', {
-    url: SUPABASE_URL ? `${SUPABASE_URL.substring(0, 30)}...` : 'MISSING',
-    key: SUPABASE_PUBLISHABLE_KEY ? `${SUPABASE_PUBLISHABLE_KEY.substring(0, 20)}...` : 'MISSING',
-  });
-}
+// Always log Supabase config (for debugging in production)
+console.log('🔧 Supabase Config Check:', {
+  url: SUPABASE_URL ? SUPABASE_URL : '❌ MISSING',
+  urlPreview: SUPABASE_URL ? `${SUPABASE_URL.substring(0, 40)}...` : 'N/A',
+  keyExists: SUPABASE_PUBLISHABLE_KEY ? '✅ SET' : '❌ MISSING',
+  keyPreview: SUPABASE_PUBLISHABLE_KEY ? `${SUPABASE_PUBLISHABLE_KEY.substring(0, 25)}...` : 'N/A',
+  isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : SUPABASE_URL?.includes('qsivfrgtncdvxvawgdbu') ? '❌ OLD PROJECT' : '❓ UNKNOWN',
+});
 
 // Validate environment variables
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
