@@ -217,18 +217,9 @@ function Dashboard() {
     setupAuthListener()
     
     return () => {
-      // Only set to false on actual unmount, not on dependency changes
-      // This prevents React Strict Mode from breaking the component
-      const timeoutId = setTimeout(() => {
-        mountedRef.current = false
-      }, 0)
-      
+      mountedRef.current = false
       if (subscription) {
         subscription.unsubscribe()
-      }
-      
-      return () => {
-        clearTimeout(timeoutId)
       }
     }
   }, [navigate])
