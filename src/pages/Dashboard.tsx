@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,37 +18,42 @@ function Dashboard() {
     suspiciousResults: 0
   })
   const [loading, setLoading] = useState(true)
+  const [, forceUpdate] = useState({})
+
+  // Helper to update user data - use useCallback to ensure it's stable
+  const updateUserData = useCallback((session) => {
+    if (!session?.user) return false
+    
+    console.log('📊 Dashboard: Updating user data', session.user.email)
+    
+    // Update all state at once to ensure React batches the updates
+    setUser(session.user)
+    
+    // Get user's remaining checks
+    const checks = getRemainingUserChecks(session.user.id)
+    console.log('📊 Dashboard: User checks', checks)
+    setRemainingChecks(checks)
+    
+    // Get user stats
+    const userStats = getUserStats(session.user.id)
+    console.log('📊 Dashboard: User stats', userStats)
+    setStats(userStats)
+    
+    // Force a re-render by updating loading state
+    setLoading(false)
+    forceUpdate({})
+    
+    // Clear hash if it exists
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    
+    return true
+  }, [])
 
   useEffect(() => {
     let mounted = true
     let subscription = null
-    
-    // Helper to update user data
-    const updateUserData = (session) => {
-      if (!mounted || !session?.user) return false
-      
-      console.log('📊 Dashboard: Updating user data', session.user.email)
-      setUser(session.user)
-      
-      // Get user's remaining checks
-      const checks = getRemainingUserChecks(session.user.id)
-      console.log('📊 Dashboard: User checks', checks)
-      setRemainingChecks(checks)
-      
-      // Get user stats
-      const userStats = getUserStats(session.user.id)
-      console.log('📊 Dashboard: User stats', userStats)
-      setStats(userStats)
-      
-      setLoading(false)
-      
-      // Clear hash if it exists
-      if (window.location.hash) {
-        window.history.replaceState(null, '', window.location.pathname)
-      }
-      
-      return true
-    }
     
     // Check session immediately and synchronously
     const checkSessionImmediately = async () => {
@@ -64,7 +69,10 @@ function Dashboard() {
         
         if (session?.user) {
           console.log('📊 Dashboard: Session found immediately')
-          return updateUserData(session)
+          if (mounted) {
+            updateUserData(session)
+          }
+          return true
         }
         
         return false
@@ -80,10 +88,11 @@ function Dashboard() {
         console.log('📊 Dashboard: Setting up auth listener...')
         const { supabase } = await import('@/integrations/supabase/client')
         
-        // Check session immediately first
+        // Check session immediately first - don't wait
         const hasSession = await checkSessionImmediately()
         if (hasSession && mounted) {
           // We already have a session, we're done
+          console.log('📊 Dashboard: Session found, dashboard should be visible')
           return
         }
         
@@ -95,13 +104,16 @@ function Dashboard() {
             if (mounted && _event === 'SIGNED_OUT') {
               console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
-            } else if (mounted && !loading) {
-              // If we're not loading and have no session, redirect
+            } else if (mounted && loading) {
+              // If we're still loading and have no session, redirect
+              setLoading(false)
               navigate('/')
             }
           } else {
             // We have a session - update user data
-            updateUserData(session)
+            if (mounted) {
+              updateUserData(session)
+            }
           }
         })
         subscription = data
@@ -111,13 +123,15 @@ function Dashboard() {
         if (!hasSession && mounted) {
           setTimeout(async () => {
             if (mounted && loading) {
+              console.log('📊 Dashboard: Re-checking session after delay...')
               const hasSessionNow = await checkSessionImmediately()
               if (!hasSessionNow && mounted) {
                 console.log('📊 Dashboard: No session found after delay, redirecting')
+                setLoading(false)
                 navigate('/')
               }
             }
-          }, 1000)
+          }, 500)
         }
         
       } catch (error) {
@@ -132,11 +146,12 @@ function Dashboard() {
                 navigate('/')
               }
             }
-          }, 1500)
+          }, 1000)
         }
       }
     }
 
+    // Start immediately
     setupAuthListener()
     
     return () => {
@@ -145,7 +160,7 @@ function Dashboard() {
         subscription.unsubscribe()
       }
     }
-  }, [navigate, loading])
+  }, [navigate, loading, updateUserData])
 
   const handleLogout = async () => {
     try {
