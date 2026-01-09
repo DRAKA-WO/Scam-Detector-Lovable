@@ -50,16 +50,26 @@ function DetectorSection() {
           const { data: { session } } = await supabase.auth.getSession()
           if (session?.user) {
             setUserId(session.user.id)
-            const checks = getRemainingUserChecks(session.user.id)
+            const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
+            let checks = getRemainingUserChecks(session.user.id)
+            // If user has no checks, initialize them with 5 (in case they just signed up)
+            if (checks === 0) {
+              initializeUserChecks(session.user.id)
+              checks = getRemainingUserChecks(session.user.id)
+            }
             console.log('📊 User checks:', checks)
             setRemainingChecks(checks)
           }
         } catch (error) {
           console.error('Error getting user session:', error)
+          // Fallback to free checks if there's an error
+          const checks = getRemainingFreeChecks()
+          setRemainingChecks(checks)
         }
       } else {
+        // Anonymous user - always use free checks
         const checks = getRemainingFreeChecks()
-        console.log('📊 Initial remaining checks:', checks)
+        console.log('📊 Anonymous user - initial remaining free checks:', checks)
         setRemainingChecks(checks)
       }
     }
@@ -73,19 +83,26 @@ function DetectorSection() {
         console.log('📦 Loading Supabase client...')
         const { supabase } = await import('@/integrations/supabase/client')
         console.log('✅ Supabase client loaded successfully')
-        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           const loggedIn = !!session
           console.log('🔐 Auth state changed:', { event: _event, loggedIn })
           setIsLoggedIn(loggedIn)
           if (session?.user) {
             setUserId(session.user.id)
             setShowSignupModal(false)
-            const checks = getRemainingUserChecks(session.user.id)
+            const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
+            let checks = getRemainingUserChecks(session.user.id)
+            // Initialize checks if user has none (new signup)
+            if (checks === 0) {
+              initializeUserChecks(session.user.id)
+              checks = getRemainingUserChecks(session.user.id)
+            }
             setRemainingChecks(checks)
           } else {
             setUserId(null)
+            // When logged out, switch back to free checks
             const checks = getRemainingFreeChecks()
-            console.log('📊 Remaining checks after logout:', checks)
+            console.log('📊 Remaining free checks after logout:', checks)
             setRemainingChecks(checks)
           }
         })
