@@ -25,19 +25,39 @@ function Dashboard() {
     
     const loadUserData = async () => {
       try {
+        // Small delay to ensure Supabase is ready
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
         const { supabase } = await import('@/integrations/supabase/client')
         
         // Get current session
         const { data: { session }, error } = await supabase.auth.getSession()
         
-        if (error || !session) {
+        if (error) {
+          console.error('Dashboard: Session error', error)
+          // Don't redirect on error, just show loading state
+          if (isMounted) {
+            setLoading(false)
+          }
+          return
+        }
+        
+        if (!session) {
+          console.log('Dashboard: No session found')
           // Not logged in, redirect to home
           if (isMounted) {
-            navigate('/')
+            setLoading(false)
+            // Small delay before redirect to avoid flash
+            setTimeout(() => {
+              if (isMounted) {
+                navigate('/')
+              }
+            }, 100)
           }
           return
         }
 
+        console.log('Dashboard: Session found', session.user.email)
         if (isMounted) {
           setUser(session.user)
           
@@ -53,8 +73,9 @@ function Dashboard() {
         }
       } catch (error) {
         console.error('Error loading user data:', error)
+        // Don't redirect on error, just stop loading
         if (isMounted) {
-          navigate('/')
+          setLoading(false)
         }
       }
     }
