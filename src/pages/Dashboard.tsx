@@ -18,7 +18,7 @@ function Dashboard() {
     suspiciousResults: 0
   })
   const [loading, setLoading] = useState(true)
-  const [, forceUpdate] = useState({})
+  const [initialized, setInitialized] = useState(false)
 
   // Helper to update user data - use useCallback to ensure it's stable
   const updateUserData = useCallback((session) => {
@@ -39,9 +39,9 @@ function Dashboard() {
     console.log('📊 Dashboard: User stats', userStats)
     setStats(userStats)
     
-    // Force a re-render by updating loading state
+    // Force a re-render by updating loading state and initialized flag
     setLoading(false)
-    forceUpdate({})
+    setInitialized(true)
     
     // Clear hash if it exists
     if (window.location.hash) {
@@ -91,9 +91,15 @@ function Dashboard() {
         // Check session immediately first - don't wait
         const hasSession = await checkSessionImmediately()
         if (hasSession && mounted) {
-          // We already have a session, we're done
+          // We already have a session, mark as initialized
           console.log('📊 Dashboard: Session found, dashboard should be visible')
+          setInitialized(true)
           return
+        }
+        
+        // Mark as initialized even if no session (so we can show error/redirect)
+        if (mounted) {
+          setInitialized(true)
         }
         
         // Set up listener for future changes
@@ -205,8 +211,8 @@ function Dashboard() {
     )
   }
 
-  // Fallback if user is not set but loading is false
-  if (!loading && !user) {
+  // Fallback if user is not set but loading is false and we've initialized
+  if (!loading && initialized && !user) {
     return (
       <div style={{ 
         minHeight: '100vh', 
