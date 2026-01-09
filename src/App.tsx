@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -16,6 +16,7 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     let mounted = true;
+    let subscription = null;
     
     const handleOAuthCallback = async () => {
       try {
@@ -29,7 +30,7 @@ const OAuthCallback = () => {
         let sessionReceived = false;
         
         // Set up auth state change listener
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           console.log('🔐 Auth state change event:', event, session ? 'Session received' : 'No session');
           
           if (event === 'SIGNED_IN' && session?.user && mounted) {
@@ -55,40 +56,49 @@ const OAuthCallback = () => {
           }
         });
         
+        subscription = data;
+        
         // Also try to get session directly (in case it's already processed)
         const checkSession = async () => {
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error('❌ OAuth callback error:', error);
+          try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            
+            if (error) {
+              console.error('❌ OAuth callback error:', error);
+              if (mounted) {
+                navigate('/', { replace: true });
+              }
+              return;
+            }
+
+            if (session?.user && !sessionReceived && mounted) {
+              console.log('✅ Session found directly');
+              sessionReceived = true;
+              
+              // Initialize user checks
+              const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+              const existingChecks = getRemainingUserChecks(session.user.id);
+              
+              if (existingChecks === 0) {
+                initializeUserChecks(session.user.id);
+                console.log('✅ Initialized 5 checks for new user');
+              }
+              
+              // Clear hash from URL
+              window.history.replaceState(null, '', window.location.pathname);
+              
+              // Redirect to dashboard
+              navigate('/dashboard', { replace: true });
+            } else if (!session && mounted) {
+              // Wait a bit longer for Supabase to process the hash
+              console.log('⏳ Waiting for session...');
+              setTimeout(checkSession, 500);
+            }
+          } catch (err) {
+            console.error('Error checking session:', err);
             if (mounted) {
               navigate('/', { replace: true });
             }
-            return;
-          }
-
-          if (session?.user && !sessionReceived && mounted) {
-            console.log('✅ Session found directly');
-            sessionReceived = true;
-            
-            // Initialize user checks
-            const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-            const existingChecks = getRemainingUserChecks(session.user.id);
-            
-            if (existingChecks === 0) {
-              initializeUserChecks(session.user.id);
-              console.log('✅ Initialized 5 checks for new user');
-            }
-            
-            // Clear hash from URL
-            window.history.replaceState(null, '', window.location.pathname);
-            
-            // Redirect to dashboard
-            navigate('/dashboard', { replace: true });
-          } else if (!session && mounted) {
-            // Wait a bit longer for Supabase to process the hash
-            console.log('⏳ Waiting for session...');
-            setTimeout(checkSession, 500);
           }
         };
         
@@ -102,10 +112,6 @@ const OAuthCallback = () => {
             navigate('/', { replace: true });
           }
         }, 5000);
-        
-        return () => {
-          subscription.unsubscribe();
-        };
       } catch (error) {
         console.error('❌ Error handling OAuth callback:', error);
         if (mounted) {
@@ -118,6 +124,9 @@ const OAuthCallback = () => {
     
     return () => {
       mounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [navigate]);
 
