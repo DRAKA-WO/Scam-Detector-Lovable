@@ -22,111 +22,93 @@ function Dashboard() {
   useEffect(() => {
     let mounted = true
     let subscription = null
-    let retryCount = 0
-    const MAX_RETRIES = 3
+    let sessionReceived = false
     
-    const loadUserData = async (retry = false) => {
-      try {
-        if (!retry) {
-          console.log('📊 Dashboard: Loading user data...')
-        }
-        const { supabase } = await import('@/integrations/supabase/client')
-        
-        // Wait a bit for Supabase to fully initialize (especially after OAuth redirect)
-        if (!retry) {
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-        
-        // Get current session
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        console.log('📊 Dashboard: Session check', { hasSession: !!session, error, retryCount })
-        
-        if (error) {
-          console.error('❌ Dashboard: Session error', error)
-          // Retry if we haven't exceeded max retries
-          if (retryCount < MAX_RETRIES && mounted) {
-            retryCount++
-            console.log(`📊 Dashboard: Retrying... (${retryCount}/${MAX_RETRIES})`)
-            setTimeout(() => loadUserData(true), 500)
-            return
-          }
-          if (mounted) {
-            setLoading(false)
-          }
-          return
-        }
-        
-        if (!session) {
-          console.log('📊 Dashboard: No session, redirecting to home')
-          // Not logged in, redirect to home
-          if (mounted) {
-            navigate('/')
-          }
-          return
-        }
-
-        console.log('📊 Dashboard: User found', session.user.email)
-        if (mounted) {
-          setUser(session.user)
-          
-          // Get user's remaining checks
-          const checks = getRemainingUserChecks(session.user.id)
-          console.log('📊 Dashboard: User checks', checks)
-          setRemainingChecks(checks)
-          
-          // Get user stats
-          const userStats = getUserStats(session.user.id)
-          console.log('📊 Dashboard: User stats', userStats)
-          setStats(userStats)
-          
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error('❌ Dashboard: Error loading user data:', error)
-        // Retry on error if we haven't exceeded max retries
-        if (retryCount < MAX_RETRIES && mounted) {
-          retryCount++
-          console.log(`📊 Dashboard: Retrying after error... (${retryCount}/${MAX_RETRIES})`)
-          setTimeout(() => loadUserData(true), 500)
-          return
-        }
-        if (mounted) {
-          setLoading(false)
-          // Don't redirect on error, just show the dashboard with error state
-        }
-      }
+    // Helper to update user data
+    const updateUserData = (session) => {
+      if (!mounted || !session?.user) return
+      
+      console.log('📊 Dashboard: Updating user data', session.user.email)
+      setUser(session.user)
+      
+      // Get user's remaining checks
+      const checks = getRemainingUserChecks(session.user.id)
+      console.log('📊 Dashboard: User checks', checks)
+      setRemainingChecks(checks)
+      
+      // Get user stats
+      const userStats = getUserStats(session.user.id)
+      console.log('📊 Dashboard: User stats', userStats)
+      setStats(userStats)
+      
+      setLoading(false)
+      sessionReceived = true
     }
-
-    // Set up auth listener first (this will also trigger on initial load)
+    
+    // Set up auth listener FIRST - this is the most reliable way
     const setupAuthListener = async () => {
       try {
+        console.log('📊 Dashboard: Setting up auth listener...')
         const { supabase } = await import('@/integrations/supabase/client')
+        
+        // Wait a bit for Supabase to initialize
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
         const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-          console.log('📊 Dashboard: Auth state changed', _event)
+          console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
+          
           if (!session) {
-            if (mounted) {
+            if (mounted && _event === 'SIGNED_OUT') {
+              console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
             }
           } else {
-            if (mounted) {
-              setUser(session.user)
-              const checks = getRemainingUserChecks(session.user.id)
-              setRemainingChecks(checks)
-              const userStats = getUserStats(session.user.id)
-              setStats(userStats)
-              setLoading(false)
-            }
+            // We have a session - update user data
+            updateUserData(session)
           }
         })
         subscription = data
         
-        // Also try to load user data directly
-        loadUserData()
+        // Also check session directly after a short delay
+        // This handles cases where the auth state change doesn't fire immediately
+        setTimeout(async () => {
+          if (!sessionReceived && mounted) {
+            try {
+              console.log('📊 Dashboard: Checking session directly...')
+              const { supabase } = await import('@/integrations/supabase/client')
+              const { data: { session }, error } = await supabase.auth.getSession()
+              
+              if (error) {
+                console.error('❌ Dashboard: Session error', error)
+                if (mounted) {
+                  setLoading(false)
+                }
+                return
+              }
+              
+              if (session) {
+                console.log('📊 Dashboard: Session found directly')
+                updateUserData(session)
+              } else {
+                console.log('📊 Dashboard: No session found, redirecting')
+                if (mounted) {
+                  navigate('/')
+                }
+              }
+            } catch (error) {
+              console.error('❌ Dashboard: Error checking session', error)
+              if (mounted) {
+                setLoading(false)
+              }
+            }
+          }
+        }, 500)
+        
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
-        // Still try to load user data
-        loadUserData()
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
