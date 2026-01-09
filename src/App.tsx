@@ -50,9 +50,9 @@ const OAuthCallback = () => {
             // Clear hash from URL
             window.history.replaceState(null, '', window.location.pathname);
             
-            // Redirect to dashboard using window.location to force full page load
+            // Redirect to dashboard
             console.log('✅ Redirecting to dashboard...');
-            window.location.href = '/dashboard';
+            navigate('/dashboard', { replace: true });
           }
         });
         
@@ -92,9 +92,9 @@ const OAuthCallback = () => {
               // Clear hash from URL
               window.history.replaceState(null, '', window.location.pathname);
               
-              // Redirect to dashboard using window.location to force full page load
+              // Redirect to dashboard
               console.log('✅ Redirecting to dashboard...');
-              window.location.href = '/dashboard';
+              navigate('/dashboard', { replace: true });
             } else if (!session && mounted && attempt < 5) {
               // Wait longer for Supabase to process the hash (up to 5 attempts)
               console.log(`⏳ Waiting for session... (attempt ${attempt + 1}/5)`);

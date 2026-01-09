@@ -68,6 +68,10 @@ function Dashboard() {
       try {
         console.log('📊 Dashboard: Checking session immediately...')
         const { supabase } = await import('@/integrations/supabase/client')
+        
+        // Wait a tiny bit for Supabase to be fully ready
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
@@ -76,13 +80,14 @@ function Dashboard() {
         }
         
         if (session?.user) {
-          console.log('📊 Dashboard: Session found immediately')
+          console.log('📊 Dashboard: Session found immediately', session.user.email)
           if (isMounted) {
             updateUserData(session)
           }
           return true
         }
         
+        console.log('📊 Dashboard: No session found')
         return false
       } catch (error) {
         console.error('❌ Dashboard: Error checking session', error)
@@ -132,20 +137,38 @@ function Dashboard() {
         })
         subscription = data
         
-        // If we still don't have a session, check again after a short delay
-        // This handles the case where Supabase is still processing
+        // If we still don't have a session, check multiple times before giving up
+        // This handles the case where Supabase is still processing (especially after OAuth)
         if (!hasSession && isMounted) {
-          setTimeout(async () => {
-            if (isMounted && loading) {
-              console.log('📊 Dashboard: Re-checking session after delay...')
-              const hasSessionNow = await checkSessionImmediately()
-              if (!hasSessionNow && isMounted) {
-                console.log('📊 Dashboard: No session found after delay, redirecting')
-                setLoading(false)
-                navigate('/')
-              }
+          let attempts = 0
+          const maxAttempts = 5
+          
+          const retryCheck = async () => {
+            if (!isMounted || !loading) return
+            
+            attempts++
+            console.log(`📊 Dashboard: Re-checking session (attempt ${attempts}/${maxAttempts})...`)
+            
+            const hasSessionNow = await checkSessionImmediately()
+            
+            if (hasSessionNow) {
+              // Session found, we're done
+              return
             }
-          }, 500)
+            
+            if (attempts < maxAttempts && isMounted && loading) {
+              // Try again after a delay
+              setTimeout(retryCheck, 500)
+            } else if (isMounted) {
+              // No session after all attempts, redirect
+              console.log('📊 Dashboard: No session found after all attempts, redirecting')
+              setLoading(false)
+              navigate('/')
+            }
+          }
+          
+          // Start retrying after a short delay
+          setTimeout(retryCheck, 300)
         }
         
       } catch (error) {
