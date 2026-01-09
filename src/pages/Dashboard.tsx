@@ -373,7 +373,66 @@ function Dashboard() {
   }
 
   // Fallback if user is not set but loading is false
-  if (!loading && !user) {
+  // BUT: If we just came from OAuth (hash in URL or recent navigation), wait a bit longer
+  const [showFallback, setShowFallback] = useState(false)
+  const oauthCheckRef = useRef(false)
+  
+  useEffect(() => {
+    // Check if we're coming from OAuth (hash in URL or just navigated)
+    if (!loading && !user && !oauthCheckRef.current) {
+      oauthCheckRef.current = true
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check',message:'Checking for OAuth session in localStorage',data:{hasHash:!!window.location.hash,url:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      
+      // Wait a bit to see if session appears in localStorage (OAuth callback might still be processing)
+      const checkForSession = (attempt = 0) => {
+        const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'))
+        if (supabaseKeys.length > 0) {
+          try {
+            const sessionStr = localStorage.getItem(supabaseKeys[0])
+            if (sessionStr) {
+              const storedSession = JSON.parse(sessionStr)
+              const sessionUser = storedSession?.currentSession?.user || storedSession?.user
+              if (sessionUser) {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-session-found',message:'Found session in localStorage, setting user',data:{userId:sessionUser.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+                // #endregion
+                setUser(sessionUser)
+                const checks = getRemainingUserChecks(sessionUser.id)
+                setRemainingChecks(checks)
+                const userStats = getUserStats(sessionUser.id)
+                setStats(userStats)
+                setLoading(false)
+                hasLoadedRef.current = true
+                return
+              }
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+        
+        // Retry up to 15 times (3 seconds total)
+        if (attempt < 15 && !user) {
+          setTimeout(() => checkForSession(attempt + 1), 200)
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-timeout',message:'No session found after waiting, showing fallback',data:{attempts:attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+          setShowFallback(true)
+        }
+      }
+      
+      // Start checking
+      checkForSession()
+    } else if (!loading && !user) {
+      // Not from OAuth, show fallback immediately
+      setShowFallback(true)
+    }
+  }, [loading, user])
+  
+  if (!loading && !user && showFallback) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:no-user-fallback',message:'Rendering no-user fallback',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
     // #endregion
@@ -401,6 +460,43 @@ function Dashboard() {
           >
             Go to Home
           </button>
+        </div>
+      </div>
+    )
+  }
+  
+  // If we're waiting for OAuth session, show loading
+  if (!loading && !user && !showFallback) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-waiting',message:'Waiting for OAuth session to appear in localStorage',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        backgroundColor: '#0a0a0a', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: '#ffffff'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div 
+            style={{
+              animation: 'spin 1s linear infinite',
+              width: '48px',
+              height: '48px',
+              border: '2px solid #9333ea',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              margin: '0 auto 16px'
+            }}
+          />
+          <p style={{ color: '#a1a1aa' }}>Loading dashboard...</p>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       </div>
     )
