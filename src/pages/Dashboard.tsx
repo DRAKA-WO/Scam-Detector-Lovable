@@ -22,18 +22,42 @@ function Dashboard() {
   useEffect(() => {
     let mounted = true
     let subscription = null
+    let retryCount = 0
+    const MAX_RETRIES = 3
     
-    const loadUserData = async () => {
+    const loadUserData = async (retry = false) => {
       try {
-        console.log('📊 Dashboard: Loading user data...')
+        if (!retry) {
+          console.log('📊 Dashboard: Loading user data...')
+        }
         const { supabase } = await import('@/integrations/supabase/client')
+        
+        // Wait a bit for Supabase to fully initialize (especially after OAuth redirect)
+        if (!retry) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
         
         // Get current session
         const { data: { session }, error } = await supabase.auth.getSession()
         
-        console.log('📊 Dashboard: Session check', { hasSession: !!session, error })
+        console.log('📊 Dashboard: Session check', { hasSession: !!session, error, retryCount })
         
-        if (error || !session) {
+        if (error) {
+          console.error('❌ Dashboard: Session error', error)
+          // Retry if we haven't exceeded max retries
+          if (retryCount < MAX_RETRIES && mounted) {
+            retryCount++
+            console.log(`📊 Dashboard: Retrying... (${retryCount}/${MAX_RETRIES})`)
+            setTimeout(() => loadUserData(true), 500)
+            return
+          }
+          if (mounted) {
+            setLoading(false)
+          }
+          return
+        }
+        
+        if (!session) {
           console.log('📊 Dashboard: No session, redirecting to home')
           // Not logged in, redirect to home
           if (mounted) {
@@ -60,6 +84,13 @@ function Dashboard() {
         }
       } catch (error) {
         console.error('❌ Dashboard: Error loading user data:', error)
+        // Retry on error if we haven't exceeded max retries
+        if (retryCount < MAX_RETRIES && mounted) {
+          retryCount++
+          console.log(`📊 Dashboard: Retrying after error... (${retryCount}/${MAX_RETRIES})`)
+          setTimeout(() => loadUserData(true), 500)
+          return
+        }
         if (mounted) {
           setLoading(false)
           // Don't redirect on error, just show the dashboard with error state
@@ -67,13 +98,11 @@ function Dashboard() {
       }
     }
 
-    loadUserData()
-
-    // Listen for auth changes
+    // Set up auth listener first (this will also trigger on initial load)
     const setupAuthListener = async () => {
       try {
         const { supabase } = await import('@/integrations/supabase/client')
-        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           console.log('📊 Dashboard: Auth state changed', _event)
           if (!session) {
             if (mounted) {
@@ -86,12 +115,18 @@ function Dashboard() {
               setRemainingChecks(checks)
               const userStats = getUserStats(session.user.id)
               setStats(userStats)
+              setLoading(false)
             }
           }
         })
         subscription = data
+        
+        // Also try to load user data directly
+        loadUserData()
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
+        // Still try to load user data
+        loadUserData()
       }
     }
 
