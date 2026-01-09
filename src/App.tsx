@@ -50,9 +50,9 @@ const OAuthCallback = () => {
             // Clear hash from URL
             window.history.replaceState(null, '', window.location.pathname);
             
-            // Redirect to dashboard
+            // Redirect to dashboard using window.location to force full page load
             console.log('✅ Redirecting to dashboard...');
-            navigate('/dashboard', { replace: true });
+            window.location.href = '/dashboard';
           }
         });
         
@@ -92,9 +92,9 @@ const OAuthCallback = () => {
               // Clear hash from URL
               window.history.replaceState(null, '', window.location.pathname);
               
-              // Redirect to dashboard
+              // Redirect to dashboard using window.location to force full page load
               console.log('✅ Redirecting to dashboard...');
-              navigate('/dashboard', { replace: true });
+              window.location.href = '/dashboard';
             } else if (!session && mounted && attempt < 5) {
               // Wait longer for Supabase to process the hash (up to 5 attempts)
               console.log(`⏳ Waiting for session... (attempt ${attempt + 1}/5)`);
@@ -174,27 +174,19 @@ const OAuthCallback = () => {
   );
 };
 
-const AppRoutes = () => {
-  const location = useLocation();
-  
-  return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/dashboard" element={<Dashboard key={location.pathname + location.search + Date.now()} />} />
-      <Route path="/auth/callback" element={<OAuthCallback />} />
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppRoutes />
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/auth/callback" element={<OAuthCallback />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
