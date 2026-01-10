@@ -8,14 +8,7 @@ import Footer from '@/components/landing/Footer'
 import { getRemainingUserChecks, getUserStats } from '@/utils/checkLimits'
 
 function Dashboard() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:component-entry',message:'Dashboard component function called',data:{url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   const navigate = useNavigate()
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:before-state-init',message:'Before state initialization',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   
   // Initialize user state synchronously from localStorage if available
   const [user, setUser] = useState(() => {
@@ -28,22 +21,14 @@ function Dashboard() {
         if (sessionStr) {
           const session = JSON.parse(sessionStr)
           if (session?.currentSession?.user) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state',message:'Initialized user from localStorage',data:{userId:session.currentSession.user.id,email:session.currentSession.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-            // #endregion
             return session.currentSession.user
           } else if (session?.user) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state',message:'Initialized user from localStorage (alt format)',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-            // #endregion
             return session.user
           }
         }
       }
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-user-state-error',message:'Error initializing user from localStorage',data:{error:e?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
+      // Ignore errors
     }
     return null
   })
@@ -81,17 +66,22 @@ function Dashboard() {
     }
   })
   // Initialize loading state - check if we already have a session
+  // IMPORTANT: Use the same logic as user state to ensure consistency
   const [loading, setLoading] = useState(() => {
-    // If we have a user from localStorage, start with loading false
+    // If we have a user from the state above, start with loading false
+    if (user) {
+      return false
+    }
+    // Otherwise check localStorage directly (same dynamic key lookup as user state)
     try {
-      const sessionStr = localStorage.getItem('sb-tpmynhukocnyggqkxckh-auth-token')
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr)
-        if (session?.user) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:initial-loading-state',message:'Initialized loading=false from localStorage',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
-          return false
+      const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'))
+      if (supabaseKeys.length > 0) {
+        const sessionStr = localStorage.getItem(supabaseKeys[0])
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr)
+          if (session?.currentSession?.user || session?.user) {
+            return false
+          }
         }
       }
     } catch (e) {
@@ -101,49 +91,23 @@ function Dashboard() {
   })
   const effectIdRef = useRef(0)
   const hasLoadedRef = useRef(!!user)
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:after-all-state-init',message:'After all state initialization',data:{hasUser:!!user,loading,remainingChecks},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:before-useEffect',message:'Before useEffect definition',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:entry',message:'useEffect started',data:{loading,hasUser:!!user,url:window.location.href,hash:window.location.hash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
-    // #endregion
     const currentEffectId = ++effectIdRef.current
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:effectId',message:'Effect ID assigned',data:{effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     let subscription = null
     
     // Helper to update user data
     const updateUserData = (session) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:entry',message:'updateUserData called',data:{effectId:currentEffectId,currentEffectId:effectIdRef.current,hasSession:!!session,hasUser:!!session?.user,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       if (!session?.user) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:early-return',message:'Early return from updateUserData - no session',data:{effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         return false
       }
       
       // Check if this effect is still active (not cleaned up)
       if (currentEffectId !== effectIdRef.current) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:effect-stale',message:'Effect is stale, skipping update',data:{effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         return false
       }
       
       console.log('📊 Dashboard: Updating user data', session.user.email)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setState',message:'Before setState calls',data:{effectId:currentEffectId,userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       setUser(session.user)
       
       // Get user's remaining checks
@@ -158,18 +122,9 @@ function Dashboard() {
       
       // Double-check effect is still active before setLoading
       if (currentEffectId !== effectIdRef.current) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setLoading-check',message:'Effect became stale before setLoading',data:{effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         return false
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:before-setLoading-call',message:'About to call setLoading(false)',data:{effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       setLoading(false)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:after-setLoading-call',message:'Called setLoading(false)',data:{effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       hasLoadedRef.current = true
       
       // Clear hash if it exists
@@ -177,9 +132,6 @@ function Dashboard() {
         window.history.replaceState(null, '', window.location.pathname)
       }
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:updateUserData:exit',message:'updateUserData completed',data:{success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       return true
     }
     
@@ -187,17 +139,8 @@ function Dashboard() {
     const checkSessionImmediately = async () => {
       try {
         console.log('📊 Dashboard: Checking session immediately...')
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:before-import',message:'Before Supabase import',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         const { supabase } = await import('@/integrations/supabase/client')
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:after-import',message:'After Supabase import',data:{hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         const { data: { session }, error } = await supabase.auth.getSession()
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:after-getSession',message:'After getSession call',data:{hasSession:!!session,hasError:!!error,error:error?.message,userId:session?.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
-        // #endregion
         
         if (error) {
           console.error('❌ Dashboard: Session error', error)
@@ -206,21 +149,12 @@ function Dashboard() {
         
         if (session?.user) {
           console.log('📊 Dashboard: Session found immediately')
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:session-found',message:'Session found, calling updateUserData',data:{userId:session.user.id,email:session.user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
-          // #endregion
           return updateUserData(session)
         }
         
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:no-session',message:'No session found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
-        // #endregion
         return false
       } catch (error) {
         console.error('❌ Dashboard: Error checking session', error)
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:checkSessionImmediately:error',message:'Error in checkSessionImmediately',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         return false
       }
     }
@@ -229,21 +163,12 @@ function Dashboard() {
     const setupAuthListener = async () => {
       try {
         console.log('📊 Dashboard: Setting up auth listener...')
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:entry',message:'setupAuthListener started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         const { supabase } = await import('@/integrations/supabase/client')
         
         // Check session immediately first
         const hasSession = await checkSessionImmediately()
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:after-checkSession',message:'After checkSessionImmediately',data:{hasSession,effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         if (hasSession && currentEffectId === effectIdRef.current) {
           // We already have a session, we're done
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:early-return',message:'Early return - session found',data:{effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
           return
         }
         
@@ -251,14 +176,8 @@ function Dashboard() {
         const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           // Check if this effect is still active before processing
           if (currentEffectId !== effectIdRef.current) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:onAuthStateChange:stale',message:'Auth state change - effect is stale, ignoring',data:{event:_event,effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             return
           }
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:onAuthStateChange:event',message:'Auth state change event fired',data:{event:_event,hasSession:!!session,userId:session?.user?.id,effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
           console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
           if (!session) {
@@ -279,20 +198,11 @@ function Dashboard() {
         // If we still don't have a session, check again after a short delay
         // This handles the case where Supabase is still processing
         if (!hasSession) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:setting-timeout',message:'Setting timeout for retry',data:{effectId:currentEffectId,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
           setTimeout(async () => {
             // Check if this effect is still active
             if (currentEffectId !== effectIdRef.current) {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-stale',message:'Timeout callback - effect is stale',data:{effectId:currentEffectId,currentEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               return
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:timeout-callback',message:'Timeout callback executing',data:{effectId:currentEffectId,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             const hasSessionNow = await checkSessionImmediately()
             if (!hasSessionNow && currentEffectId === effectIdRef.current) {
               console.log('📊 Dashboard: No session found after delay, redirecting')
@@ -303,9 +213,6 @@ function Dashboard() {
         
       } catch (error) {
         console.error('❌ Dashboard: Error setting up auth listener:', error)
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:setupAuthListener:error',message:'Error in setupAuthListener',data:{error:error?.message,effectId:currentEffectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         // On error, try one more time after a delay
         setTimeout(async () => {
           if (currentEffectId !== effectIdRef.current) return
@@ -323,9 +230,6 @@ function Dashboard() {
     return () => {
       // Increment effect ID to invalidate any pending async operations
       effectIdRef.current++
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:useEffect:cleanup',message:'useEffect cleanup',data:{effectId:currentEffectId,newEffectId:effectIdRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       if (subscription) {
         subscription.unsubscribe()
       }
@@ -342,22 +246,9 @@ function Dashboard() {
     }
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:after-state-init',message:'After state initialization',data:{hasUser:!!user,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
   // If we've already loaded the user, don't show loading screen even if loading is true
   // This prevents React Strict Mode from resetting the UI
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:check-loading-condition',message:'Checking loading condition',data:{loading,hasLoaded:hasLoadedRef.current,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   if (loading && !hasLoadedRef.current) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:loading-render',message:'Rendering loading state',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:loading-render',message:'Rendering loading state',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -395,26 +286,16 @@ function Dashboard() {
   const [showFallback, setShowFallback] = useState(false)
   const oauthCheckRef = useRef(false)
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:render-check',message:'Render check',data:{loading,hasUser:!!user,remainingChecks:remainingChecks??'undefined',hasStats:!!stats,hasLoaded:hasLoadedRef.current,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
   useEffect(() => {
     // Always check localStorage when we don't have a user, regardless of loading state
     // This handles the case where OAuthCallback redirected before localStorage was written
     if (!user && !oauthCheckRef.current) {
       oauthCheckRef.current = true
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check',message:'Checking for OAuth session in localStorage',data:{loading,hasHash:!!window.location.hash,url:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       
       // Wait a bit to see if session appears in localStorage (OAuth callback might still be processing)
       const checkForSession = (attempt = 0) => {
         // Check if user was set (might have been set by another effect)
         if (user) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check-cancelled',message:'User was set, cancelling OAuth check',data:{attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
           return
         }
         
@@ -426,9 +307,6 @@ function Dashboard() {
               const storedSession = JSON.parse(sessionStr)
               const sessionUser = storedSession?.currentSession?.user || storedSession?.user
               if (sessionUser) {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-session-found',message:'Found session in localStorage, setting user',data:{userId:sessionUser.id,attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-                // #endregion
                 setUser(sessionUser)
                 const checks = getRemainingUserChecks(sessionUser.id)
                 setRemainingChecks(checks)
@@ -440,9 +318,7 @@ function Dashboard() {
               }
             }
           } catch (e) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-check-error',message:'Error parsing localStorage session',data:{error:e?.message,attempt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-            // #endregion
+            // Ignore parse errors
           }
         }
         
@@ -450,9 +326,6 @@ function Dashboard() {
         if (attempt < 20) {
           setTimeout(() => checkForSession(attempt + 1), 200)
         } else {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-timeout',message:'No session found after waiting, showing fallback',data:{attempts:attempt,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
           // Only show fallback if loading is also false
           if (!loading) {
             setShowFallback(true)
@@ -468,17 +341,7 @@ function Dashboard() {
     }
   }, [loading, user]) // Removed getRemainingUserChecks and getUserStats from dependencies - they're stable functions
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:after-all-useEffects',message:'After all useEffect definitions',data:{hasUser:!!user,loading,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:check-fallback-condition',message:'Checking fallback condition',data:{loading,hasUser:!!user,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   if (!loading && !user && showFallback) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:no-user-fallback',message:'Rendering no-user fallback',data:{loading,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -509,13 +372,7 @@ function Dashboard() {
   }
   
   // If we're waiting for OAuth session, show loading
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:check-oauth-waiting',message:'Checking OAuth waiting condition',data:{loading,hasUser:!!user,showFallback},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   if (!loading && !user && !showFallback) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:oauth-waiting',message:'Waiting for OAuth session to appear in localStorage',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -548,14 +405,7 @@ function Dashboard() {
     )
   }
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:main-render',message:'Rendering main dashboard content',data:{loading,hasUser:!!user,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:before-return',message:'About to return main dashboard JSX',data:{loading,hasUser:!!user,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
   return (
     <div 
       className="min-h-screen bg-background" 
@@ -566,9 +416,6 @@ function Dashboard() {
         paddingTop: '64px'
       }}
     >
-      {/* #region agent log */}
-      {(() => { fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:rendering-header',message:'Rendering Header component',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{}); return null; })()}
-      {/* #endregion */}
       <Header />
       <main 
         className="container mx-auto px-4 py-8 max-w-7xl" 
@@ -579,22 +426,6 @@ function Dashboard() {
           color: '#ffffff'
         }}
       >
-        {/* #region agent log */}
-        {(() => { fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:rendering-main-content',message:'Rendering main content section',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{}); return null; })()}
-        {/* #endregion */}
-        {/* Test element to verify rendering */}
-        <div style={{ 
-          position: 'fixed', 
-          top: '100px', 
-          left: '20px', 
-          zIndex: 9999, 
-          backgroundColor: 'red', 
-          color: 'white', 
-          padding: '10px',
-          fontSize: '14px'
-        }}>
-          DASHBOARD RENDERED - User: {user?.email || 'none'}
-        </div>
         
         {/* Welcome Section */}
         <div style={{ marginBottom: '32px' }}>
@@ -682,10 +513,25 @@ function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Button
-                onClick={() => navigate('/#detector')}
-                className="w-full"
+                onClick={() => {
+                  // Navigate to home page with hash, then scroll smoothly
+                  if (window.location.pathname === '/') {
+                    // Already on home page, just scroll
+                    const detectorSection = document.getElementById('detector')
+                    if (detectorSection) {
+                      detectorSection.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  } else {
+                    // Navigate to home page with hash
+                    window.location.href = '/#detector'
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold text-base h-14 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] border-0"
                 size="lg"
               >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
                 Start New Scan
               </Button>
               <Button

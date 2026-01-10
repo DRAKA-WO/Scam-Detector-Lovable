@@ -21,6 +21,22 @@ const OAuthCallback = () => {
     const handleOAuthCallback = async () => {
       try {
         console.log('🔄 Processing OAuth callback...');
+        
+        // Check if user cancelled OAuth (error in URL params or hash)
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const error = urlParams.get('error') || hashParams.get('error');
+        const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
+        
+        if (error === 'access_denied' || errorDescription?.toLowerCase().includes('user denied') || errorDescription?.toLowerCase().includes('cancelled')) {
+          console.log('⚠️ User cancelled OAuth sign-in');
+          if (mounted) {
+            // Use window.location.href to force full page reload and clear the black screen
+            window.location.href = '/';
+          }
+          return;
+        }
+        
         const { supabase } = await import('@/integrations/supabase/client');
         
         // Supabase automatically processes hash fragments when the client is initialized
@@ -84,7 +100,9 @@ const OAuthCallback = () => {
               // Redirect to dashboard
               if (mounted) {
                 console.log('✅ Redirecting to dashboard...');
-                navigate('/dashboard', { replace: true });
+                // Use window.location.href instead of navigate() to force a full page navigation
+                // This ensures React Router fully commits the route change and Dashboard renders immediately
+                window.location.href = '/dashboard';
               }
             };
             
@@ -103,7 +121,8 @@ const OAuthCallback = () => {
             if (error) {
               console.error('❌ OAuth callback error:', error);
               if (mounted && attempt >= 3) {
-                navigate('/', { replace: true });
+                // Use window.location.href to force full page reload and clear the black screen
+                window.location.href = '/';
               } else if (mounted) {
                 setTimeout(() => checkSession(attempt + 1), 500);
               }
@@ -157,10 +176,11 @@ const OAuthCallback = () => {
                 // Clear hash from URL
                 window.history.replaceState(null, '', window.location.pathname);
                 
-                // Redirect to dashboard
+                // Redirect to dashboard - use window.location.href to force full page navigation
+                // This ensures OAuthCallback is completely unmounted before Dashboard mounts
                 if (mounted) {
                   console.log('✅ Redirecting to dashboard...');
-                  navigate('/dashboard', { replace: true });
+                  window.location.href = '/dashboard';
                 }
               };
               
@@ -171,8 +191,9 @@ const OAuthCallback = () => {
               console.log(`⏳ Waiting for session... (attempt ${attempt + 1}/5)`);
               setTimeout(() => checkSession(attempt + 1), 600);
             } else if (!session && mounted) {
-              console.error('❌ No session after multiple attempts');
-              navigate('/', { replace: true });
+              console.error('❌ No session after multiple attempts - user may have cancelled');
+              // Use window.location.href to force full page reload and clear the black screen
+              window.location.href = '/';
             }
           } catch (err) {
             console.error('Error checking session:', err);
@@ -191,13 +212,15 @@ const OAuthCallback = () => {
         setTimeout(() => {
           if (!sessionReceived && mounted) {
             console.warn('⚠️ OAuth callback timeout, redirecting to home');
-            navigate('/', { replace: true });
+            // Use window.location.href to force full page reload and clear the black screen
+            window.location.href = '/';
           }
         }, 5000);
       } catch (error) {
         console.error('❌ Error handling OAuth callback:', error);
         if (mounted) {
-          navigate('/', { replace: true });
+          // Use window.location.href to force full page reload and clear the black screen
+          window.location.href = '/';
         }
       }
     };
