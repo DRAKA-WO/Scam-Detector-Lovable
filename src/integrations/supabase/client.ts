@@ -14,25 +14,6 @@ if (!SUPABASE_URL || !SUPABASE_URL.includes('tpmynhukocnyggqkxckh') || SUPABASE_
   SUPABASE_URL = FALLBACK_SUPABASE_URL;
 }
 
-// 🛡️ Intercept fetch to prevent URL corruption by browser extensions
-const originalFetch = window.fetch;
-window.fetch = function(...args) {
-  let [resource, config] = args;
-  
-  // Fix corrupted Supabase URLs
-  if (typeof resource === 'string') {
-    // Check for corrupted URL patterns
-    if (resource.includes('.ggg') || (resource.includes('supabase.co') && !resource.includes('tpmynhukocnyggqkxckh'))) {
-      console.warn('🛡️ Intercepted corrupted Supabase URL:', resource);
-      // Replace with correct URL
-      resource = resource.replace(/tpmynhukocny\.gggkxckh\.supabase\.co/g, 'tpmynhukocnyggqkxckh.supabase.co');
-      console.log('✅ Fixed URL to:', resource);
-    }
-  }
-  
-  return originalFetch.call(this, resource, config);
-};
-
 // Always log Supabase config (for debugging in production)
 console.log('🔧 Supabase Config Check:', {
   url: SUPABASE_URL ? SUPABASE_URL : '❌ MISSING',
@@ -41,7 +22,6 @@ console.log('🔧 Supabase Config Check:', {
   keyPreview: SUPABASE_PUBLISHABLE_KEY ? `${SUPABASE_PUBLISHABLE_KEY.substring(0, 25)}...` : 'N/A',
   isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : SUPABASE_URL?.includes('qsivfrgtncdvxvawgdbu') ? '❌ OLD PROJECT' : '❓ UNKNOWN',
   usingFallback: SUPABASE_URL === FALLBACK_SUPABASE_URL ? '⚠️ YES' : '✅ NO',
-  fetchInterceptorActive: '✅ YES',
 });
 
 // Validate environment variables
