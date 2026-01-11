@@ -51,12 +51,20 @@ const OAuthCallback = () => {
         if (window.location.hash && window.location.hash.includes('access_token')) {
           console.log('🔧 DEBUG: Hash contains access_token, forcing Supabase to process it...');
           
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:52_manualSessionStart',message:'Manual session extraction START',data:{hasAccessToken:hashParams.has('access_token'),hasRefreshToken:hashParams.has('refresh_token'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+          // #endregion
+          
           try {
             // Supabase should auto-process the hash, but let's explicitly trigger it
             const { data, error: sessionError } = await supabase.auth.setSession({
               access_token: hashParams.get('access_token') || '',
               refresh_token: hashParams.get('refresh_token') || '',
             });
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:65_afterSetSession',message:'After supabase.auth.setSession',data:{hasData:!!data,hasSession:!!data?.session,hasError:!!sessionError,errorMsg:sessionError?.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+            // #endregion
             
             if (sessionError) {
               console.error('❌ Error manually setting session:', sessionError);
@@ -136,17 +144,29 @@ const OAuthCallback = () => {
             };
             
             const proceedWithRedirect = async () => {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:82_proceedStart',message:'OAuth proceedWithRedirect START',data:{userId:session.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
+              // #endregion
+              
               // Initialize user checks (give 5 checks on signup)
               const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
               const { initializePermanentStats } = await import('./utils/permanentStats');
               const existingChecks = getRemainingUserChecks(session.user.id);
               console.log('📊 Existing checks:', existingChecks);
               
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:90_beforeInit',message:'BEFORE initializeUserChecks and initializePermanentStats',data:{existingChecks,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
+              // #endregion
+              
               if (existingChecks === 0) {
                 // New user - give them 5 checks
                 initializeUserChecks(session.user.id);
                 initializePermanentStats(session.user.id);
                 console.log('✅ Initialized 5 checks and permanent stats for new user');
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:100_afterInit',message:'AFTER initializePermanentStats called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+                // #endregion
               }
               
               // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
@@ -244,6 +264,9 @@ const OAuthCallback = () => {
               // Redirect to dashboard
               if (mounted) {
                 console.log('✅ Redirecting to dashboard...');
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:189_beforeRedirect',message:'BEFORE window.location.href redirect',data:{mounted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+                // #endregion
                 // Use window.location.href instead of navigate() to force a full page navigation
                 // This ensures React Router fully commits the route change and Dashboard renders immediately
                 window.location.href = '/dashboard';

@@ -18,8 +18,16 @@ function getStatsKey(userId) {
  * Initialize permanent stats for a user
  */
 export function initializePermanentStats(userId) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'permanentStats.js:19_initStart',message:'initializePermanentStats called',data:{userId,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H4'})}).catch(()=>{});
+  // #endregion
+  
   const key = getStatsKey(userId);
   const existing = localStorage.getItem(key);
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'permanentStats.js:27_afterGet',message:'After localStorage.getItem in init',data:{hasExisting:!!existing,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
   
   if (!existing) {
     const initialStats = {
@@ -31,6 +39,10 @@ export function initializePermanentStats(userId) {
     };
     localStorage.setItem(key, JSON.stringify(initialStats));
     console.log('✅ Initialized permanent stats for user:', userId);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'permanentStats.js:43_afterSet',message:'After localStorage.setItem in init',data:{initialStats,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H4'})}).catch(()=>{});
+    // #endregion
   }
 }
 

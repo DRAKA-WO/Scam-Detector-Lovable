@@ -47,13 +47,27 @@ function Dashboard() {
     return 0
   })
   const [stats, setStats] = useState(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:49_statsInit',message:'Dashboard stats useState initializer START',data:{hasUser:!!user,userId:user?.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H3'})}).catch(()=>{});
+    // #endregion
+    
     // Load permanent stats immediately if we have a user
     if (user?.id) {
       try {
         const { getPermanentStats } = require('@/utils/permanentStats')
-        return getPermanentStats(user.id)
+        const stats = getPermanentStats(user.id)
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:60_statsLoaded',message:'Dashboard loaded permanent stats',data:{stats,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H3'})}).catch(()=>{});
+        // #endregion
+        
+        return stats
       } catch (e) {
         console.error('Error loading permanent stats:', e)
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboard.tsx:69_statsError',message:'ERROR loading permanent stats',data:{error:e.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H3'})}).catch(()=>{});
+        // #endregion
       }
     }
     return {
