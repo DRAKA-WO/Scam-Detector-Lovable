@@ -7,7 +7,7 @@ import Header from '@/components/landing/Header'
 import Footer from '@/components/landing/Footer'
 import ScanHistory from '@/components/ScanHistory'
 import ResultCard from '@/components/ResultCard'
-import { getRemainingUserChecks, getUserStats } from '@/utils/checkLimits'
+import { getRemainingUserChecks } from '@/utils/checkLimits'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -46,26 +46,11 @@ function Dashboard() {
     }
     return 0
   })
-  const [stats, setStats] = useState(() => {
-    if (user?.id) {
-      try {
-        const userStats = getUserStats(user.id)
-        return userStats
-      } catch (e) {
-        return {
-          totalScans: 0,
-          scamsDetected: 0,
-          safeResults: 0,
-          suspiciousResults: 0
-        }
-      }
-    }
-    return {
-      totalScans: 0,
-      scamsDetected: 0,
-      safeResults: 0,
-      suspiciousResults: 0
-    }
+  const [stats, setStats] = useState({
+    totalScans: 0,
+    scamsDetected: 0,
+    safeResults: 0,
+    suspiciousResults: 0
   })
   // Initialize loading state - check if we already have a session
   // IMPORTANT: Use the same logic as user state to ensure consistency
@@ -98,12 +83,26 @@ function Dashboard() {
   const [latestScan, setLatestScan] = useState(null)
   const [showLatestScan, setShowLatestScan] = useState(false)
 
+  // Function to refresh stats from database
+  const refreshStats = async () => {
+    if (!user?.id) return
+    
+    try {
+      const { getUserStatsFromDatabase } = await import('@/utils/scanHistory')
+      const userStats = await getUserStatsFromDatabase(user.id)
+      console.log('🔄 Dashboard: Refreshed stats from database', userStats)
+      setStats(userStats)
+    } catch (error) {
+      console.error('❌ Dashboard: Error refreshing stats:', error)
+    }
+  }
+
   useEffect(() => {
     const currentEffectId = ++effectIdRef.current
     let subscription = null
     
     // Helper to update user data
-    const updateUserData = (session) => {
+    const updateUserData = async (session) => {
       if (!session?.user) {
         return false
       }
@@ -121,10 +120,21 @@ function Dashboard() {
       console.log('📊 Dashboard: User checks', checks)
       setRemainingChecks(checks)
       
-      // Get user stats
-      const userStats = getUserStats(session.user.id)
-      console.log('📊 Dashboard: User stats', userStats)
-      setStats(userStats)
+      // Get user stats from database (not localStorage)
+      try {
+        const { getUserStatsFromDatabase } = await import('@/utils/scanHistory')
+        const userStats = await getUserStatsFromDatabase(session.user.id)
+        console.log('📊 Dashboard: User stats from database', userStats)
+        setStats(userStats)
+      } catch (error) {
+        console.error('❌ Dashboard: Error fetching stats:', error)
+        setStats({
+          totalScans: 0,
+          scamsDetected: 0,
+          safeResults: 0,
+          suspiciousResults: 0
+        })
+      }
       
       // Double-check effect is still active before setLoading
       if (currentEffectId !== effectIdRef.current) {
@@ -352,8 +362,16 @@ function Dashboard() {
                 setUser(sessionUser)
                 const checks = getRemainingUserChecks(sessionUser.id)
                 setRemainingChecks(checks)
-                const userStats = getUserStats(sessionUser.id)
-                setStats(userStats)
+                
+                // Fetch stats from database asynchronously
+                import('@/utils/scanHistory').then(({ getUserStatsFromDatabase }) => {
+                  getUserStatsFromDatabase(sessionUser.id).then(userStats => {
+                    setStats(userStats)
+                  }).catch(err => {
+                    console.error('Error fetching stats:', err)
+                  })
+                })
+                
                 setLoading(false)
                 hasLoadedRef.current = true
                 return
@@ -381,7 +399,7 @@ function Dashboard() {
       // We've already checked, and still no user - show fallback
       setShowFallback(true)
     }
-  }, [loading, user]) // Removed getRemainingUserChecks and getUserStats from dependencies - they're stable functions
+  }, [loading, user]) // Removed getRemainingUserChecks from dependencies - it's a stable function
   
   if (!loading && !user && showFallback) {
     return (
@@ -739,6 +757,7 @@ function Dashboard() {
                 <ScanHistory
                   userId={user?.id}
                   onScanClick={(scan) => setSelectedScan(scan)}
+                  onRefresh={refreshStats}
                 />
               )}
             </CardContent>

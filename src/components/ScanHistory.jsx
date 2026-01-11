@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Shield, CheckCircle, AlertTriangle, AlertCircle, Image as ImageIcon, Link as LinkIcon, FileText, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-function ScanHistory({ userId, onScanClick }) {
+function ScanHistory({ userId, onScanClick, onRefresh }) {
   const [scans, setScans] = useState([])
   const [loading, setLoading] = useState(true)
   const [imageUrls, setImageUrls] = useState({}) // Cache signed URLs
@@ -50,6 +50,10 @@ function ScanHistory({ userId, onScanClick }) {
     try {
       const history = await getScanHistory(userId)
       setScans(history)
+      // Also refresh dashboard stats after loading history
+      if (onRefresh) {
+        onRefresh()
+      }
     } catch (error) {
       console.error('Error loading scan history:', error)
       setScans([])

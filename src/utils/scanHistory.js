@@ -159,6 +159,61 @@ export async function getSignedImageUrl(imagePath) {
 }
 
 /**
+ * Get user statistics from database (fetches ALL scans, not just latest 3)
+ * @param {string} userId - User ID
+ * @returns {Promise<Object>} User stats calculated from database
+ */
+export async function getUserStatsFromDatabase(userId) {
+  if (!userId) {
+    return {
+      totalScans: 0,
+      scamsDetected: 0,
+      safeResults: 0,
+      suspiciousResults: 0
+    }
+  }
+
+  try {
+    console.log('📊 Fetching user stats from database for user:', userId);
+    
+    // Fetch ALL scans for the user (not just latest 3)
+    const { data, error } = await supabase
+      .from('scan_history')
+      .select('classification')
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('❌ Error fetching scan stats:', error)
+      return {
+        totalScans: 0,
+        scamsDetected: 0,
+        safeResults: 0,
+        suspiciousResults: 0
+      }
+    }
+
+    // Calculate stats from the data
+    const stats = {
+      totalScans: data.length,
+      scamsDetected: data.filter(scan => scan.classification === 'scam').length,
+      safeResults: data.filter(scan => scan.classification === 'safe').length,
+      suspiciousResults: data.filter(scan => scan.classification === 'suspicious').length
+    }
+
+    console.log('✅ Calculated user stats from database:', stats);
+    return stats
+  } catch (error) {
+    console.error('❌ Exception fetching scan stats:', error)
+    return {
+      totalScans: 0,
+      scamsDetected: 0,
+      safeResults: 0,
+      suspiciousResults: 0
+    }
+  }
+}
+
+/**
  * Delete old images from storage when scans are removed
  * @param {Array<string>} imageUrls - Array of image URLs to delete
  */
