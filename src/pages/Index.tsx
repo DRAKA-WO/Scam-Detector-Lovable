@@ -34,7 +34,7 @@ const Index = () => {
       </main>
       <Footer />
       <ScrollToAnalyze />
-    </div>
+      </div>
   )
 }
 

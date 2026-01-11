@@ -91,11 +91,95 @@ const OAuthCallback = () => {
                 console.log('✅ Initialized 5 checks for new user');
               }
               
+              // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
+              console.log('🔍 [OAuthCallback] Checking for pending scan...');
+              const PENDING_SCAN_KEY = 'scam_checker_pending_scan';
+              
+              try {
+                const pendingScanData = localStorage.getItem(PENDING_SCAN_KEY);
+                console.log('📦 [OAuthCallback] Pending scan in localStorage:', pendingScanData ? 'FOUND' : 'NOT FOUND');
+                
+                if (pendingScanData) {
+                  const scan = JSON.parse(pendingScanData);
+                  console.log('📋 [OAuthCallback] Parsed pending scan:', scan);
+                  console.log('🔎 [OAuthCallback] Scan details:', {
+                    scanType: scan.scanType,
+                    classification: scan.classification,
+                    hasImageFile: !!scan.imageFile,
+                    hasContentPreview: !!scan.contentPreview
+                  });
+                  
+                  // Import scan history utilities
+                  const { saveScanToHistory, uploadScanImage } = await import('./utils/scanHistory');
+                  
+                  let imageUrl = scan.imageUrl;
+                  
+                  // If it's an image scan, upload the image
+                  if (scan.scanType === 'image' && scan.imageData) {
+                    console.log('📤 [OAuthCallback] Uploading pending image from base64...');
+                    try {
+                      console.log('🔗 [OAuthCallback] Converting base64 to blob...');
+                      // Convert base64 to blob
+                      const response = await fetch(scan.imageData);
+                      const blob = await response.blob();
+                      console.log('✅ [OAuthCallback] Blob created, size:', blob.size, 'type:', blob.type);
+                      
+                      const fileName = scan.imageName || 'scan-image.png';
+                      const file = new File([blob], fileName, { type: blob.type });
+                      console.log('📁 [OAuthCallback] File created, uploading to Supabase...');
+                      
+                      imageUrl = await uploadScanImage(file, session.user.id);
+                      console.log('✅ [OAuthCallback] Successfully uploaded image:', imageUrl);
+                    } catch (uploadError) {
+                      console.error('❌ [OAuthCallback] Error uploading pending image:', uploadError);
+                      console.error('[OAuthCallback] Upload error details:', uploadError.message);
+                      // Continue anyway - save scan without image
+                    }
+                  }
+                  
+                  // Save to scan history
+                  console.log('💾 [OAuthCallback] Saving pending scan to history...');
+                  try {
+                    const savedScan = await saveScanToHistory(
+                      session.user.id,
+                      scan.scanType,
+                      imageUrl,
+                      scan.contentPreview,
+                      scan.classification,
+                      scan.analysisResult
+                    );
+                    
+                    console.log('✅ [OAuthCallback] Successfully saved pending scan to history!', savedScan);
+                    
+                    // Update user stats (analytics)
+                    console.log('📊 [OAuthCallback] Updating user stats for analytics...');
+                    const { updateUserStats } = await import('./utils/checkLimits');
+                    const resultType = scan.classification === 'scam' ? 'scam' : 
+                                      scan.classification === 'safe' ? 'safe' : 'suspicious';
+                    updateUserStats(session.user.id, resultType);
+                    console.log('✅ [OAuthCallback] User stats updated:', resultType);
+                    
+                    // Clear pending scan
+                    localStorage.removeItem(PENDING_SCAN_KEY);
+                    console.log('🗑️ [OAuthCallback] Cleared pending scan from localStorage');
+                  } catch (saveError) {
+                    console.error('❌ [OAuthCallback] CRITICAL ERROR saving pending scan:', saveError);
+                    console.error('[OAuthCallback] Save error details:', saveError.message);
+                    alert('Error saving your scan to history. Error: ' + saveError.message);
+                  }
+                } else {
+                  console.log('ℹ️ [OAuthCallback] No pending scan found');
+                }
+              } catch (error) {
+                console.error('❌ [OAuthCallback] Error handling pending scan:', error);
+                console.error('[OAuthCallback] Error details:', error.message);
+              }
+              
               // Clear hash from URL
               window.history.replaceState(null, '', window.location.pathname);
               
               // Small delay to ensure everything is settled
-              await new Promise(resolve => setTimeout(resolve, 300));
+              await new Promise(resolve => setTimeout(resolve, 500));
               
               // Redirect to dashboard
               if (mounted) {

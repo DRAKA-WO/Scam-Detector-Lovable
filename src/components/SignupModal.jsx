@@ -3,6 +3,9 @@ import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { saveScanToHistory, uploadScanImage } from "@/utils/scanHistory";
+
+const PENDING_SCAN_KEY = 'scam_checker_pending_scan';
 
 function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchToLogin }) {
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -48,6 +51,54 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
     }
   }
 
+  const handlePendingScan = async (userId) => {
+    try {
+      const pendingScanData = localStorage.getItem(PENDING_SCAN_KEY);
+      
+      if (pendingScanData) {
+        const scan = JSON.parse(pendingScanData);
+        console.log('📦 Found pending scan, saving to history:', scan);
+        
+        let imageUrl = scan.imageUrl;
+        
+        // If it's an image scan, we need to upload the image
+        if (scan.scanType === 'image' && scan.imageFile) {
+          try {
+            // Convert blob URL back to file
+            const response = await fetch(scan.imageFile);
+            const blob = await response.blob();
+            const file = new File([blob], 'scan-image.png', { type: blob.type });
+            
+            // Upload to Supabase Storage
+            imageUrl = await uploadScanImage(file, userId);
+            console.log('✅ Uploaded pending scan image:', imageUrl);
+          } catch (uploadError) {
+            console.error('Error uploading pending scan image:', uploadError);
+            // Continue anyway - save scan without image
+          }
+        }
+        
+        // Save to scan history
+        await saveScanToHistory(
+          userId,
+          scan.scanType,
+          imageUrl,
+          scan.contentPreview,
+          scan.classification,
+          scan.analysisResult
+        );
+        
+        console.log('✅ Saved pending scan to history');
+        
+        // Clear pending scan from localStorage
+        localStorage.removeItem(PENDING_SCAN_KEY);
+      }
+    } catch (error) {
+      console.error('Error handling pending scan:', error);
+      // Don't throw - we don't want to block signup completion
+    }
+  };
+
   const handleEmailSignup = async (e) => {
     e.preventDefault();
     setError("");
@@ -81,6 +132,29 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
       setIsLoading(false);
     }
   }
+
+  const handleGoogleSignup = async () => {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+
+      if (error) {
+        setError(error.message || "Google signup failed. Please try again.");
+        return;
+      }
+
+      // Check for pending scan and handle after OAuth redirect completes
+      // This will be handled in the auth callback or auth state change listener
+    } catch (err) {
+      setError(err.message || "An error occurred. Please try again.");
+    }
+  };
 
   return (
     <div 
@@ -159,7 +233,7 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
               {/* Buttons */}
               <div className="space-y-3">
                 <Button
-                  onClick={() => onSignup('google')}
+                  onClick={handleGoogleSignup}
                   variant="outline"
                   className="w-full h-12 bg-white hover:bg-gray-100 text-gray-900 border-0 font-semibold flex items-center justify-center gap-3 transition-all hover:scale-[1.02] shadow-md"
                 >

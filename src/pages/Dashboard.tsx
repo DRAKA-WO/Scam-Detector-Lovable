@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Header from '@/components/landing/Header'
 import Footer from '@/components/landing/Footer'
+import ScanHistory from '@/components/ScanHistory'
+import ResultCard from '@/components/ResultCard'
 import { getRemainingUserChecks, getUserStats } from '@/utils/checkLimits'
 
 function Dashboard() {
@@ -91,6 +93,10 @@ function Dashboard() {
   })
   const effectIdRef = useRef(0)
   const hasLoadedRef = useRef(!!user)
+  const [showHistory, setShowHistory] = useState(false)
+  const [selectedScan, setSelectedScan] = useState(null)
+  const [latestScan, setLatestScan] = useState(null)
+  const [showLatestScan, setShowLatestScan] = useState(false)
 
   useEffect(() => {
     const currentEffectId = ++effectIdRef.current
@@ -235,6 +241,42 @@ function Dashboard() {
       }
     }
   }, [navigate])
+
+  // Fetch latest scan on mount - only show once after signup
+  useEffect(() => {
+    const fetchLatestScan = async () => {
+      if (!user?.id) return
+      
+      // Check if user has already seen the latest scan result
+      const hasSeenKey = `has_seen_latest_scan_${user.id}`
+      const hasSeen = localStorage.getItem(hasSeenKey)
+      
+      if (hasSeen === 'true') {
+        console.log('📋 Dashboard: User has already seen latest scan, not showing')
+        return
+      }
+      
+      try {
+        const { getScanHistory } = await import('@/utils/scanHistory')
+        const scans = await getScanHistory(user.id)
+        
+        if (scans && scans.length > 0) {
+          console.log('📋 Dashboard: Loaded latest scan for first-time display:', scans[0])
+          setLatestScan(scans[0])
+          setShowLatestScan(true)
+          
+          // Mark as seen immediately
+          localStorage.setItem(hasSeenKey, 'true')
+        } else {
+          console.log('📋 Dashboard: No scans found')
+        }
+      } catch (error) {
+        console.error('Error fetching latest scan:', error)
+      }
+    }
+
+    fetchLatestScan()
+  }, [user?.id])
 
   const handleLogout = async () => {
     try {
@@ -450,17 +492,30 @@ function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Remaining Checks</CardTitle>
               <Shield className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{remainingChecks}</div>
-              <p className="text-xs text-muted-foreground">
-                {remainingChecks > 0 ? 'Ready to scan' : 'Upgrade for more'}
-              </p>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-2xl font-bold">{remainingChecks}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {remainingChecks > 0 ? 'Ready to scan' : 'Upgrade for more'}
+                  </p>
+                </div>
+                <a
+                  href="/pricing"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium transition-all"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Get more
+                </a>
+              </div>
             </CardContent>
           </Card>
 
@@ -486,6 +541,19 @@ function Dashboard() {
               <div className="text-2xl font-bold">{stats.scamsDetected}</div>
               <p className="text-xs text-muted-foreground">
                 Threats identified
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Suspicious Results</CardTitle>
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.suspiciousResults}</div>
+              <p className="text-xs text-muted-foreground">
+                Potentially risky content
               </p>
             </CardContent>
           </Card>
@@ -538,9 +606,10 @@ function Dashboard() {
                 variant="outline"
                 className="w-full"
                 size="lg"
-                disabled
+                onClick={() => setShowHistory(!showHistory)}
               >
-                View Scan History (Coming Soon)
+                <History className="w-4 h-4 mr-2" />
+                {showHistory ? 'Hide' : 'View'} Scan History
               </Button>
             </CardContent>
           </Card>
@@ -551,40 +620,130 @@ function Dashboard() {
               <CardDescription>Your account details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  {user?.user_metadata?.avatar_url ? (
-                    <img
-                      src={user.user_metadata.avatar_url}
-                      alt="Avatar"
-                      className="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <User className="w-5 h-5 text-white" />
-                  )}
+              {/* User Info and Plan - Side by Side */}
+              <div className="flex items-stretch gap-4">
+                {/* Left: User Info (50%) */}
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      {user?.user_metadata?.avatar_url ? (
+                        <img
+                          src={user.user_metadata.avatar_url}
+                          alt="Avatar"
+                          className="w-10 h-10 rounded-full"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-white" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-semibold">
+                        {user?.user_metadata?.full_name || user?.email || 'User'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Member since</p>
+                    <p className="font-medium text-sm">
+                      {user?.created_at
+                        ? new Date(user.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
+                        : 'Recently'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold">
-                    {user?.user_metadata?.full_name || user?.email || 'User'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+
+                {/* Divider */}
+                <div className="w-px bg-border"></div>
+
+                {/* Right: Current Plan & Upgrade - Centered (50%) */}
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-2">Current Plan</p>
+                    <div className="inline-flex items-center px-4 py-1.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
+                      <span className="text-sm font-bold text-purple-300">FREE PLAN</span>
+                    </div>
+                  </div>
+                  <a
+                    href="/pricing"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold transition-all hover:scale-105 shadow-md"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Upgrade Plan
+                  </a>
                 </div>
-              </div>
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground mb-2">Member since</p>
-                <p className="font-medium">
-                  {user?.created_at
-                    ? new Date(user.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })
-                    : 'Recently'}
-                </p>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Latest Scan Result - Auto Display */}
+        {latestScan && showLatestScan && (
+          <Card className="mb-8">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle>Latest Scan Result</CardTitle>
+                <CardDescription>Your most recent scan</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLatestScan(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <ResultCard
+                result={latestScan.analysis_result}
+                onNewAnalysis={() => {
+                  window.location.href = '/#detector'
+                }}
+                onReportScam={() => {}}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Scan History Section */}
+        {showHistory && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Scan History</CardTitle>
+              <CardDescription>View your latest 3 scans</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {selectedScan ? (
+                <div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedScan(null)}
+                    className="mb-4"
+                  >
+                    ← Back to History
+                  </Button>
+                  <ResultCard
+                    result={selectedScan.analysis_result}
+                    onNewAnalysis={() => setSelectedScan(null)}
+                    onReportScam={() => {}}
+                  />
+                </div>
+              ) : (
+                <ScanHistory
+                  userId={user?.id}
+                  onScanClick={(scan) => setSelectedScan(scan)}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Features Section */}
         <Card>

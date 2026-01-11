@@ -6,6 +6,7 @@ import TextInput from '../TextInput'
 import ResultCard from '../ResultCard'
 import ReportModal from '../ReportModal'
 import SignupModal from '../SignupModal'
+import BlurredResultPreview from '../BlurredResultPreview'
 import AnalyzingSteps from '../AnalyzingSteps'
 import { API_ENDPOINTS } from '../../config'
 import { handleApiError, getUserFriendlyError } from '../../utils/errorHandler'
@@ -17,7 +18,10 @@ import {
   useUserCheck,
   updateUserStats
 } from '../../utils/checkLimits'
+import { saveScanToHistory, uploadScanImage } from '../../utils/scanHistory'
 // Supabase import removed - will be loaded dynamically to avoid build errors
+
+const PENDING_SCAN_KEY = 'scam_checker_pending_scan'
 
 function DetectorSection() {
   const [activeTab, setActiveTab] = useState('image')
@@ -33,6 +37,7 @@ function DetectorSection() {
   const [remainingChecks, setRemainingChecks] = useState(getRemainingFreeChecks())
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userId, setUserId] = useState(null)
+  const [showBlurredPreview, setShowBlurredPreview] = useState(false)
 
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
   const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
@@ -90,6 +95,8 @@ function DetectorSection() {
           if (session?.user) {
             setUserId(session.user.id)
             setShowSignupModal(false)
+            setShowBlurredPreview(false) // Hide blurred preview on login
+            
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
             let checks = getRemainingUserChecks(session.user.id)
             // Initialize checks if user has none (new signup)
@@ -98,6 +105,9 @@ function DetectorSection() {
               checks = getRemainingUserChecks(session.user.id)
             }
             setRemainingChecks(checks)
+            
+            // NOTE: Pending scan handling is now in App.tsx OAuthCallback
+            // This ensures it runs even when redirecting to dashboard
           } else {
             setUserId(null)
             // When logged out, switch back to free checks
@@ -120,6 +130,53 @@ function DetectorSection() {
       }
     }
   }, [])
+
+  // Helper to store pending scan for later conversion
+  const storePendingScan = async (scanType, imageFile, imageUrl, contentPreview, classification, analysisResult) => {
+    try {
+      let imageData = null;
+      let imageName = null;
+      
+      // Convert image file to base64 so it survives OAuth redirect
+      if (imageFile) {
+        console.log('📸 Converting image to base64 for storage...');
+        imageData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(imageFile);
+        });
+        imageName = imageFile.name;
+        console.log('✅ Image converted to base64, size:', imageData.length, 'bytes');
+      }
+      
+      const pendingScan = {
+        scanType,
+        imageData, // Base64 string instead of blob URL
+        imageName, // Original filename
+        imageUrl,
+        contentPreview,
+        classification,
+        analysisResult,
+        timestamp: new Date().toISOString()
+      };
+      
+      localStorage.setItem(PENDING_SCAN_KEY, JSON.stringify(pendingScan));
+      console.log('✅ Successfully stored pending scan:', { scanType, classification, hasImageData: !!imageData });
+      console.log('📦 Full pending scan data (image truncated):', { ...pendingScan, imageData: imageData ? `base64 (${imageData.length} chars)` : null });
+      
+      // Verify it was stored
+      const stored = localStorage.getItem(PENDING_SCAN_KEY);
+      if (stored) {
+        console.log('✅ Verified: Pending scan is in localStorage');
+      } else {
+        console.error('❌ ERROR: Pending scan was NOT stored in localStorage!');
+      }
+    } catch (error) {
+      console.error('❌ Failed to store pending scan:', error);
+      console.error('Error details:', error.message);
+    }
+  };
 
   // Check if user can perform analysis
   const canPerformAnalysis = () => {
@@ -273,12 +330,53 @@ function DetectorSection() {
         throw new Error(errorMessage)
       }
       const data = await response.json()
-      setResult(data)
       
-      // Update user stats if logged in
-      if (isLoggedIn && userId && data) {
-        const resultType = data.type === 'scam' ? 'scam' : data.type === 'safe' ? 'safe' : 'suspicious'
-        updateUserStats(userId, resultType)
+      // Check if this was the last free check for anonymous user
+      const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
+      const isLastFreeCheck = !isLoggedIn && checksAfter === 0
+      
+      console.log('🔍 After image analysis:', { isLoggedIn, checksAfter, isLastFreeCheck });
+      
+      if (isLastFreeCheck) {
+        console.log('🎯 LAST FREE CHECK DETECTED - Storing pending scan and showing preview');
+        
+        // Store this scan for after signup (await since it's async now)
+        await storePendingScan('image', file, null, null, data.classification, data)
+        
+        // Show blurred preview and signup modal
+        setResult(data)
+        setShowBlurredPreview(true)
+        setShowSignupModal(true)
+        console.log('✅ Blurred preview and signup modal should now be visible');
+      } else {
+        console.log('ℹ️ Normal flow - not last free check');
+        // Normal flow - show full result
+        setResult(data)
+        
+        // Update user stats and save to history if logged in
+        if (isLoggedIn && userId && data) {
+          const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
+          updateUserStats(userId, resultType)
+          
+          // Save to scan history
+          try {
+            // Upload image to Supabase Storage
+            const imageUrl = await uploadScanImage(file, userId)
+            
+            // Save scan to history
+            await saveScanToHistory(
+              userId,
+              'image',
+              imageUrl,
+              null, // No content preview for images
+              data.classification,
+              data
+            )
+          } catch (error) {
+            console.error('Error saving scan to history:', error)
+            // Don't block the user if history save fails
+          }
+        }
       }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'image'))
@@ -311,6 +409,8 @@ function DetectorSection() {
         const after = getRemainingUserChecks(userId)
         console.log(`💳 After using user check: ${after}`)
         setRemainingChecks(after)
+        // Notify header to update
+        window.dispatchEvent(new Event('checksUpdated'))
       } else {
         const before = getRemainingFreeChecks()
         console.log(`💳 Before using free check: ${before}`)
@@ -318,6 +418,8 @@ function DetectorSection() {
         const after = getRemainingFreeChecks()
         console.log(`💳 After using free check: ${after}`)
         setRemainingChecks(after)
+        // Notify header to update
+        window.dispatchEvent(new Event('checksUpdated'))
       }
 
       const response = await fetch(API_ENDPOINTS.analyzeUrl, {
@@ -330,12 +432,51 @@ function DetectorSection() {
         throw new Error(errorMessage)
       }
       const data = await response.json()
-      setResult(data)
       
-      // Update user stats if logged in
-      if (isLoggedIn && userId && data) {
-        const resultType = data.type === 'scam' ? 'scam' : data.type === 'safe' ? 'safe' : 'suspicious'
-        updateUserStats(userId, resultType)
+      // Check if this was the last free check for anonymous user
+      const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
+      const isLastFreeCheck = !isLoggedIn && checksAfter === 0
+      
+      if (isLastFreeCheck) {
+        // Create preview for storage
+        const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
+        
+        // Store this scan for after signup (await since it's async now)
+        await storePendingScan('url', null, null, contentPreview, data.classification, data)
+        
+        // Show blurred preview and signup modal
+        setResult(data)
+        setShowBlurredPreview(true)
+        setShowSignupModal(true)
+        console.log('🎯 Last free check used - showing blurred preview and signup modal')
+      } else {
+        // Normal flow - show full result
+        setResult(data)
+        
+        // Update user stats and save to history if logged in
+        if (isLoggedIn && userId && data) {
+          const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
+          updateUserStats(userId, resultType)
+          
+          // Save to scan history
+          try {
+            // Create preview (first 200 chars of URL)
+            const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
+            
+            // Save scan to history
+            await saveScanToHistory(
+              userId,
+              'url',
+              null, // No image for URL scans
+              contentPreview,
+              data.classification,
+              data
+            )
+          } catch (error) {
+            console.error('Error saving scan to history:', error)
+            // Don't block the user if history save fails
+          }
+        }
       }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'url'))
@@ -368,6 +509,8 @@ function DetectorSection() {
         const after = getRemainingUserChecks(userId)
         console.log(`💳 After using user check: ${after}`)
         setRemainingChecks(after)
+        // Notify header to update
+        window.dispatchEvent(new Event('checksUpdated'))
       } else {
         const before = getRemainingFreeChecks()
         console.log(`💳 Before using free check: ${before}`)
@@ -375,6 +518,8 @@ function DetectorSection() {
         const after = getRemainingFreeChecks()
         console.log(`💳 After using free check: ${after}`)
         setRemainingChecks(after)
+        // Notify header to update
+        window.dispatchEvent(new Event('checksUpdated'))
       }
 
       const response = await fetch(API_ENDPOINTS.analyzeText, {
@@ -387,12 +532,51 @@ function DetectorSection() {
         throw new Error(errorMessage)
       }
       const data = await response.json()
-      setResult(data)
       
-      // Update user stats if logged in
-      if (isLoggedIn && userId && data) {
-        const resultType = data.type === 'scam' ? 'scam' : data.type === 'safe' ? 'safe' : 'suspicious'
-        updateUserStats(userId, resultType)
+      // Check if this was the last free check for anonymous user
+      const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
+      const isLastFreeCheck = !isLoggedIn && checksAfter === 0
+      
+      if (isLastFreeCheck) {
+        // Create preview for storage
+        const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
+        
+        // Store this scan for after signup (await since it's async now)
+        await storePendingScan('text', null, null, contentPreview, data.classification, data)
+        
+        // Show blurred preview and signup modal
+        setResult(data)
+        setShowBlurredPreview(true)
+        setShowSignupModal(true)
+        console.log('🎯 Last free check used - showing blurred preview and signup modal')
+      } else {
+        // Normal flow - show full result
+        setResult(data)
+        
+        // Update user stats and save to history if logged in
+        if (isLoggedIn && userId && data) {
+          const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
+          updateUserStats(userId, resultType)
+          
+          // Save to scan history
+          try {
+            // Create preview (first 200 chars of text)
+            const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
+            
+            // Save scan to history
+            await saveScanToHistory(
+              userId,
+              'text',
+              null, // No image for text scans
+              contentPreview,
+              data.classification,
+              data
+            )
+          } catch (error) {
+            console.error('Error saving scan to history:', error)
+            // Don't block the user if history save fails
+          }
+        }
       }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'text'))
@@ -407,6 +591,7 @@ function DetectorSection() {
     setText(null)
     setResult(null)
     setError(null)
+    setShowBlurredPreview(false)
   }
 
   const handleReportScam = () => {
@@ -504,36 +689,6 @@ function DetectorSection() {
             </p>
           </div>
 
-          {/* Show remaining checks banner */}
-          {(!isLoggedIn || (isLoggedIn && remainingChecks > 0)) && (
-            <div className={`rounded-xl p-4 mb-6 animate-fade-in border ${
-              remainingChecks === 0 
-                ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/50 dark:border-orange-400/30' 
-                : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-500/50 dark:border-blue-400/30'
-            }`}>
-              <p className={`text-center text-sm font-medium ${
-                remainingChecks === 0 
-                  ? 'text-orange-700 dark:text-orange-300' 
-                  : 'text-blue-700 dark:text-blue-300'
-              }`}>
-                <strong>
-                  {isLoggedIn ? 'Your checks remaining: ' : 'Free checks remaining: '}
-                  {remainingChecks}
-                </strong>
-                {remainingChecks === 0 && !isLoggedIn && (
-                  <span className="ml-2 block mt-1 text-xs opacity-90">
-                    Sign up to continue analyzing
-                  </span>
-                )}
-                {remainingChecks === 0 && isLoggedIn && (
-                  <span className="ml-2 block mt-1 text-xs opacity-90">
-                    Upgrade for more checks
-                  </span>
-                )}
-              </p>
-            </div>
-          )}
-
           {!result && !loading && (
             <div 
               ref={cardRef}
@@ -572,22 +727,25 @@ function DetectorSection() {
 
           {error && (
             <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 backdrop-blur-xl animate-fade-in">
-              <p className="text-destructive mb-4">{error}</p>
-              <button
-                onClick={handleNewAnalysis}
-                className="px-6 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
-              >
-                Try Again
-              </button>
+              <p className="text-destructive">{error}</p>
             </div>
           )}
 
-          {result && (
+          {result && !showBlurredPreview && (
             <div className="animate-fade-in">
               <ResultCard
                 result={result}
                 onNewAnalysis={handleNewAnalysis}
                 onReportScam={handleReportScam}
+              />
+            </div>
+          )}
+
+          {showBlurredPreview && result && (
+            <div className="animate-fade-in">
+              <BlurredResultPreview
+                classification={result.classification}
+                onSignup={() => setShowSignupModal(true)}
               />
             </div>
           )}
