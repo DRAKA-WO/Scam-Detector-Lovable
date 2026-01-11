@@ -24,6 +24,11 @@ const OAuthCallback = () => {
         console.log('🔍 DEBUG: Current URL =', window.location.href);
         console.log('🔍 DEBUG: Search params =', window.location.search);
         console.log('🔍 DEBUG: Hash =', window.location.hash);
+        console.log('🔍 DEBUG: Pathname =', window.location.pathname);
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:23_callbackStart',message:'OAuth callback handler START',data:{pathname:window.location.pathname,hasHash:!!window.location.hash,hashLength:window.location.hash.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H10'})}).catch(()=>{});
+        // #endregion
         
         // Check if user cancelled OAuth (error in URL params or hash)
         const urlParams = new URLSearchParams(window.location.search);
@@ -47,8 +52,17 @@ const OAuthCallback = () => {
         const { supabase } = await import('@/integrations/supabase/client');
         console.log('✅ DEBUG: Supabase client loaded');
         
+        // Parse what's actually in the hash
+        const hashData = {
+          hasAccessToken: hashParams.has('access_token'),
+          hasRefreshToken: hashParams.has('refresh_token'),
+          hasCode: hashParams.has('code'),
+          hasError: hashParams.has('error'),
+          hashKeys: Array.from(hashParams.keys())
+        };
+        
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:48_supabaseLoaded',message:'Supabase client loaded',data:{hasHash:!!window.location.hash,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:48_supabaseLoaded',message:'Supabase client loaded - analyzing hash',data:{hasHash:!!window.location.hash,hashData,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8,H10'})}).catch(()=>{});
         // #endregion
         
         // Supabase auto-processes hash on initialization, but in OAuth callback context
