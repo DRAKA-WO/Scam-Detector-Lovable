@@ -82,13 +82,15 @@ const OAuthCallback = () => {
             const proceedWithRedirect = async () => {
               // Initialize user checks (give 5 checks on signup)
               const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+              const { initializePermanentStats } = await import('./utils/permanentStats');
               const existingChecks = getRemainingUserChecks(session.user.id);
               console.log('📊 Existing checks:', existingChecks);
               
               if (existingChecks === 0) {
                 // New user - give them 5 checks
                 initializeUserChecks(session.user.id);
-                console.log('✅ Initialized 5 checks for new user');
+                initializePermanentStats(session.user.id);
+                console.log('✅ Initialized 5 checks and permanent stats for new user');
               }
               
               // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
@@ -151,13 +153,15 @@ const OAuthCallback = () => {
                     
                     console.log('✅ [OAuthCallback] Successfully saved pending scan to history!', savedScan);
                     
-                    // Update user stats (analytics)
+                    // Update user stats (analytics) - both old and permanent
                     console.log('📊 [OAuthCallback] Updating user stats for analytics...');
                     const { updateUserStats } = await import('./utils/checkLimits');
+                    const { incrementPermanentStats } = await import('./utils/permanentStats');
                     const resultType = scan.classification === 'scam' ? 'scam' : 
                                       scan.classification === 'safe' ? 'safe' : 'suspicious';
                     updateUserStats(session.user.id, resultType);
-                    console.log('✅ [OAuthCallback] User stats updated:', resultType);
+                    incrementPermanentStats(session.user.id, scan.classification);
+                    console.log('✅ [OAuthCallback] User stats updated (permanent & temp):', resultType);
                     
                     // Clear pending scan
                     localStorage.removeItem(PENDING_SCAN_KEY);

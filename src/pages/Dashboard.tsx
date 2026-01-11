@@ -46,11 +46,22 @@ function Dashboard() {
     }
     return 0
   })
-  const [stats, setStats] = useState({
-    totalScans: 0,
-    scamsDetected: 0,
-    safeResults: 0,
-    suspiciousResults: 0
+  const [stats, setStats] = useState(() => {
+    // Load permanent stats immediately if we have a user
+    if (user?.id) {
+      try {
+        const { getPermanentStats } = require('@/utils/permanentStats')
+        return getPermanentStats(user.id)
+      } catch (e) {
+        console.error('Error loading permanent stats:', e)
+      }
+    }
+    return {
+      totalScans: 0,
+      scamsDetected: 0,
+      safeResults: 0,
+      suspiciousResults: 0
+    }
   })
   // Initialize loading state - check if we already have a session
   // IMPORTANT: Use the same logic as user state to ensure consistency
@@ -83,14 +94,14 @@ function Dashboard() {
   const [latestScan, setLatestScan] = useState(null)
   const [showLatestScan, setShowLatestScan] = useState(false)
 
-  // Function to refresh stats from database
-  const refreshStats = async () => {
+  // Function to refresh permanent stats
+  const refreshStats = () => {
     if (!user?.id) return
     
     try {
-      const { getUserStatsFromDatabase } = await import('@/utils/scanHistory')
-      const userStats = await getUserStatsFromDatabase(user.id)
-      console.log('🔄 Dashboard: Refreshed stats from database', userStats)
+      const { getPermanentStats } = require('@/utils/permanentStats')
+      const userStats = getPermanentStats(user.id)
+      console.log('🔄 Dashboard: Refreshed permanent stats', userStats)
       setStats(userStats)
     } catch (error) {
       console.error('❌ Dashboard: Error refreshing stats:', error)
