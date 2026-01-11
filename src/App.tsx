@@ -48,11 +48,54 @@ const OAuthCallback = () => {
         console.log('✅ DEBUG: Supabase client loaded');
         
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:48_supabaseLoaded',message:'Supabase client loaded, NOT manually extracting session',data:{hasHash:!!window.location.hash,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:48_supabaseLoaded',message:'Supabase client loaded',data:{hasHash:!!window.location.hash,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8'})}).catch(()=>{});
         // #endregion
         
-        // DON'T manually extract session - let Supabase handle OAuth naturally
-        // Supabase will auto-process the hash and fire auth state changes
+        // Supabase auto-processes hash on initialization, but in OAuth callback context
+        // we need to explicitly check if it resulted in a session
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:56_beforeGetSession',message:'About to call getSession',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+        // #endregion
+        
+        const { data: { session: immediateSession }, error: immediateError } = await supabase.auth.getSession();
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:64_afterGetSession',message:'After getSession',data:{hasSession:!!immediateSession,hasError:!!immediateError,errorMsg:immediateError?.message,userId:immediateSession?.user?.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+        // #endregion
+        
+        if (immediateSession && !sessionReceived && mounted) {
+          console.log('✅ Session available immediately after OAuth!');
+          sessionReceived = true;
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:74_immediateSessionFound',message:'Immediate session found, proceeding',data:{userId:immediateSession.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
+          // #endregion
+          
+          // Proceed with redirect immediately
+          const proceedWithRedirect = async () => {
+            const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+            const { initializePermanentStats } = await import('./utils/permanentStats');
+            const existingChecks = getRemainingUserChecks(immediateSession.user.id);
+            
+            if (existingChecks === 0) {
+              initializeUserChecks(immediateSession.user.id);
+              initializePermanentStats(immediateSession.user.id);
+              console.log('✅ Initialized checks for new user');
+            }
+            
+            // Clear hash and redirect
+            window.history.replaceState(null, '', window.location.pathname);
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            if (mounted) {
+              console.log('✅ Redirecting to dashboard...');
+              window.location.href = '/dashboard';
+            }
+          };
+          
+          await proceedWithRedirect();
+          return;
+        }
         
         // Supabase automatically processes hash fragments when the client is initialized
         // We need to wait a bit for it to process, then check the session
