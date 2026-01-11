@@ -639,23 +639,23 @@ function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* User Info and Plan - Side by Side */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-stretch gap-4">
                 {/* Left: User Info (50%) */}
-                <div className="flex-1 flex flex-col gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                       {user?.user_metadata?.avatar_url ? (
                         <img
                           src={user.user_metadata.avatar_url}
                           alt="Avatar"
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="w-10 h-10 rounded-full"
                         />
                       ) : (
-                        <User className="w-6 h-6 text-white" />
+                        <User className="w-5 h-5 text-white" />
                       )}
                     </div>
                     <div>
-                      <p className="font-semibold text-base">
+                      <p className="font-semibold">
                         {user?.user_metadata?.full_name || user?.email || 'User'}
                       </p>
                       <p className="text-sm text-muted-foreground">{user?.email}</p>
@@ -676,19 +676,19 @@ function Dashboard() {
                 </div>
 
                 {/* Divider */}
-                <div className="h-24 w-px bg-border"></div>
+                <div className="w-px bg-border"></div>
 
                 {/* Right: Current Plan & Upgrade - Centered (50%) */}
-                <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4">
                   <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-3">Current Plan</p>
-                    <div className="inline-flex items-center px-5 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
-                      <span className="text-base font-bold text-purple-300">FREE PLAN</span>
+                    <p className="text-xs text-muted-foreground mb-2">Current Plan</p>
+                    <div className="inline-flex items-center px-4 py-1.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
+                      <span className="text-sm font-bold text-purple-300">FREE PLAN</span>
                     </div>
                   </div>
                   <a
                     href="/pricing"
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold transition-all hover:scale-105 shadow-lg"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold transition-all hover:scale-105 shadow-md"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
