@@ -77,6 +77,67 @@ const OAuthCallback = () => {
         fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:64_afterGetSession',message:'After getSession',data:{hasSession:!!immediateSession,hasError:!!immediateError,errorMsg:immediateError?.message,userId:immediateSession?.user?.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
         // #endregion
         
+        // If no session yet but we have tokens in hash, manually set session
+        if (!immediateSession && hashData.hasAccessToken && hashData.hasRefreshToken) {
+          console.log('⚠️ No auto-session, manually setting from hash tokens...');
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:76_manualSetStart',message:'Manually setting session from hash tokens',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
+          // #endregion
+          
+          try {
+            const { data: setData, error: setError } = await supabase.auth.setSession({
+              access_token: hashParams.get('access_token')!,
+              refresh_token: hashParams.get('refresh_token')!,
+            });
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:88_afterManualSet',message:'After manual setSession',data:{hasData:!!setData,hasSession:!!setData?.session,hasError:!!setError,errorMsg:setError?.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
+            // #endregion
+            
+            if (setError) {
+              console.error('❌ Error setting session:', setError);
+            } else if (setData?.session) {
+              console.log('✅ Manually set session successfully!');
+              sessionReceived = true;
+              
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:102_manualSetSuccess',message:'Manual session set SUCCESS',data:{userId:setData.session.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
+              // #endregion
+              
+              // Proceed with redirect
+              const proceedWithRedirect = async () => {
+                const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+                const { initializePermanentStats } = await import('./utils/permanentStats');
+                const existingChecks = getRemainingUserChecks(setData.session.user.id);
+                
+                if (existingChecks === 0) {
+                  initializeUserChecks(setData.session.user.id);
+                  initializePermanentStats(setData.session.user.id);
+                  console.log('✅ Initialized checks for new user');
+                }
+                
+                // Clear hash and redirect
+                window.history.replaceState(null, '', window.location.pathname);
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                if (mounted) {
+                  console.log('✅ Redirecting to dashboard...');
+                  window.location.href = '/dashboard';
+                }
+              };
+              
+              await proceedWithRedirect();
+              return;
+            }
+          } catch (manualError) {
+            console.error('❌ Exception during manual session set:', manualError);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:138_manualSetException',message:'Exception during manual setSession',data:{error:String(manualError),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
+            // #endregion
+          }
+        }
+        
         if (immediateSession && !sessionReceived && mounted) {
           console.log('✅ Session available immediately after OAuth!');
           sessionReceived = true;
