@@ -731,38 +731,36 @@ function Dashboard() {
         )}
 
         {/* Scan History Section */}
-        {showHistory && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Scan History</CardTitle>
-              <CardDescription>View your latest 3 scans</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {selectedScan ? (
-                <div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedScan(null)}
-                    className="mb-4"
-                  >
-                    ← Back to History
-                  </Button>
-                  <ResultCard
-                    result={selectedScan.analysis_result}
-                    onNewAnalysis={() => setSelectedScan(null)}
-                    onReportScam={() => {}}
-                  />
-                </div>
-              ) : (
-                <ScanHistory
-                  userId={user?.id}
-                  onScanClick={(scan) => setSelectedScan(scan)}
-                  onRefresh={refreshStats}
+        <Card className={`mb-8 ${!showHistory ? 'hidden' : ''}`}>
+          <CardHeader>
+            <CardTitle>Scan History</CardTitle>
+            <CardDescription>View your latest 3 scans</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {selectedScan ? (
+              <div>
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedScan(null)}
+                  className="mb-4"
+                >
+                  ← Back to History
+                </Button>
+                <ResultCard
+                  result={selectedScan.analysis_result}
+                  onNewAnalysis={() => setSelectedScan(null)}
+                  onReportScam={() => {}}
                 />
-              )}
-            </CardContent>
-          </Card>
-        )}
+              </div>
+            ) : (
+              <ScanHistory
+                userId={user?.id}
+                onScanClick={(scan) => setSelectedScan(scan)}
+                onRefresh={refreshStats}
+              />
+            )}
+          </CardContent>
+        </Card>
 
         {/* Features Section */}
         <Card>

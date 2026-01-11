@@ -18,12 +18,21 @@ function ScanHistory({ userId, onScanClick, onRefresh }) {
     }
   }, [userId])
 
-  // Generate signed URLs for images
+  // Generate signed URLs for images - only if not already cached
   useEffect(() => {
     const generateSignedUrls = async () => {
-      const urlMap = {}
+      const urlMap = { ...imageUrls } // Start with existing cached URLs
+      let hasNewUrls = false
+      
       for (const scan of scans) {
         if (scan.scan_type === 'image' && scan.image_url) {
+          // Skip if we already have a cached URL for this scan
+          if (urlMap[scan.id]) {
+            continue
+          }
+          
+          hasNewUrls = true
+          
           // Check if it's already a full URL or just a path
           if (scan.image_url.startsWith('http')) {
             // Already a URL (might be from old data)
@@ -37,13 +46,17 @@ function ScanHistory({ userId, onScanClick, onRefresh }) {
           }
         }
       }
-      setImageUrls(urlMap)
+      
+      // Only update state if we added new URLs
+      if (hasNewUrls) {
+        setImageUrls(urlMap)
+      }
     }
 
     if (scans.length > 0) {
       generateSignedUrls()
     }
-  }, [scans])
+  }, [scans]) // imageUrls removed from dependencies to prevent infinite loop
 
   const loadHistory = async () => {
     setLoading(true)
