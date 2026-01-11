@@ -6,6 +6,7 @@ import TextInput from '../TextInput'
 import ResultCard from '../ResultCard'
 import ReportModal from '../ReportModal'
 import SignupModal from '../SignupModal'
+import LoginModal from '../LoginModal'
 import BlurredResultPreview from '../BlurredResultPreview'
 import AnalyzingSteps from '../AnalyzingSteps'
 import { API_ENDPOINTS } from '../../config'
@@ -33,6 +34,7 @@ function DetectorSection() {
   const [error, setError] = useState(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const [remainingChecks, setRemainingChecks] = useState(getRemainingFreeChecks())
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -763,7 +765,23 @@ function DetectorSection() {
         isOpen={showSignupModal}
         onClose={() => setShowSignupModal(false)}
         onSignup={handleSignup}
+        onSwitchToLogin={() => {
+          setShowSignupModal(false)
+          setShowLoginModal(true)
+        }}
         remainingChecks={remainingChecks}
+      />
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={async (method) => {
+          // This is handled inside LoginModal
+        }}
+        onSwitchToSignup={() => {
+          setShowLoginModal(false)
+          setShowSignupModal(true)
+        }}
       />
     </section>
   )
