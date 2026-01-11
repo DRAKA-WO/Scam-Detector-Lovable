@@ -47,6 +47,49 @@ const OAuthCallback = () => {
         const { supabase } = await import('@/integrations/supabase/client');
         console.log('✅ DEBUG: Supabase client loaded');
         
+        // 🔧 MANUAL SESSION EXTRACTION - Force Supabase to process the hash
+        if (window.location.hash && window.location.hash.includes('access_token')) {
+          console.log('🔧 DEBUG: Hash contains access_token, forcing Supabase to process it...');
+          
+          try {
+            // Supabase should auto-process the hash, but let's explicitly trigger it
+            const { data, error: sessionError } = await supabase.auth.setSession({
+              access_token: hashParams.get('access_token') || '',
+              refresh_token: hashParams.get('refresh_token') || '',
+            });
+            
+            if (sessionError) {
+              console.error('❌ Error manually setting session:', sessionError);
+            } else if (data?.session) {
+              console.log('✅ Manually set session successfully!', data.session.user.email);
+              sessionReceived = true;
+              
+              // Initialize user and redirect immediately
+              const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+              const { initializePermanentStats } = await import('./utils/permanentStats');
+              const existingChecks = getRemainingUserChecks(data.session.user.id);
+              
+              if (existingChecks === 0) {
+                initializeUserChecks(data.session.user.id);
+                initializePermanentStats(data.session.user.id);
+                console.log('✅ Initialized checks for new user');
+              }
+              
+              // Clear hash and redirect
+              window.history.replaceState(null, '', window.location.pathname);
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              if (mounted) {
+                console.log('✅ Redirecting to dashboard...');
+                window.location.href = '/dashboard';
+              }
+              return;
+            }
+          } catch (manualError) {
+            console.error('❌ Exception during manual session extraction:', manualError);
+          }
+        }
+        
         // Supabase automatically processes hash fragments when the client is initialized
         // We need to wait a bit for it to process, then check the session
         // Also listen for auth state changes as a backup
