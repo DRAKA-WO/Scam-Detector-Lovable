@@ -159,9 +159,9 @@ export async function getSignedImageUrl(imagePath) {
 }
 
 /**
- * Get user statistics from database (fetches ALL scans, not just latest 3)
+ * Get user statistics from database (permanent cumulative stats)
  * @param {string} userId - User ID
- * @returns {Promise<Object>} User stats calculated from database
+ * @returns {Promise<Object>} User stats from permanent stats table
  */
 export async function getUserStatsFromDatabase(userId) {
   if (!userId) {
@@ -176,13 +176,25 @@ export async function getUserStatsFromDatabase(userId) {
   try {
     console.log('📊 Fetching user stats from database for user:', userId);
     
-    // Fetch ALL scans for the user (not just latest 3)
+    // Fetch permanent stats from user_stats table
     const { data, error } = await supabase
-      .from('scan_history')
-      .select('classification')
+      .from('user_stats')
+      .select('total_scans, scams_detected, safe_results, suspicious_results')
       .eq('user_id', userId)
+      .single()
 
     if (error) {
+      // If no stats exist yet (new user), return zeros
+      if (error.code === 'PGRST116') {
+        console.log('ℹ️ No stats found for user (new user), returning zeros');
+        return {
+          totalScans: 0,
+          scamsDetected: 0,
+          safeResults: 0,
+          suspiciousResults: 0
+        }
+      }
+      
       console.error('❌ Error fetching scan stats:', error)
       return {
         totalScans: 0,
@@ -192,15 +204,15 @@ export async function getUserStatsFromDatabase(userId) {
       }
     }
 
-    // Calculate stats from the data
+    // Return stats from permanent table
     const stats = {
-      totalScans: data.length,
-      scamsDetected: data.filter(scan => scan.classification === 'scam').length,
-      safeResults: data.filter(scan => scan.classification === 'safe').length,
-      suspiciousResults: data.filter(scan => scan.classification === 'suspicious').length
+      totalScans: data.total_scans || 0,
+      scamsDetected: data.scams_detected || 0,
+      safeResults: data.safe_results || 0,
+      suspiciousResults: data.suspicious_results || 0
     }
 
-    console.log('✅ Calculated user stats from database:', stats);
+    console.log('✅ Fetched permanent user stats from database:', stats);
     return stats
   } catch (error) {
     console.error('❌ Exception fetching scan stats:', error)
