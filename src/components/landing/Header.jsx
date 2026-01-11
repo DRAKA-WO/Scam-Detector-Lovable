@@ -186,16 +186,16 @@ function Header() {
 
           {/* Checks Counter & CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            {/* Checks Counter with Upgrade Button - Unified Design */}
-            <div className="flex items-center rounded-md overflow-hidden border border-border bg-card/50 backdrop-blur-sm">
-              {/* Checks Display */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/30">
-                <span className="text-sm font-medium text-foreground">Checks:</span>
-                <span className="text-sm font-bold text-foreground">{remainingChecks}</span>
-              </div>
-              
-              {/* Upgrade Button (only show for logged in users) */}
-              {isLoggedIn && (
+            {/* Checks Counter with Upgrade Button - Only show when logged in */}
+            {isLoggedIn && (
+              <div className="flex items-center rounded-md overflow-hidden border border-border bg-card/50 backdrop-blur-sm">
+                {/* Checks Display */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/30">
+                  <span className="text-sm font-medium text-foreground">Checks:</span>
+                  <span className="text-sm font-bold text-foreground">{remainingChecks}</span>
+                </div>
+                
+                {/* Upgrade Button */}
                 <a
                   href="/pricing"
                   className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium transition-all"
@@ -203,8 +203,8 @@ function Header() {
                   <Zap className="w-3 h-3" />
                   Get more
                 </a>
-              )}
-            </div>
+              </div>
+            )}
             
             {isLoggedIn ? (
               <>
