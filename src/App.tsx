@@ -184,9 +184,13 @@ const OAuthCallback = () => {
               // Redirect to dashboard
               if (mounted) {
                 console.log('✅ Redirecting to dashboard...');
+                console.log('🔍 Session user ID:', session.user.id);
+                console.log('🔍 Remaining checks:', getRemainingUserChecks(session.user.id));
                 // Use window.location.href instead of navigate() to force a full page navigation
                 // This ensures React Router fully commits the route change and Dashboard renders immediately
                 window.location.href = '/dashboard';
+              } else {
+                console.warn('⚠️ Component unmounted, canceling redirect');
               }
             };
             
@@ -292,14 +296,15 @@ const OAuthCallback = () => {
         // Check session after a longer delay to give Supabase time to process hash
         setTimeout(() => checkSession(0), 500);
         
-        // Timeout fallback - redirect to home if no session after 5 seconds
+        // Timeout fallback - redirect to home if no session after 10 seconds (increased from 5)
         setTimeout(() => {
           if (!sessionReceived && mounted) {
-            console.warn('⚠️ OAuth callback timeout, redirecting to home');
+            console.warn('⚠️ OAuth callback timeout after 10 seconds, redirecting to home');
+            console.log('💡 Check browser console for auth state events to diagnose the issue');
             // Use window.location.href to force full page reload and clear the black screen
             window.location.href = '/';
           }
-        }, 5000);
+        }, 10000);
       } catch (error) {
         console.error('❌ Error handling OAuth callback:', error);
         if (mounted) {
