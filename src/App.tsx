@@ -21,12 +21,18 @@ const OAuthCallback = () => {
     const handleOAuthCallback = async () => {
       try {
         console.log('🔄 Processing OAuth callback...');
+        console.log('🔍 DEBUG: Current URL =', window.location.href);
+        console.log('🔍 DEBUG: Search params =', window.location.search);
+        console.log('🔍 DEBUG: Hash =', window.location.hash);
         
         // Check if user cancelled OAuth (error in URL params or hash)
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const error = urlParams.get('error') || hashParams.get('error');
         const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
+        
+        console.log('🔍 DEBUG: URL error =', error);
+        console.log('🔍 DEBUG: Error description =', errorDescription);
         
         if (error === 'access_denied' || errorDescription?.toLowerCase().includes('user denied') || errorDescription?.toLowerCase().includes('cancelled')) {
           console.log('⚠️ User cancelled OAuth sign-in');
@@ -37,7 +43,9 @@ const OAuthCallback = () => {
           return;
         }
         
+        console.log('🔍 DEBUG: Loading Supabase client...');
         const { supabase } = await import('@/integrations/supabase/client');
+        console.log('✅ DEBUG: Supabase client loaded');
         
         // Supabase automatically processes hash fragments when the client is initialized
         // We need to wait a bit for it to process, then check the session
@@ -46,10 +54,15 @@ const OAuthCallback = () => {
         let sessionReceived = false;
         
         // Set up auth state change listener
+        console.log('🔍 DEBUG: Setting up auth state change listener...');
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           console.log('🔐 Auth state change event:', event, session ? 'Session received' : 'No session');
+          console.log('🔍 DEBUG: Full session object:', session);
+          console.log('🔍 DEBUG: sessionReceived flag =', sessionReceived);
+          console.log('🔍 DEBUG: mounted flag =', mounted);
           
             if (event === 'SIGNED_IN' && session?.user && mounted) {
+            console.log('✅ DEBUG: SIGNED_IN event received! User:', session.user.email);
             sessionReceived = true;
             
             // Wait for Supabase to write session to localStorage
@@ -200,25 +213,33 @@ const OAuthCallback = () => {
         });
         
         subscription = data;
+        console.log('🔍 DEBUG: Auth listener subscription created');
         
         // Also try to get session directly (in case it's already processed)
+        console.log('🔍 DEBUG: Starting checkSession attempts...');
         const checkSession = async (attempt = 0) => {
           try {
+            console.log(`🔍 DEBUG: checkSession attempt ${attempt + 1}...`);
             const { data: { session }, error } = await supabase.auth.getSession();
+            
+            console.log('🔍 DEBUG: getSession response - session:', !!session, 'error:', error);
             
             if (error) {
               console.error('❌ OAuth callback error:', error);
               if (mounted && attempt >= 3) {
+                console.error('❌ DEBUG: Max attempts reached, redirecting to home');
                 // Use window.location.href to force full page reload and clear the black screen
                 window.location.href = '/';
               } else if (mounted) {
+                console.log(`⏳ DEBUG: Will retry checkSession in 500ms (attempt ${attempt + 1})`);
                 setTimeout(() => checkSession(attempt + 1), 500);
               }
               return;
             }
 
             if (session?.user && !sessionReceived && mounted) {
-              console.log('✅ Session found directly');
+              console.log('✅ Session found directly - User:', session.user.email);
+              console.log('🔍 DEBUG: Setting sessionReceived to true');
               sessionReceived = true;
               
               // Wait for Supabase to write session to localStorage
@@ -296,14 +317,17 @@ const OAuthCallback = () => {
         // Check session after a longer delay to give Supabase time to process hash
         setTimeout(() => checkSession(0), 500);
         
-        // Timeout fallback - redirect to home if no session after 5 seconds
+        // Timeout fallback - redirect to home if no session after 15 seconds
         setTimeout(() => {
           if (!sessionReceived && mounted) {
-            console.warn('⚠️ OAuth callback timeout, redirecting to home');
+            console.warn('⚠️ OAuth callback timeout after 15 seconds, redirecting to home');
+            console.error('🔍 DEBUG: sessionReceived =', sessionReceived);
+            console.error('🔍 DEBUG: mounted =', mounted);
+            console.error('🔍 DEBUG: URL =', window.location.href);
             // Use window.location.href to force full page reload and clear the black screen
             window.location.href = '/';
           }
-        }, 5000);
+        }, 15000);
       } catch (error) {
         console.error('❌ Error handling OAuth callback:', error);
         if (mounted) {
