@@ -47,56 +47,12 @@ const OAuthCallback = () => {
         const { supabase } = await import('@/integrations/supabase/client');
         console.log('✅ DEBUG: Supabase client loaded');
         
-        // 🔧 MANUAL SESSION EXTRACTION - Force Supabase to process the hash
-        if (window.location.hash && window.location.hash.includes('access_token')) {
-          console.log('🔧 DEBUG: Hash contains access_token, forcing Supabase to process it...');
-          
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:52_manualSessionStart',message:'Manual session extraction START',data:{hasAccessToken:hashParams.has('access_token'),hasRefreshToken:hashParams.has('refresh_token'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-          // #endregion
-          
-          try {
-            // Supabase should auto-process the hash, but let's explicitly trigger it
-            const { data, error: sessionError } = await supabase.auth.setSession({
-              access_token: hashParams.get('access_token') || '',
-              refresh_token: hashParams.get('refresh_token') || '',
-            });
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:65_afterSetSession',message:'After supabase.auth.setSession',data:{hasData:!!data,hasSession:!!data?.session,hasError:!!sessionError,errorMsg:sessionError?.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-            // #endregion
-            
-            if (sessionError) {
-              console.error('❌ Error manually setting session:', sessionError);
-            } else if (data?.session) {
-              console.log('✅ Manually set session successfully!', data.session.user.email);
-              sessionReceived = true;
-              
-              // Initialize user and redirect immediately
-              const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-              const { initializePermanentStats } = await import('./utils/permanentStats');
-              const existingChecks = getRemainingUserChecks(data.session.user.id);
-              
-              if (existingChecks === 0) {
-                initializeUserChecks(data.session.user.id);
-                initializePermanentStats(data.session.user.id);
-                console.log('✅ Initialized checks for new user');
-              }
-              
-              // Clear hash and redirect
-              window.history.replaceState(null, '', window.location.pathname);
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              if (mounted) {
-                console.log('✅ Redirecting to dashboard...');
-                window.location.href = '/dashboard';
-              }
-              return;
-            }
-          } catch (manualError) {
-            console.error('❌ Exception during manual session extraction:', manualError);
-          }
-        }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:48_supabaseLoaded',message:'Supabase client loaded, NOT manually extracting session',data:{hasHash:!!window.location.hash,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8'})}).catch(()=>{});
+        // #endregion
+        
+        // DON'T manually extract session - let Supabase handle OAuth naturally
+        // Supabase will auto-process the hash and fire auth state changes
         
         // Supabase automatically processes hash fragments when the client is initialized
         // We need to wait a bit for it to process, then check the session
@@ -115,6 +71,10 @@ const OAuthCallback = () => {
             if (event === 'SIGNED_IN' && session?.user && mounted) {
             console.log('✅ DEBUG: SIGNED_IN event received! User:', session.user.email);
             sessionReceived = true;
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:64_signedIn',message:'SIGNED_IN event fired',data:{userEmail:session.user.email,userId:session.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8'})}).catch(()=>{});
+            // #endregion
             
             // Wait for Supabase to write session to localStorage
             const waitForLocalStorage = (attempt = 0) => {
