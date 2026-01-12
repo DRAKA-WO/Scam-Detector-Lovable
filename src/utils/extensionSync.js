@@ -1,68 +1,53 @@
 /**
  * Utility to sync Supabase session with browser extension
- * This allows the extension to access the user's session after login on web
+ * Uses custom events to communicate with content script which forwards to extension
  */
 
 /**
- * Check if extension is installed
- */
-export function isExtensionInstalled() {
-  return typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
-}
-
-/**
- * Sync session to extension
+ * Sync session to extension via custom event
  * @param {Object} session - Supabase session object
  * @param {string} userId - User ID
  */
 export async function syncSessionToExtension(session, userId) {
-  if (!isExtensionInstalled()) {
-    console.log('🔌 Extension not installed, skipping session sync');
-    return;
-  }
-
   try {
-    await chrome.storage.local.set({
-      supabaseSession: session,
-      userId: userId,
-      lastSyncTime: Date.now()
+    // Dispatch custom event that content script will listen for
+    const event = new CustomEvent('scamChecker:syncSession', {
+      detail: {
+        session: session,
+        userId: userId,
+        timestamp: Date.now()
+      }
     });
-    console.log('✅ Session synced to extension:', { userId, syncTime: new Date().toLocaleTimeString() });
+    
+    window.dispatchEvent(event);
+    console.log('✅ Session sync event dispatched:', { userId, syncTime: new Date().toLocaleTimeString() });
+    
+    // Small delay to let extension process
+    await new Promise(resolve => setTimeout(resolve, 100));
   } catch (error) {
-    console.warn('⚠️ Failed to sync session to extension:', error);
+    console.warn('⚠️ Failed to dispatch session sync event:', error);
     // Don't throw error - extension sync is optional
   }
 }
 
 /**
- * Clear session from extension
+ * Clear session from extension via custom event
  */
 export async function clearExtensionSession() {
-  if (!isExtensionInstalled()) {
-    return;
-  }
-
   try {
-    await chrome.storage.local.remove(['supabaseSession', 'userId', 'lastSyncTime']);
-    console.log('🧹 Extension session cleared');
+    // Dispatch custom event that content script will listen for
+    const event = new CustomEvent('scamChecker:clearSession', {
+      detail: {
+        timestamp: Date.now()
+      }
+    });
+    
+    window.dispatchEvent(event);
+    console.log('🧹 Extension session clear event dispatched');
+    
+    // Small delay to let extension process
+    await new Promise(resolve => setTimeout(resolve, 100));
   } catch (error) {
-    console.warn('⚠️ Failed to clear extension session:', error);
-  }
-}
-
-/**
- * Get session from extension storage (for debugging)
- */
-export async function getExtensionSession() {
-  if (!isExtensionInstalled()) {
-    return null;
-  }
-
-  try {
-    const result = await chrome.storage.local.get(['supabaseSession', 'userId', 'lastSyncTime']);
-    return result;
-  } catch (error) {
-    console.error('Error getting extension session:', error);
-    return null;
+    console.warn('⚠️ Failed to dispatch session clear event:', error);
   }
 }
