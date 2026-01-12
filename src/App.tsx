@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncSessionToExtension } from "./utils/extensionSync";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
@@ -51,6 +52,10 @@ const OAuthCallback = () => {
             
             if (data?.session && !error) {
               console.log('✅ Session set successfully!');
+              
+              // Sync session to extension
+              await syncSessionToExtension(data.session, data.session.user.id);
+              
               // Don't redirect yet - need to process pending scan and initialize checks first
               // Continue to proceedWithRedirect() below
             } else if (error) {
@@ -102,6 +107,9 @@ const OAuthCallback = () => {
             
             const proceedWithRedirect = async () => {
               console.log('🚀 [OAuthCallback] Starting proceedWithRedirect...');
+              
+              // Sync session to extension
+              await syncSessionToExtension(session, session.user.id);
               
               try {
                 // Initialize user checks (give 5 checks on signup)

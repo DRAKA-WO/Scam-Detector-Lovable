@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { syncSessionToExtension } from "@/utils/extensionSync";
 
 function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
   const [email, setEmail] = useState("");
@@ -39,7 +40,7 @@ function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
     setIsLoading(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -48,6 +49,11 @@ function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
         setError(signInError.message || "Invalid email or password");
         setIsLoading(false);
         return;
+      }
+
+      // Sync session to extension
+      if (data?.session) {
+        await syncSessionToExtension(data.session, data.session.user.id);
       }
 
       // Success - the auth state change will handle the rest

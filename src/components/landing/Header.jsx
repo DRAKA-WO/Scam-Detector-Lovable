@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown, Sparkles, PlayCircle, HelpCircle, MessageCircle, Zap, User, Settings, Gift, Mail, LogOut } from "lucide-react"
 import { supabase } from '@/integrations/supabase/client'
+import { clearExtensionSession } from '@/utils/extensionSync'
 
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -308,6 +309,7 @@ function Header() {
                         onClick={async () => {
                           try {
                             await supabase.auth.signOut()
+                            await clearExtensionSession()
                             window.location.href = '/'
                           } catch (error) {
                             console.error('Logout error:', error)
@@ -422,6 +424,7 @@ function Header() {
                     onClick={async () => {
                       try {
                         await supabase.auth.signOut()
+                        await clearExtensionSession()
                         window.location.href = '/'
                       } catch (error) {
                         console.error('Logout error:', error)
