@@ -9,6 +9,7 @@ import SignupModal from '../SignupModal'
 import LoginModal from '../LoginModal'
 import BlurredResultPreview from '../BlurredResultPreview'
 import AnalyzingSteps from '../AnalyzingSteps'
+import OutOfChecksModal from '../OutOfChecksModal'
 import { API_ENDPOINTS } from '../../config'
 import { handleApiError, getUserFriendlyError } from '../../utils/errorHandler'
 import { 
@@ -39,6 +40,7 @@ function DetectorSection() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userId, setUserId] = useState(null)
   const [showBlurredPreview, setShowBlurredPreview] = useState(false)
+  const [showOutOfChecksModal, setShowOutOfChecksModal] = useState(false)
 
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
   const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
@@ -217,8 +219,8 @@ function DetectorSection() {
       const userChecks = getRemainingUserChecks(userId)
       console.log('📊 User checks:', userChecks)
       if (userChecks === 0) {
-        console.log('🚫 No user checks remaining - showing upgrade message')
-        alert('You have no checks remaining. Please upgrade your account for more checks.')
+        console.log('🚫 No user checks remaining - showing upgrade modal')
+        setShowOutOfChecksModal(true)
         return false
       }
       console.log('✅ User has checks, allowing analysis')
@@ -783,6 +785,11 @@ function DetectorSection() {
           setShowLoginModal(false)
           setShowSignupModal(true)
         }}
+      />
+
+      <OutOfChecksModal
+        isOpen={showOutOfChecksModal}
+        onClose={() => setShowOutOfChecksModal(false)}
       />
     </section>
   )
