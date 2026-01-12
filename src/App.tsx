@@ -281,6 +281,8 @@ const OAuthCallback = () => {
               };
               
               const proceedWithRedirect = async () => {
+                console.log('🚀 [OAuthCallback-v2] Starting proceedWithRedirect...');
+                
                 // Initialize user checks
                 const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
                 
@@ -302,14 +304,70 @@ const OAuthCallback = () => {
                   }
                 }
                 
+                // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
+                console.log('🔍 [OAuthCallback-v2] Checking for pending scan...');
+                const PENDING_SCAN_KEY = 'scam_checker_pending_scan';
+                
+                try {
+                  const pendingScanData = localStorage.getItem(PENDING_SCAN_KEY);
+                  console.log('📦 [OAuthCallback-v2] Pending scan in localStorage:', pendingScanData ? 'FOUND' : 'NOT FOUND');
+                  
+                  if (pendingScanData) {
+                    const scan = JSON.parse(pendingScanData);
+                    console.log('📋 [OAuthCallback-v2] Parsed pending scan:', scan);
+                    
+                    // Import scan history utilities
+                    const { saveScanToHistory, uploadScanImage } = await import('./utils/scanHistory');
+                    
+                    let imageUrl = scan.imageUrl;
+                    
+                    // If it's an image scan, upload the image
+                    if (scan.scanType === 'image' && scan.imageData) {
+                      console.log('📤 [OAuthCallback-v2] Uploading pending image...');
+                      try {
+                        const response = await fetch(scan.imageData);
+                        const blob = await response.blob();
+                        const fileName = scan.imageName || 'scan-image.png';
+                        const file = new File([blob], fileName, { type: blob.type });
+                        imageUrl = await uploadScanImage(file, session.user.id);
+                        console.log('✅ [OAuthCallback-v2] Image uploaded:', imageUrl);
+                      } catch (uploadError) {
+                        console.error('❌ [OAuthCallback-v2] Error uploading image:', uploadError);
+                      }
+                    }
+                    
+                    // Save to scan history
+                    console.log('💾 [OAuthCallback-v2] Saving pending scan to history...');
+                    try {
+                      const savedScan = await saveScanToHistory(
+                        session.user.id,
+                        scan.scanType,
+                        imageUrl,
+                        scan.contentPreview,
+                        scan.classification,
+                        scan.analysisResult
+                      );
+                      
+                      console.log('✅ [OAuthCallback-v2] Successfully saved pending scan!', savedScan);
+                      localStorage.removeItem(PENDING_SCAN_KEY);
+                      console.log('🗑️ [OAuthCallback-v2] Cleared pending scan');
+                    } catch (saveError) {
+                      console.error('❌ [OAuthCallback-v2] Error saving scan:', saveError);
+                    }
+                  } else {
+                    console.log('ℹ️ [OAuthCallback-v2] No pending scan found');
+                  }
+                } catch (error) {
+                  console.error('❌ [OAuthCallback-v2] Error processing pending scan:', error);
+                }
+                
                 // Wait a bit more to ensure everything is processed
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Clear hash from URL
                 window.history.replaceState(null, '', window.location.pathname);
                 
-                // Redirect to dashboard - use window.location.href to force full page navigation
-                // This ensures OAuthCallback is completely unmounted before Dashboard mounts
+                // Redirect to dashboard
                 if (mounted) {
                   console.log('✅ Redirecting to dashboard...');
                   window.location.href = '/dashboard';
