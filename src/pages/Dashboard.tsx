@@ -8,6 +8,7 @@ import Footer from '@/components/landing/Footer'
 import ScanHistory from '@/components/ScanHistory'
 import ResultCard from '@/components/ResultCard'
 import { getRemainingUserChecks } from '@/utils/checkLimits'
+import { syncSessionToExtension } from '@/utils/extensionSync'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -82,6 +83,26 @@ function Dashboard() {
   const [selectedScan, setSelectedScan] = useState(null)
   const [latestScan, setLatestScan] = useState(null)
   const [showLatestScan, setShowLatestScan] = useState(false)
+
+  // Auto-sync existing session to extension on Dashboard load
+  useEffect(() => {
+    const syncExistingSession = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (session && session.user && !error) {
+          console.log('🔍 Dashboard: Syncing session to extension...');
+          await syncSessionToExtension(session, session.user.id);
+          console.log('✅ Dashboard: Session synced to extension');
+        }
+      } catch (error) {
+        console.error('Dashboard: Error syncing session to extension:', error);
+      }
+    };
+    
+    syncExistingSession();
+  }, []); // Empty dependency array = runs once on mount
 
   // Function to refresh stats from database
   const refreshStats = async () => {
