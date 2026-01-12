@@ -51,13 +51,13 @@ const OAuthCallback = () => {
             
             if (data?.session && !error) {
               console.log('✅ Session set successfully!');
-              // Clear the hash to prevent re-processing
-              window.history.replaceState(null, '', window.location.pathname);
-              // Redirect to dashboard
-              window.location.href = '/dashboard';
-              return;
+              // Don't redirect yet - need to process pending scan and initialize checks first
+              // Continue to proceedWithRedirect() below
             } else if (error) {
               console.error('❌ Session setup error:', error.message);
+              // On error, still redirect to dashboard
+              window.location.href = '/dashboard';
+              return;
             }
           } catch (err: any) {
             console.error('❌ Session setup failed:', err?.message);
