@@ -20,7 +20,6 @@ import {
   updateUserStats
 } from '../../utils/checkLimits'
 import { saveScanToHistory, uploadScanImage } from '../../utils/scanHistory'
-import { incrementPermanentStats, initializePermanentStats } from '../../utils/permanentStats'
 // Supabase import removed - will be loaded dynamically to avoid build errors
 
 const PENDING_SCAN_KEY = 'scam_checker_pending_scan'
@@ -361,9 +360,6 @@ function DetectorSection() {
           const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
           updateUserStats(userId, resultType)
           
-          // Update permanent stats (never decrease)
-          incrementPermanentStats(userId, data.classification)
-          
           // Save to scan history
           try {
             // Upload image to Supabase Storage
@@ -464,9 +460,6 @@ function DetectorSection() {
           const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
           updateUserStats(userId, resultType)
           
-          // Update permanent stats (never decrease)
-          incrementPermanentStats(userId, data.classification)
-          
           // Save to scan history
           try {
             // Create preview (first 200 chars of URL)
@@ -566,9 +559,6 @@ function DetectorSection() {
         if (isLoggedIn && userId && data) {
           const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
           updateUserStats(userId, resultType)
-          
-          // Update permanent stats (never decrease)
-          incrementPermanentStats(userId, data.classification)
           
           // Save to scan history
           try {
