@@ -125,7 +125,7 @@ const OAuthCallback = () => {
                 if (!hasBeenInitialized) {
                   // First time - give 5 checks
                   console.log('🆕 First-time user - giving 5 checks');
-                  initializeUserChecks(session.user.id, true);
+                  await initializeUserChecks(session.user.id, true);
                   localStorage.setItem(checksInitializedKey, 'true');
                   console.log('✅ Initialized 5 checks for first-time user');
                 } else {
@@ -301,7 +301,7 @@ const OAuthCallback = () => {
                 if (!hasBeenInitialized) {
                   // First time - give 5 checks
                   console.log('🆕 First-time user - giving 5 checks');
-                  initializeUserChecks(session.user.id, true);
+                  await initializeUserChecks(session.user.id, true);
                   localStorage.setItem(checksInitializedKey, 'true');
                   console.log('✅ Initialized 5 checks for first-time user');
                 } else {

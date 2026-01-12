@@ -39,11 +39,53 @@ export function getRemainingUserChecks(userId) {
 }
 
 /**
+ * Sync user checks from Supabase to localStorage
+ * @param {string} userId - User ID from Supabase
+ * @returns {Promise<number>} Number of checks
+ */
+export async function syncUserChecksFromSupabase(userId) {
+  if (typeof window === 'undefined' || !userId) return 0
+  
+  try {
+    const { supabase } = await import('@/integrations/supabase/client')
+    
+    // Fetch user data from Supabase
+    const { data, error } = await supabase
+      .from('users')
+      .select('checks')
+      .eq('id', userId)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching checks from Supabase:', error)
+      return getRemainingUserChecks(userId) // Fallback to localStorage
+    }
+    
+    if (data && typeof data.checks === 'number') {
+      // Update localStorage with Supabase value
+      const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
+      localStorage.setItem(key, data.checks.toString())
+      console.log(`✅ Synced ${data.checks} checks from Supabase for user ${userId}`)
+      
+      // Dispatch event to update UI
+      window.dispatchEvent(new Event('checksUpdated'))
+      
+      return data.checks
+    }
+    
+    return getRemainingUserChecks(userId)
+  } catch (error) {
+    console.error('Exception syncing checks from Supabase:', error)
+    return getRemainingUserChecks(userId)
+  }
+}
+
+/**
  * Initialize user checks (give 5 checks on signup)
  * @param {string} userId - User ID from Supabase
  * @param {boolean} forceInit - Force initialization even if checks exist (for new signups)
  */
-export function initializeUserChecks(userId, forceInit = false) {
+export async function initializeUserChecks(userId, forceInit = false) {
   if (typeof window === 'undefined' || !userId) return
   
   const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
@@ -53,6 +95,46 @@ export function initializeUserChecks(userId, forceInit = false) {
   if (forceInit || !existing || parseInt(existing) === 0) {
     localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
     console.log(`✅ Initialized ${SIGNUP_BONUS_CHECKS} checks for user ${userId} (force: ${forceInit})`)
+    
+    // Also ensure Supabase has the user record
+    try {
+      const { supabase } = await import('@/integrations/supabase/client')
+      
+      // Check if user record exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id, checks')
+        .eq('id', userId)
+        .single()
+      
+      if (!existingUser) {
+        // Create new user record if it doesn't exist
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({ id: userId, checks: SIGNUP_BONUS_CHECKS })
+        
+        if (insertError) {
+          console.error('Error creating user record in Supabase:', insertError)
+        } else {
+          console.log(`✅ Created user record in Supabase with ${SIGNUP_BONUS_CHECKS} checks`)
+        }
+      } else if (forceInit) {
+        // Update existing user with signup bonus
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ checks: SIGNUP_BONUS_CHECKS })
+          .eq('id', userId)
+        
+        if (updateError) {
+          console.error('Error updating checks in Supabase:', updateError)
+        } else {
+          console.log(`✅ Reset checks to ${SIGNUP_BONUS_CHECKS} in Supabase`)
+        }
+      }
+    } catch (error) {
+      console.error('Exception initializing checks in Supabase:', error)
+    }
+    
     // Dispatch event to update UI
     window.dispatchEvent(new Event('checksUpdated'))
   }
@@ -61,16 +143,39 @@ export function initializeUserChecks(userId, forceInit = false) {
 /**
  * Use a check for logged-in users
  * @param {string} userId - User ID from Supabase
- * @returns {boolean} True if check was used successfully, false if no checks remaining
+ * @returns {Promise<boolean>} True if check was used successfully, false if no checks remaining
  */
-export function useUserCheck(userId) {
+export async function useUserCheck(userId) {
   if (typeof window === 'undefined' || !userId) return false
   
   const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
   const remaining = getRemainingUserChecks(userId)
   
   if (remaining > 0) {
-    localStorage.setItem(key, (remaining - 1).toString())
+    const newCount = remaining - 1
+    
+    // Update localStorage immediately (for instant UI update)
+    localStorage.setItem(key, newCount.toString())
+    
+    // Also update Supabase (for persistence)
+    try {
+      const { supabase } = await import('@/integrations/supabase/client')
+      const { error } = await supabase
+        .from('users')
+        .update({ checks: newCount })
+        .eq('id', userId)
+      
+      if (error) {
+        console.error('Error updating checks in Supabase:', error)
+        // Don't fail - localStorage is already updated
+      } else {
+        console.log(`✅ Decremented checks in Supabase: ${remaining} → ${newCount}`)
+      }
+    } catch (error) {
+      console.error('Exception updating checks in Supabase:', error)
+      // Don't fail - localStorage is already updated
+    }
+    
     return true
   }
   

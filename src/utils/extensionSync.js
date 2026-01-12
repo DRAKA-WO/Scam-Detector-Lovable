@@ -11,21 +11,29 @@
  */
 export async function syncSessionToExtension(session, userId, checks = null) {
   try {
-    // Get checks from localStorage if not provided
+    // Get checks from Supabase (or localStorage fallback) if not provided
     let checksCount = checks;
     if (checksCount === null && userId) {
       try {
-        // Use the same key format as checkLimits.js
-        const checksKey = `scam_checker_user_checks_${userId}`;
-        const storedChecks = localStorage.getItem(checksKey);
-        if (storedChecks !== null) {
-          checksCount = parseInt(storedChecks, 10);
-          console.log(`📊 Got ${checksCount} checks from localStorage for syncing to extension`);
-        } else {
-          console.warn(`⚠️ No checks found in localStorage with key: ${checksKey}`);
-        }
+        // First, try to sync from Supabase users table
+        const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
+        checksCount = await syncUserChecksFromSupabase(userId);
+        console.log(`📊 Synced ${checksCount} checks from Supabase for extension sync`);
       } catch (e) {
-        console.warn('Could not get checks from localStorage:', e);
+        console.warn('Could not sync checks from Supabase, trying localStorage:', e);
+        // Fallback to localStorage
+        try {
+          const checksKey = `scam_checker_user_checks_${userId}`;
+          const storedChecks = localStorage.getItem(checksKey);
+          if (storedChecks !== null) {
+            checksCount = parseInt(storedChecks, 10);
+            console.log(`📊 Got ${checksCount} checks from localStorage for syncing to extension`);
+          } else {
+            console.warn(`⚠️ No checks found in localStorage with key: ${checksKey}`);
+          }
+        } catch (fallbackError) {
+          console.warn('Could not get checks from localStorage:', fallbackError);
+        }
       }
     }
     

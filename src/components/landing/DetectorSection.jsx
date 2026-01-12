@@ -67,7 +67,7 @@ function DetectorSection() {
             if (!hasBeenInitialized) {
               // First time - give 5 checks
               console.log('🆕 First-time user on mount - giving 5 checks');
-              initializeUserChecks(session.user.id, true);
+              await initializeUserChecks(session.user.id, true);
               localStorage.setItem(checksInitializedKey, 'true');
             }
             
@@ -116,7 +116,7 @@ function DetectorSection() {
             if (!hasBeenInitialized) {
               // First time - give 5 checks
               console.log('🆕 First-time user on auth change - giving 5 checks');
-              initializeUserChecks(session.user.id, true);
+              await initializeUserChecks(session.user.id, true);
               localStorage.setItem(checksInitializedKey, 'true');
             }
             
@@ -323,7 +323,7 @@ function DetectorSection() {
       if (isLoggedIn && userId) {
         const before = getRemainingUserChecks(userId)
         console.log(`💳 Before using user check: ${before}`)
-        useUserCheck(userId)
+        await useUserCheck(userId)
         const after = getRemainingUserChecks(userId)
         console.log(`💳 After using user check: ${after}`)
         setRemainingChecks(after)
@@ -418,7 +418,7 @@ function DetectorSection() {
       if (isLoggedIn && userId) {
         const before = getRemainingUserChecks(userId)
         console.log(`💳 Before using user check: ${before}`)
-        useUserCheck(userId)
+        await useUserCheck(userId)
         const after = getRemainingUserChecks(userId)
         console.log(`💳 After using user check: ${after}`)
         setRemainingChecks(after)
@@ -514,7 +514,7 @@ function DetectorSection() {
       if (isLoggedIn && userId) {
         const before = getRemainingUserChecks(userId)
         console.log(`💳 Before using user check: ${before}`)
-        useUserCheck(userId)
+        await useUserCheck(userId)
         const after = getRemainingUserChecks(userId)
         console.log(`💳 After using user check: ${after}`)
         setRemainingChecks(after)
