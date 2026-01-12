@@ -101,28 +101,37 @@ const OAuthCallback = () => {
             };
             
             const proceedWithRedirect = async () => {
-              // Initialize user checks (give 5 checks on signup)
-              const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
+              console.log('🚀 [OAuthCallback] Starting proceedWithRedirect...');
               
-              // Check if user has ever been initialized
-              const checksInitializedKey = `checks_initialized_${session.user.id}`;
-              const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
-              
-              if (!hasBeenInitialized) {
-                // First time - give 5 checks
-                console.log('🆕 First-time user - giving 5 checks');
-                initializeUserChecks(session.user.id, true);
-                localStorage.setItem(checksInitializedKey, 'true');
-                console.log('✅ Initialized 5 checks for first-time user');
-              } else {
-                // Returning user - only refill if they're at 0
-                const existingChecks = getRemainingUserChecks(session.user.id);
-                console.log('👤 Returning user, current checks:', existingChecks);
+              try {
+                // Initialize user checks (give 5 checks on signup)
+                console.log('📦 [OAuthCallback] Importing checkLimits...');
+                const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
                 
-                if (existingChecks === 0) {
-                  console.log('⚠️ User has 0 checks but was already initialized - not refilling');
-                  // Don't auto-refill - user needs to upgrade
+                // Check if user has ever been initialized
+                const checksInitializedKey = `checks_initialized_${session.user.id}`;
+                const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
+                
+                console.log('🔍 [OAuthCallback] Checks initialized?', hasBeenInitialized);
+                
+                if (!hasBeenInitialized) {
+                  // First time - give 5 checks
+                  console.log('🆕 First-time user - giving 5 checks');
+                  initializeUserChecks(session.user.id, true);
+                  localStorage.setItem(checksInitializedKey, 'true');
+                  console.log('✅ Initialized 5 checks for first-time user');
+                } else {
+                  // Returning user - only refill if they're at 0
+                  const existingChecks = getRemainingUserChecks(session.user.id);
+                  console.log('👤 Returning user, current checks:', existingChecks);
+                  
+                  if (existingChecks === 0) {
+                    console.log('⚠️ User has 0 checks but was already initialized - not refilling');
+                    // Don't auto-refill - user needs to upgrade
+                  }
                 }
+              } catch (error) {
+                console.error('❌ [OAuthCallback] Error initializing checks:', error);
               }
               
               // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
