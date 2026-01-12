@@ -21,23 +21,12 @@ const OAuthCallback = () => {
     const handleOAuthCallback = async () => {
       try {
         console.log('🔄 Processing OAuth callback...');
-        console.log('🔍 DEBUG: Current URL =', window.location.href);
-        console.log('🔍 DEBUG: Search params =', window.location.search);
-        console.log('🔍 DEBUG: Hash =', window.location.hash);
-        console.log('🔍 DEBUG: Pathname =', window.location.pathname);
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:23_callbackStart',message:'OAuth callback handler START',data:{pathname:window.location.pathname,hasHash:!!window.location.hash,hashLength:window.location.hash.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H10'})}).catch(()=>{});
-        // #endregion
         
         // Check if user cancelled OAuth (error in URL params or hash)
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const error = urlParams.get('error') || hashParams.get('error');
         const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
-        
-        console.log('🔍 DEBUG: URL error =', error);
-        console.log('🔍 DEBUG: Error description =', errorDescription);
         
         if (error === 'access_denied' || errorDescription?.toLowerCase().includes('user denied') || errorDescription?.toLowerCase().includes('cancelled')) {
           console.log('⚠️ User cancelled OAuth sign-in');
@@ -48,129 +37,7 @@ const OAuthCallback = () => {
           return;
         }
         
-        console.log('🔍 DEBUG: Loading Supabase client...');
         const { supabase } = await import('@/integrations/supabase/client');
-        console.log('✅ DEBUG: Supabase client loaded');
-        
-        // Parse what's actually in the hash
-        const hashData = {
-          hasAccessToken: hashParams.has('access_token'),
-          hasRefreshToken: hashParams.has('refresh_token'),
-          hasCode: hashParams.has('code'),
-          hasError: hashParams.has('error'),
-          hashKeys: Array.from(hashParams.keys())
-        };
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:48_supabaseLoaded',message:'Supabase client loaded - analyzing hash',data:{hasHash:!!window.location.hash,hashData,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8,H10'})}).catch(()=>{});
-        // #endregion
-        
-        // Supabase auto-processes hash on initialization, but in OAuth callback context
-        // we need to explicitly check if it resulted in a session
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:56_beforeGetSession',message:'About to call getSession',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
-        // #endregion
-        
-        const { data: { session: immediateSession }, error: immediateError } = await supabase.auth.getSession();
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:64_afterGetSession',message:'After getSession',data:{hasSession:!!immediateSession,hasError:!!immediateError,errorMsg:immediateError?.message,userId:immediateSession?.user?.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
-        // #endregion
-        
-        // If no session yet but we have tokens in hash, manually set session
-        if (!immediateSession && hashData.hasAccessToken && hashData.hasRefreshToken) {
-          console.log('⚠️ No auto-session, manually setting from hash tokens...');
-          
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:76_manualSetStart',message:'Manually setting session from hash tokens',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
-          // #endregion
-          
-          try {
-            const { data: setData, error: setError } = await supabase.auth.setSession({
-              access_token: hashParams.get('access_token')!,
-              refresh_token: hashParams.get('refresh_token')!,
-            });
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:88_afterManualSet',message:'After manual setSession',data:{hasData:!!setData,hasSession:!!setData?.session,hasError:!!setError,errorMsg:setError?.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
-            // #endregion
-            
-            if (setError) {
-              console.error('❌ Error setting session:', setError);
-            } else if (setData?.session) {
-              console.log('✅ Manually set session successfully!');
-              sessionReceived = true;
-              
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:102_manualSetSuccess',message:'Manual session set SUCCESS',data:{userId:setData.session.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
-              // #endregion
-              
-              // Proceed with redirect
-              const proceedWithRedirect = async () => {
-                const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-                const { initializePermanentStats } = await import('./utils/permanentStats');
-                const existingChecks = getRemainingUserChecks(setData.session.user.id);
-                
-                if (existingChecks === 0) {
-                  initializeUserChecks(setData.session.user.id);
-                  initializePermanentStats(setData.session.user.id);
-                  console.log('✅ Initialized checks for new user');
-                }
-                
-                // Clear hash and redirect
-                window.history.replaceState(null, '', window.location.pathname);
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                if (mounted) {
-                  console.log('✅ Redirecting to dashboard...');
-                  window.location.href = '/dashboard';
-                }
-              };
-              
-              await proceedWithRedirect();
-              return;
-            }
-          } catch (manualError) {
-            console.error('❌ Exception during manual session set:', manualError);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:138_manualSetException',message:'Exception during manual setSession',data:{error:String(manualError),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11'})}).catch(()=>{});
-            // #endregion
-          }
-        }
-        
-        if (immediateSession && !sessionReceived && mounted) {
-          console.log('✅ Session available immediately after OAuth!');
-          sessionReceived = true;
-          
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:74_immediateSessionFound',message:'Immediate session found, proceeding',data:{userId:immediateSession.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9'})}).catch(()=>{});
-          // #endregion
-          
-          // Proceed with redirect immediately
-          const proceedWithRedirect = async () => {
-            const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-            const { initializePermanentStats } = await import('./utils/permanentStats');
-            const existingChecks = getRemainingUserChecks(immediateSession.user.id);
-            
-            if (existingChecks === 0) {
-              initializeUserChecks(immediateSession.user.id);
-              initializePermanentStats(immediateSession.user.id);
-              console.log('✅ Initialized checks for new user');
-            }
-            
-            // Clear hash and redirect
-            window.history.replaceState(null, '', window.location.pathname);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            if (mounted) {
-              console.log('✅ Redirecting to dashboard...');
-              window.location.href = '/dashboard';
-            }
-          };
-          
-          await proceedWithRedirect();
-          return;
-        }
         
         // Supabase automatically processes hash fragments when the client is initialized
         // We need to wait a bit for it to process, then check the session
@@ -179,20 +46,11 @@ const OAuthCallback = () => {
         let sessionReceived = false;
         
         // Set up auth state change listener
-        console.log('🔍 DEBUG: Setting up auth state change listener...');
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           console.log('🔐 Auth state change event:', event, session ? 'Session received' : 'No session');
-          console.log('🔍 DEBUG: Full session object:', session);
-          console.log('🔍 DEBUG: sessionReceived flag =', sessionReceived);
-          console.log('🔍 DEBUG: mounted flag =', mounted);
           
             if (event === 'SIGNED_IN' && session?.user && mounted) {
-            console.log('✅ DEBUG: SIGNED_IN event received! User:', session.user.email);
             sessionReceived = true;
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:64_signedIn',message:'SIGNED_IN event fired',data:{userEmail:session.user.email,userId:session.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H8'})}).catch(()=>{});
-            // #endregion
             
             // Wait for Supabase to write session to localStorage
             const waitForLocalStorage = (attempt = 0) => {
@@ -222,29 +80,17 @@ const OAuthCallback = () => {
             };
             
             const proceedWithRedirect = async () => {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:82_proceedStart',message:'OAuth proceedWithRedirect START',data:{userId:session.user.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
-              // #endregion
-              
               // Initialize user checks (give 5 checks on signup)
               const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
               const { initializePermanentStats } = await import('./utils/permanentStats');
               const existingChecks = getRemainingUserChecks(session.user.id);
               console.log('📊 Existing checks:', existingChecks);
               
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:90_beforeInit',message:'BEFORE initializeUserChecks and initializePermanentStats',data:{existingChecks,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
-              // #endregion
-              
               if (existingChecks === 0) {
                 // New user - give them 5 checks
                 initializeUserChecks(session.user.id);
                 initializePermanentStats(session.user.id);
                 console.log('✅ Initialized 5 checks and permanent stats for new user');
-                
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:100_afterInit',message:'AFTER initializePermanentStats called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-                // #endregion
               }
               
               // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
@@ -307,15 +153,13 @@ const OAuthCallback = () => {
                     
                     console.log('✅ [OAuthCallback] Successfully saved pending scan to history!', savedScan);
                     
-                    // Update user stats (analytics) - both old and permanent
+                    // Update user stats (analytics)
                     console.log('📊 [OAuthCallback] Updating user stats for analytics...');
                     const { updateUserStats } = await import('./utils/checkLimits');
-                    const { incrementPermanentStats } = await import('./utils/permanentStats');
                     const resultType = scan.classification === 'scam' ? 'scam' : 
                                       scan.classification === 'safe' ? 'safe' : 'suspicious';
                     updateUserStats(session.user.id, resultType);
-                    incrementPermanentStats(session.user.id, scan.classification);
-                    console.log('✅ [OAuthCallback] User stats updated (permanent & temp):', resultType);
+                    console.log('✅ [OAuthCallback] User stats updated:', resultType);
                     
                     // Clear pending scan
                     localStorage.removeItem(PENDING_SCAN_KEY);
@@ -342,9 +186,6 @@ const OAuthCallback = () => {
               // Redirect to dashboard
               if (mounted) {
                 console.log('✅ Redirecting to dashboard...');
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/3b9ffdac-951a-426c-a611-3e43b6ce3c2b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:189_beforeRedirect',message:'BEFORE window.location.href redirect',data:{mounted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-                // #endregion
                 // Use window.location.href instead of navigate() to force a full page navigation
                 // This ensures React Router fully commits the route change and Dashboard renders immediately
                 window.location.href = '/dashboard';
@@ -357,33 +198,25 @@ const OAuthCallback = () => {
         });
         
         subscription = data;
-        console.log('🔍 DEBUG: Auth listener subscription created');
         
         // Also try to get session directly (in case it's already processed)
-        console.log('🔍 DEBUG: Starting checkSession attempts...');
         const checkSession = async (attempt = 0) => {
           try {
-            console.log(`🔍 DEBUG: checkSession attempt ${attempt + 1}...`);
             const { data: { session }, error } = await supabase.auth.getSession();
-            
-            console.log('🔍 DEBUG: getSession response - session:', !!session, 'error:', error);
             
             if (error) {
               console.error('❌ OAuth callback error:', error);
               if (mounted && attempt >= 3) {
-                console.error('❌ DEBUG: Max attempts reached, redirecting to home');
                 // Use window.location.href to force full page reload and clear the black screen
                 window.location.href = '/';
               } else if (mounted) {
-                console.log(`⏳ DEBUG: Will retry checkSession in 500ms (attempt ${attempt + 1})`);
                 setTimeout(() => checkSession(attempt + 1), 500);
               }
               return;
             }
 
             if (session?.user && !sessionReceived && mounted) {
-              console.log('✅ Session found directly - User:', session.user.email);
-              console.log('🔍 DEBUG: Setting sessionReceived to true');
+              console.log('✅ Session found directly');
               sessionReceived = true;
               
               // Wait for Supabase to write session to localStorage
@@ -461,17 +294,14 @@ const OAuthCallback = () => {
         // Check session after a longer delay to give Supabase time to process hash
         setTimeout(() => checkSession(0), 500);
         
-        // Timeout fallback - redirect to home if no session after 15 seconds
+        // Timeout fallback - redirect to home if no session after 5 seconds
         setTimeout(() => {
           if (!sessionReceived && mounted) {
-            console.warn('⚠️ OAuth callback timeout after 15 seconds, redirecting to home');
-            console.error('🔍 DEBUG: sessionReceived =', sessionReceived);
-            console.error('🔍 DEBUG: mounted =', mounted);
-            console.error('🔍 DEBUG: URL =', window.location.href);
+            console.warn('⚠️ OAuth callback timeout, redirecting to home');
             // Use window.location.href to force full page reload and clear the black screen
             window.location.href = '/';
           }
-        }, 15000);
+        }, 5000);
       } catch (error) {
         console.error('❌ Error handling OAuth callback:', error);
         if (mounted) {
