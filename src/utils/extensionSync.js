@@ -10,6 +10,16 @@
  */
 export async function syncSessionToExtension(session, userId) {
   try {
+    // Log session structure before syncing
+    console.log('📤 Syncing session to extension:', {
+      userId,
+      hasAccessToken: !!session?.access_token,
+      hasRefreshToken: !!session?.refresh_token,
+      hasUser: !!session?.user,
+      sessionKeys: session ? Object.keys(session) : [],
+      expiresAt: session?.expires_at
+    });
+    
     // Dispatch custom event that content script will listen for
     const event = new CustomEvent('scamChecker:syncSession', {
       detail: {
