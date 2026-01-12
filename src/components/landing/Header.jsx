@@ -21,6 +21,7 @@ function Header() {
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
   const [userAvatar, setUserAvatar] = useState('')
+  const [avatarError, setAvatarError] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -34,8 +35,11 @@ function Header() {
           if (session?.user) {
             setUserId(session.user.id)
             setUserEmail(session.user.email || '')
-            setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User')
-            setUserAvatar(session.user.user_metadata?.avatar_url || '')
+            const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
+            const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || ''
+            setUserName(fullName)
+            setUserAvatar(avatarUrl)
+            setAvatarError(false) // Reset error when avatar changes
             const checks = getRemainingUserChecks(session.user.id)
             setRemainingChecks(checks)
           }
@@ -60,8 +64,12 @@ function Header() {
           if (loggedIn && session?.user) {
             setUserId(session.user.id)
             setUserEmail(session.user.email || '')
-            setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User')
-            setUserAvatar(session.user.user_metadata?.avatar_url || '')
+            const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
+            const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || ''
+            
+            setUserName(fullName)
+            setUserAvatar(avatarUrl)
+            setAvatarError(false) // Reset error when avatar changes
             const checks = getRemainingUserChecks(session.user.id)
             setRemainingChecks(checks)
           } else {
@@ -69,6 +77,7 @@ function Header() {
             setUserEmail('')
             setUserName('')
             setUserAvatar('')
+            setAvatarError(false)
             const checks = getRemainingFreeChecks()
             setRemainingChecks(checks)
           }
@@ -108,7 +117,7 @@ function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <a 
-            href="#" 
+            href="/" 
             className="flex items-center gap-2"
           >
             <div className="w-8 h-8 rounded-lg gradient-button flex items-center justify-center">
@@ -223,25 +232,35 @@ function Header() {
                 {/* User Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
-                      {userAvatar ? (
-                        <img src={userAvatar} alt="Avatar" className="w-8 h-8 rounded-full" />
-                      ) : (
-                        <span>{userName.charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
+                    {userAvatar && !avatarError ? (
+                      <img 
+                        src={userAvatar} 
+                        alt="User Avatar" 
+                        className="w-8 h-8 rounded-full object-cover"
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
+                        <span>{userName?.charAt(0)?.toUpperCase() || 'U'}</span>
+                      </div>
+                    )}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-64 bg-gray-900 border-gray-700 p-0">
                     {/* User Info Header */}
                     <div className="p-4 border-b border-gray-700">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
-                          {userAvatar ? (
-                            <img src={userAvatar} alt="Avatar" className="w-12 h-12 rounded-full" />
-                          ) : (
-                            <span>{userName.charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
+                        {userAvatar && !avatarError ? (
+                          <img 
+                            src={userAvatar} 
+                            alt="User Avatar" 
+                            className="w-12 h-12 rounded-full object-cover"
+                            onError={() => setAvatarError(true)}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                            <span>{userName?.charAt(0)?.toUpperCase() || 'U'}</span>
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="text-white font-semibold truncate">{userName}</div>
                           <div className="text-gray-400 text-xs truncate">{userEmail}</div>
