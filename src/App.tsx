@@ -82,15 +82,13 @@ const OAuthCallback = () => {
             const proceedWithRedirect = async () => {
               // Initialize user checks (give 5 checks on signup)
               const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-              const { initializePermanentStats } = await import('./utils/permanentStats');
               const existingChecks = getRemainingUserChecks(session.user.id);
               console.log('📊 Existing checks:', existingChecks);
               
               if (existingChecks === 0) {
                 // New user - give them 5 checks
                 initializeUserChecks(session.user.id);
-                initializePermanentStats(session.user.id);
-                console.log('✅ Initialized 5 checks and permanent stats for new user');
+                console.log('✅ Initialized 5 checks for new user');
               }
               
               // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
