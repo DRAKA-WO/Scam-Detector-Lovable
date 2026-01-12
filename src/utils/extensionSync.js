@@ -15,10 +15,14 @@ export async function syncSessionToExtension(session, userId, checks = null) {
     let checksCount = checks;
     if (checksCount === null && userId) {
       try {
-        const checksKey = `userChecks_${userId}`;
+        // Use the same key format as checkLimits.js
+        const checksKey = `scam_checker_user_checks_${userId}`;
         const storedChecks = localStorage.getItem(checksKey);
         if (storedChecks !== null) {
           checksCount = parseInt(storedChecks, 10);
+          console.log(`📊 Got ${checksCount} checks from localStorage for syncing to extension`);
+        } else {
+          console.warn(`⚠️ No checks found in localStorage with key: ${checksKey}`);
         }
       } catch (e) {
         console.warn('Could not get checks from localStorage:', e);
