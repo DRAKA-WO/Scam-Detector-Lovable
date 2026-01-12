@@ -526,9 +526,9 @@ function Dashboard() {
                 </div>
                 <a
                   href="/pricing"
-                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium transition-all shadow-sm hover:shadow-md"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   Get more
@@ -643,20 +643,23 @@ function Dashboard() {
                 {/* Left: User Info (50%) */}
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                      {user?.user_metadata?.avatar_url ? (
-                        <img
-                          src={user.user_metadata.avatar_url}
-                          alt="Avatar"
-                          className="w-10 h-10 rounded-full"
-                        />
-                      ) : (
-                        <User className="w-5 h-5 text-white" />
-                      )}
+                    {(user?.user_metadata?.avatar_url || user?.user_metadata?.picture) ? (
+                      <img
+                        src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                        alt="Avatar"
+                        className="w-10 h-10 rounded-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ${(user?.user_metadata?.avatar_url || user?.user_metadata?.picture) ? 'hidden' : ''}`}>
+                      <User className="w-5 h-5 text-white" />
                     </div>
                     <div>
                       <p className="font-semibold">
-                        {user?.user_metadata?.full_name || user?.email || 'User'}
+                        {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'User'}
                       </p>
                       <p className="text-sm text-muted-foreground">{user?.email}</p>
                     </div>
