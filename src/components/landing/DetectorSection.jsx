@@ -58,22 +58,18 @@ function DetectorSection() {
             setUserId(session.user.id)
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
             
-            // Check if this is a new user
-            const isNewUserKey = `is_new_user_${session.user.id}`;
-            const isNewUser = !localStorage.getItem(isNewUserKey);
+            // Check if user has ever been initialized
+            const checksInitializedKey = `checks_initialized_${session.user.id}`;
+            const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
             
-            if (isNewUser) {
-              // New user - force initialize
+            if (!hasBeenInitialized) {
+              // First time - give 5 checks
+              console.log('🆕 First-time user on mount - giving 5 checks');
               initializeUserChecks(session.user.id, true);
-              localStorage.setItem(isNewUserKey, 'true');
+              localStorage.setItem(checksInitializedKey, 'true');
             }
             
-            let checks = getRemainingUserChecks(session.user.id)
-            // If user has no checks, initialize them (existing user)
-            if (checks === 0 && !isNewUser) {
-              initializeUserChecks(session.user.id)
-              checks = getRemainingUserChecks(session.user.id)
-            }
+            const checks = getRemainingUserChecks(session.user.id)
             console.log('📊 User checks:', checks)
             setRemainingChecks(checks)
           }
@@ -111,22 +107,18 @@ function DetectorSection() {
             
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
             
-            // Check if this is a new user
-            const isNewUserKey = `is_new_user_${session.user.id}`;
-            const isNewUser = !localStorage.getItem(isNewUserKey);
+            // Check if user has ever been initialized
+            const checksInitializedKey = `checks_initialized_${session.user.id}`;
+            const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
             
-            if (isNewUser) {
-              // New user - force initialize
+            if (!hasBeenInitialized) {
+              // First time - give 5 checks
+              console.log('🆕 First-time user on auth change - giving 5 checks');
               initializeUserChecks(session.user.id, true);
-              localStorage.setItem(isNewUserKey, 'true');
+              localStorage.setItem(checksInitializedKey, 'true');
             }
             
-            let checks = getRemainingUserChecks(session.user.id)
-            // Initialize checks if user has none (existing user with 0 checks)
-            if (checks === 0 && !isNewUser) {
-              initializeUserChecks(session.user.id)
-              checks = getRemainingUserChecks(session.user.id)
-            }
+            const checks = getRemainingUserChecks(session.user.id)
             setRemainingChecks(checks)
             
             // NOTE: Pending scan handling is now in App.tsx OAuthCallback

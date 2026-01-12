@@ -101,27 +101,27 @@ const OAuthCallback = () => {
             };
             
             const proceedWithRedirect = async () => {
-              // Check if this is a new user (first time signing up)
-              const isNewUserKey = `is_new_user_${session.user.id}`;
-              const isNewUser = !localStorage.getItem(isNewUserKey);
-              
               // Initialize user checks (give 5 checks on signup)
               const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
               
-              if (isNewUser) {
-                // Brand new user - force initialize with 5 checks
-                console.log('🆕 New user detected - forcing initialization with 5 checks');
-                initializeUserChecks(session.user.id, true); // Force init
-                localStorage.setItem(isNewUserKey, 'true');
-                console.log('✅ Initialized 5 checks for new user');
+              // Check if user has ever been initialized
+              const checksInitializedKey = `checks_initialized_${session.user.id}`;
+              const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
+              
+              if (!hasBeenInitialized) {
+                // First time - give 5 checks
+                console.log('🆕 First-time user - giving 5 checks');
+                initializeUserChecks(session.user.id, true);
+                localStorage.setItem(checksInitializedKey, 'true');
+                console.log('✅ Initialized 5 checks for first-time user');
               } else {
-                // Existing user - only init if they have 0 checks
+                // Returning user - only refill if they're at 0
                 const existingChecks = getRemainingUserChecks(session.user.id);
-                console.log('👤 Existing user, current checks:', existingChecks);
+                console.log('👤 Returning user, current checks:', existingChecks);
                 
                 if (existingChecks === 0) {
-                  initializeUserChecks(session.user.id);
-                  console.log('✅ Reinitialized checks for existing user');
+                  console.log('⚠️ User has 0 checks but was already initialized - not refilling');
+                  // Don't auto-refill - user needs to upgrade
                 }
               }
               
@@ -272,24 +272,24 @@ const OAuthCallback = () => {
               };
               
               const proceedWithRedirect = async () => {
-                // Check if this is a new user
-                const isNewUserKey = `is_new_user_${session.user.id}`;
-                const isNewUser = !localStorage.getItem(isNewUserKey);
-                
                 // Initialize user checks
                 const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
                 
-                if (isNewUser) {
-                  // Brand new user - force initialize
-                  console.log('🆕 New user detected - forcing initialization');
+                // Check if user has ever been initialized
+                const checksInitializedKey = `checks_initialized_${session.user.id}`;
+                const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
+                
+                if (!hasBeenInitialized) {
+                  // First time - give 5 checks
+                  console.log('🆕 First-time user - giving 5 checks');
                   initializeUserChecks(session.user.id, true);
-                  localStorage.setItem(isNewUserKey, 'true');
-                  console.log('✅ Initialized 5 checks for new user');
+                  localStorage.setItem(checksInitializedKey, 'true');
+                  console.log('✅ Initialized 5 checks for first-time user');
                 } else {
                   const existingChecks = getRemainingUserChecks(session.user.id);
+                  console.log('👤 Returning user, current checks:', existingChecks);
                   if (existingChecks === 0) {
-                    initializeUserChecks(session.user.id);
-                    console.log('✅ Reinitialized checks for existing user');
+                    console.log('⚠️ User has 0 checks - needs to upgrade');
                   }
                 }
                 
