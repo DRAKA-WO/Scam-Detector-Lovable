@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 
 function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
   const [email, setEmail] = useState("");
@@ -38,8 +39,6 @@ function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
     setIsLoading(true);
 
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -62,8 +61,6 @@ function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
 
   const handleGoogleLogin = async () => {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
       const { error, data } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
@@ -37,11 +38,31 @@ const OAuthCallback = () => {
           return;
         }
         
-        const { supabase } = await import('@/integrations/supabase/client');
+        // Manual session setting from hash tokens
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
         
-        // Supabase automatically processes hash fragments when the client is initialized
-        // We need to wait a bit for it to process, then check the session
-        // Also listen for auth state changes as a backup
+        if (accessToken && refreshToken) {
+          try {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            
+            if (data?.session && !error) {
+              console.log('✅ Session set successfully!');
+              // Clear the hash to prevent re-processing
+              window.history.replaceState(null, '', window.location.pathname);
+              // Redirect to dashboard
+              window.location.href = '/dashboard';
+              return;
+            } else if (error) {
+              console.error('❌ Session setup error:', error.message);
+            }
+          } catch (err: any) {
+            console.error('❌ Session setup failed:', err?.message);
+          }
+        }
         
         let sessionReceived = false;
         

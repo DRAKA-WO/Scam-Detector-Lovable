@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveScanToHistory, uploadScanImage } from "@/utils/scanHistory";
+import { supabase } from "@/integrations/supabase/client";
 
 const PENDING_SCAN_KEY = 'scam_checker_pending_scan';
 
@@ -105,8 +106,6 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
     setIsLoading(true);
 
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -135,8 +134,6 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
 
   const handleGoogleSignup = async () => {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
