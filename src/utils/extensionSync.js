@@ -7,12 +7,28 @@
  * Sync session to extension via custom event
  * @param {Object} session - Supabase session object
  * @param {string} userId - User ID
+ * @param {number} checks - User's remaining checks (optional)
  */
-export async function syncSessionToExtension(session, userId) {
+export async function syncSessionToExtension(session, userId, checks = null) {
   try {
+    // Get checks from localStorage if not provided
+    let checksCount = checks;
+    if (checksCount === null && userId) {
+      try {
+        const checksKey = `userChecks_${userId}`;
+        const storedChecks = localStorage.getItem(checksKey);
+        if (storedChecks !== null) {
+          checksCount = parseInt(storedChecks, 10);
+        }
+      } catch (e) {
+        console.warn('Could not get checks from localStorage:', e);
+      }
+    }
+    
     // Log session structure before syncing
     console.log('📤 Syncing session to extension:', {
       userId,
+      checks: checksCount,
       hasAccessToken: !!session?.access_token,
       hasRefreshToken: !!session?.refresh_token,
       hasUser: !!session?.user,
@@ -25,6 +41,7 @@ export async function syncSessionToExtension(session, userId) {
       detail: {
         session: session,
         userId: userId,
+        checks: checksCount,
         timestamp: Date.now()
       }
     });
