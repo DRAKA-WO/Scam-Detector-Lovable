@@ -41,17 +41,20 @@ export function getRemainingUserChecks(userId) {
 /**
  * Initialize user checks (give 5 checks on signup)
  * @param {string} userId - User ID from Supabase
+ * @param {boolean} forceInit - Force initialization even if checks exist (for new signups)
  */
-export function initializeUserChecks(userId) {
+export function initializeUserChecks(userId, forceInit = false) {
   if (typeof window === 'undefined' || !userId) return
   
   const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
   const existing = localStorage.getItem(key)
   
-  // Only initialize if user doesn't have checks yet
-  if (!existing || parseInt(existing) === 0) {
+  // Force init for new signups, or initialize if user doesn't have checks yet
+  if (forceInit || !existing || parseInt(existing) === 0) {
     localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
-    console.log(`✅ Initialized ${SIGNUP_BONUS_CHECKS} checks for user ${userId}`)
+    console.log(`✅ Initialized ${SIGNUP_BONUS_CHECKS} checks for user ${userId} (force: ${forceInit})`)
+    // Dispatch event to update UI
+    window.dispatchEvent(new Event('checksUpdated'))
   }
 }
 

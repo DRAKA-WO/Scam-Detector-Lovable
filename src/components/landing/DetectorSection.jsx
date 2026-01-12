@@ -57,9 +57,20 @@ function DetectorSection() {
           if (session?.user) {
             setUserId(session.user.id)
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
+            
+            // Check if this is a new user
+            const isNewUserKey = `is_new_user_${session.user.id}`;
+            const isNewUser = !localStorage.getItem(isNewUserKey);
+            
+            if (isNewUser) {
+              // New user - force initialize
+              initializeUserChecks(session.user.id, true);
+              localStorage.setItem(isNewUserKey, 'true');
+            }
+            
             let checks = getRemainingUserChecks(session.user.id)
-            // If user has no checks, initialize them with 5 (in case they just signed up)
-            if (checks === 0) {
+            // If user has no checks, initialize them (existing user)
+            if (checks === 0 && !isNewUser) {
               initializeUserChecks(session.user.id)
               checks = getRemainingUserChecks(session.user.id)
             }
@@ -99,9 +110,20 @@ function DetectorSection() {
             setShowBlurredPreview(false) // Hide blurred preview on login
             
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
+            
+            // Check if this is a new user
+            const isNewUserKey = `is_new_user_${session.user.id}`;
+            const isNewUser = !localStorage.getItem(isNewUserKey);
+            
+            if (isNewUser) {
+              // New user - force initialize
+              initializeUserChecks(session.user.id, true);
+              localStorage.setItem(isNewUserKey, 'true');
+            }
+            
             let checks = getRemainingUserChecks(session.user.id)
-            // Initialize checks if user has none (new signup)
-            if (checks === 0) {
+            // Initialize checks if user has none (existing user with 0 checks)
+            if (checks === 0 && !isNewUser) {
               initializeUserChecks(session.user.id)
               checks = getRemainingUserChecks(session.user.id)
             }

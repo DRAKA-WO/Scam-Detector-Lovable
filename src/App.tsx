@@ -101,15 +101,28 @@ const OAuthCallback = () => {
             };
             
             const proceedWithRedirect = async () => {
+              // Check if this is a new user (first time signing up)
+              const isNewUserKey = `is_new_user_${session.user.id}`;
+              const isNewUser = !localStorage.getItem(isNewUserKey);
+              
               // Initialize user checks (give 5 checks on signup)
               const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-              const existingChecks = getRemainingUserChecks(session.user.id);
-              console.log('📊 Existing checks:', existingChecks);
               
-              if (existingChecks === 0) {
-                // New user - give them 5 checks
-                initializeUserChecks(session.user.id);
+              if (isNewUser) {
+                // Brand new user - force initialize with 5 checks
+                console.log('🆕 New user detected - forcing initialization with 5 checks');
+                initializeUserChecks(session.user.id, true); // Force init
+                localStorage.setItem(isNewUserKey, 'true');
                 console.log('✅ Initialized 5 checks for new user');
+              } else {
+                // Existing user - only init if they have 0 checks
+                const existingChecks = getRemainingUserChecks(session.user.id);
+                console.log('👤 Existing user, current checks:', existingChecks);
+                
+                if (existingChecks === 0) {
+                  initializeUserChecks(session.user.id);
+                  console.log('✅ Reinitialized checks for existing user');
+                }
               }
               
               // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
@@ -259,13 +272,25 @@ const OAuthCallback = () => {
               };
               
               const proceedWithRedirect = async () => {
+                // Check if this is a new user
+                const isNewUserKey = `is_new_user_${session.user.id}`;
+                const isNewUser = !localStorage.getItem(isNewUserKey);
+                
                 // Initialize user checks
                 const { getRemainingUserChecks, initializeUserChecks } = await import('./utils/checkLimits');
-                const existingChecks = getRemainingUserChecks(session.user.id);
                 
-                if (existingChecks === 0) {
-                  initializeUserChecks(session.user.id);
+                if (isNewUser) {
+                  // Brand new user - force initialize
+                  console.log('🆕 New user detected - forcing initialization');
+                  initializeUserChecks(session.user.id, true);
+                  localStorage.setItem(isNewUserKey, 'true');
                   console.log('✅ Initialized 5 checks for new user');
+                } else {
+                  const existingChecks = getRemainingUserChecks(session.user.id);
+                  if (existingChecks === 0) {
+                    initializeUserChecks(session.user.id);
+                    console.log('✅ Reinitialized checks for existing user');
+                  }
                 }
                 
                 // Wait a bit more to ensure everything is processed
