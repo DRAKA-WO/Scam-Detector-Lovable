@@ -43,6 +43,10 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
     }
 
     console.log('✅ Successfully saved scan to history:', data);
+    
+    // Increment permanent stats (cumulative, never decrease)
+    await incrementUserStats(userId, classification);
+    
     // The trigger will automatically clean up old scans (keep only 3)
     return data
   } catch (error) {
@@ -210,6 +214,163 @@ export async function getUserStatsFromDatabase(userId) {
       safeResults: 0,
       suspiciousResults: 0
     }
+  }
+}
+
+/**
+ * Get or create user stats from permanent stats table
+ * These stats are cumulative and never decrease
+ * @param {string} userId - User ID
+ * @returns {Promise<Object>} User permanent stats
+ */
+export async function getUserPermanentStats(userId) {
+  if (!userId) {
+    return {
+      totalScans: 0,
+      scamsDetected: 0,
+      safeResults: 0,
+      suspiciousResults: 0
+    }
+  }
+
+  try {
+    console.log('📊 Fetching permanent stats for user:', userId);
+    
+    // Try to get existing stats
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      console.error('❌ Error fetching permanent stats:', error)
+      return {
+        totalScans: 0,
+        scamsDetected: 0,
+        safeResults: 0,
+        suspiciousResults: 0
+      }
+    }
+
+    // If no stats exist, create initial record
+    if (!data) {
+      console.log('📝 Creating initial stats record for user:', userId);
+      const { data: newStats, error: insertError } = await supabase
+        .from('user_stats')
+        .insert({ user_id: userId })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error('❌ Error creating initial stats:', insertError)
+        return {
+          totalScans: 0,
+          scamsDetected: 0,
+          safeResults: 0,
+          suspiciousResults: 0
+        }
+      }
+
+      return {
+        totalScans: newStats.total_scans || 0,
+        scamsDetected: newStats.scams_detected || 0,
+        safeResults: newStats.safe_results || 0,
+        suspiciousResults: newStats.suspicious_results || 0
+      }
+    }
+
+    console.log('✅ Fetched permanent stats:', data);
+    return {
+      totalScans: data.total_scans || 0,
+      scamsDetected: data.scams_detected || 0,
+      safeResults: data.safe_results || 0,
+      suspiciousResults: data.suspicious_results || 0
+    }
+  } catch (error) {
+    console.error('❌ Exception fetching permanent stats:', error)
+    return {
+      totalScans: 0,
+      scamsDetected: 0,
+      safeResults: 0,
+      suspiciousResults: 0
+    }
+  }
+}
+
+/**
+ * Increment user stats (call this every time a scan is saved)
+ * @param {string} userId - User ID
+ * @param {string} classification - 'safe', 'suspicious', or 'scam'
+ */
+export async function incrementUserStats(userId, classification) {
+  if (!userId || !classification) {
+    console.warn('⚠️ Cannot increment stats: missing userId or classification');
+    return
+  }
+
+  try {
+    console.log('📈 Incrementing stats for user:', userId, 'classification:', classification);
+    
+    // Get current stats or create if not exists
+    let { data: stats, error } = await supabase
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code === 'PGRST116') {
+      // Create initial record
+      console.log('📝 Creating initial stats record during increment');
+      const { error: insertError } = await supabase
+        .from('user_stats')
+        .insert({ user_id: userId })
+
+      if (!insertError) {
+        // Fetch the newly created record
+        const { data: newStats } = await supabase
+          .from('user_stats')
+          .select('*')
+          .eq('user_id', userId)
+          .single()
+        stats = newStats
+      }
+    }
+
+    if (!stats) {
+      console.error('❌ Could not get or create stats record');
+      return
+    }
+
+    // Increment appropriate counters
+    const updates = {
+      total_scans: (stats.total_scans || 0) + 1,
+      updated_at: new Date().toISOString()
+    }
+
+    if (classification === 'scam') {
+      updates.scams_detected = (stats.scams_detected || 0) + 1
+    } else if (classification === 'safe') {
+      updates.safe_results = (stats.safe_results || 0) + 1
+    } else if (classification === 'suspicious') {
+      updates.suspicious_results = (stats.suspicious_results || 0) + 1
+    }
+
+    console.log('📊 Updating stats with:', updates);
+
+    // Update the record
+    const { error: updateError } = await supabase
+      .from('user_stats')
+      .update(updates)
+      .eq('user_id', userId)
+
+    if (updateError) {
+      console.error('❌ Error updating permanent stats:', updateError)
+    } else {
+      console.log('✅ Successfully incremented permanent stats');
+    }
+  } catch (error) {
+    console.error('❌ Exception incrementing stats:', error)
   }
 }
 

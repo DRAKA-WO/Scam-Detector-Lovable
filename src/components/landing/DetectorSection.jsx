@@ -16,8 +16,7 @@ import {
   useFreeCheck, 
   isUserLoggedIn,
   getRemainingUserChecks,
-  useUserCheck,
-  updateUserStats
+  useUserCheck
 } from '../../utils/checkLimits'
 import { saveScanToHistory, uploadScanImage } from '../../utils/scanHistory'
 // Supabase import removed - will be loaded dynamically to avoid build errors
@@ -355,17 +354,13 @@ function DetectorSection() {
         // Normal flow - show full result
         setResult(data)
         
-        // Update user stats and save to history if logged in
+        // Save to history if logged in (stats will be auto-incremented)
         if (isLoggedIn && userId && data) {
-          const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
-          updateUserStats(userId, resultType)
-          
-          // Save to scan history
           try {
             // Upload image to Supabase Storage
             const imageUrl = await uploadScanImage(file, userId)
             
-            // Save scan to history
+            // Save scan to history (stats auto-incremented in Supabase)
             await saveScanToHistory(
               userId,
               'image',
@@ -455,17 +450,13 @@ function DetectorSection() {
         // Normal flow - show full result
         setResult(data)
         
-        // Update user stats and save to history if logged in
+        // Save to history if logged in (stats will be auto-incremented)
         if (isLoggedIn && userId && data) {
-          const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
-          updateUserStats(userId, resultType)
-          
-          // Save to scan history
           try {
             // Create preview (first 200 chars of URL)
             const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
             
-            // Save scan to history
+            // Save scan to history (stats auto-incremented in Supabase)
             await saveScanToHistory(
               userId,
               'url',
@@ -555,17 +546,13 @@ function DetectorSection() {
         // Normal flow - show full result
         setResult(data)
         
-        // Update user stats and save to history if logged in
+        // Save to history if logged in (stats will be auto-incremented)
         if (isLoggedIn && userId && data) {
-          const resultType = data.classification === 'scam' ? 'scam' : data.classification === 'safe' ? 'safe' : 'suspicious'
-          updateUserStats(userId, resultType)
-          
-          // Save to scan history
           try {
             // Create preview (first 200 chars of text)
             const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
             
-            // Save scan to history
+            // Save scan to history (stats auto-incremented in Supabase)
             await saveScanToHistory(
               userId,
               'text',

@@ -171,14 +171,7 @@ const OAuthCallback = () => {
                     );
                     
                     console.log('✅ [OAuthCallback] Successfully saved pending scan to history!', savedScan);
-                    
-                    // Update user stats (analytics)
-                    console.log('📊 [OAuthCallback] Updating user stats for analytics...');
-                    const { updateUserStats } = await import('./utils/checkLimits');
-                    const resultType = scan.classification === 'scam' ? 'scam' : 
-                                      scan.classification === 'safe' ? 'safe' : 'suspicious';
-                    updateUserStats(session.user.id, resultType);
-                    console.log('✅ [OAuthCallback] User stats updated:', resultType);
+                    console.log('✅ [OAuthCallback] Permanent stats automatically incremented');
                     
                     // Clear pending scan
                     localStorage.removeItem(PENDING_SCAN_KEY);

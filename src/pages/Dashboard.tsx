@@ -88,9 +88,9 @@ function Dashboard() {
     if (!user?.id) return
     
     try {
-      const { getUserStatsFromDatabase } = await import('@/utils/scanHistory')
-      const userStats = await getUserStatsFromDatabase(user.id)
-      console.log('🔄 Dashboard: Refreshed stats from database', userStats)
+      const { getUserPermanentStats } = await import('@/utils/scanHistory')
+      const userStats = await getUserPermanentStats(user.id)
+      console.log('🔄 Dashboard: Refreshed permanent stats', userStats)
       setStats(userStats)
     } catch (error) {
       console.error('❌ Dashboard: Error refreshing stats:', error)
@@ -120,11 +120,11 @@ function Dashboard() {
       console.log('📊 Dashboard: User checks', checks)
       setRemainingChecks(checks)
       
-      // Get user stats from database (not localStorage)
+      // Get user stats from permanent stats table (cumulative, never decrease)
       try {
-        const { getUserStatsFromDatabase } = await import('@/utils/scanHistory')
-        const userStats = await getUserStatsFromDatabase(session.user.id)
-        console.log('📊 Dashboard: User stats from database', userStats)
+        const { getUserPermanentStats } = await import('@/utils/scanHistory')
+        const userStats = await getUserPermanentStats(session.user.id)
+        console.log('📊 Dashboard: User permanent stats', userStats)
         setStats(userStats)
       } catch (error) {
         console.error('❌ Dashboard: Error fetching stats:', error)
@@ -363,12 +363,12 @@ function Dashboard() {
                 const checks = getRemainingUserChecks(sessionUser.id)
                 setRemainingChecks(checks)
                 
-                // Fetch stats from database asynchronously
-                import('@/utils/scanHistory').then(({ getUserStatsFromDatabase }) => {
-                  getUserStatsFromDatabase(sessionUser.id).then(userStats => {
+                // Fetch permanent stats asynchronously
+                import('@/utils/scanHistory').then(({ getUserPermanentStats }) => {
+                  getUserPermanentStats(sessionUser.id).then(userStats => {
                     setStats(userStats)
                   }).catch(err => {
-                    console.error('Error fetching stats:', err)
+                    console.error('Error fetching permanent stats:', err)
                   })
                 })
                 
