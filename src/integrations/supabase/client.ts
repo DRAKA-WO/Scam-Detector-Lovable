@@ -2,17 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// 🔒 HARDCODED FALLBACK to prevent URL corruption from browser extensions
-const FALLBACK_SUPABASE_URL = 'https://tpmynhukocnyggqkxckh.supabase.co';
-
-let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-// Check if URL is corrupted or missing and use fallback
-if (!SUPABASE_URL || !SUPABASE_URL.includes('tpmynhukocnyggqkxckh') || SUPABASE_URL.includes('.ggg')) {
-  console.warn('⚠️ Supabase URL missing or corrupted, using hardcoded fallback');
-  SUPABASE_URL = FALLBACK_SUPABASE_URL;
-}
 
 // Always log Supabase config (for debugging in production)
 console.log('🔧 Supabase Config Check:', {
@@ -21,8 +12,6 @@ console.log('🔧 Supabase Config Check:', {
   keyExists: SUPABASE_PUBLISHABLE_KEY ? '✅ SET' : '❌ MISSING',
   keyPreview: SUPABASE_PUBLISHABLE_KEY ? `${SUPABASE_PUBLISHABLE_KEY.substring(0, 25)}...` : 'N/A',
   isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : SUPABASE_URL?.includes('qsivfrgtncdvxvawgdbu') ? '❌ OLD PROJECT' : '❓ UNKNOWN',
-  usingFallback: SUPABASE_URL === FALLBACK_SUPABASE_URL ? '⚠️ YES' : '✅ NO',
-  usingCustomFetch: '❌ NO (reverted to native fetch)',
 });
 
 // Validate environment variables
@@ -37,7 +26,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL || FALLBACK_SUPABASE_URL, 
+  SUPABASE_URL || '', 
   SUPABASE_PUBLISHABLE_KEY || '', 
   {
   auth: {
