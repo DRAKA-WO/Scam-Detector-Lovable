@@ -8,8 +8,9 @@
  * @param {Object} session - Supabase session object
  * @param {string} userId - User ID
  * @param {number} checks - User's remaining checks (optional)
+ * @param {string} plan - User's subscription plan (optional)
  */
-export async function syncSessionToExtension(session, userId, checks = null) {
+export async function syncSessionToExtension(session, userId, checks = null, plan = null) {
   try {
     // Get checks from Supabase (or localStorage fallback) if not provided
     let checksCount = checks;
@@ -34,9 +35,43 @@ export async function syncSessionToExtension(session, userId, checks = null) {
       }
     }
     
+    // Get plan from Supabase if not provided (non-blocking - don't await)
+    let userPlan = plan || 'FREE';
+    
+    // Fetch plan asynchronously without blocking login
+    if (userPlan === 'FREE' && userId) {
+      // Don't await - fetch in background
+      (async () => {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data, error } = await supabase
+            .from('users')
+            .select('plan')
+            .eq('id', userId)
+            .single();
+          
+          if (!error && data?.plan) {
+            // Update plan in a follow-up sync (non-blocking)
+            const updateEvent = new CustomEvent('scamChecker:syncSession', {
+              detail: {
+                session: session,
+                userId: userId,
+                checks: checksCount,
+                plan: data.plan,
+                timestamp: Date.now()
+              }
+            });
+            window.dispatchEvent(updateEvent);
+          }
+        } catch (e) {
+          // Silently fail - plan fetching is optional
+        }
+      })();
+    }
+    
     // Only log in development mode
     if (import.meta.env.DEV) {
-      console.log('📤 Syncing to extension:', { userId, checks: checksCount });
+      console.log('📤 Syncing to extension:', { userId, checks: checksCount, plan: userPlan });
     }
     
     // Dispatch custom event that content script will listen for
@@ -45,6 +80,7 @@ export async function syncSessionToExtension(session, userId, checks = null) {
         session: session,
         userId: userId,
         checks: checksCount,
+        plan: userPlan || 'FREE',
         timestamp: Date.now()
       }
     });

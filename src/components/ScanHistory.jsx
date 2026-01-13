@@ -241,25 +241,37 @@ function ScanHistory({ userId, onScanClick, onRefresh }) {
                   </div>
 
                   {/* Preview */}
-                  {scan.content_preview && (
-                    <div className="mb-2">
-                      {scan.scan_type === 'url' ? (
-                        <a
-                          href={scan.content_preview}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-400 hover:text-blue-300 underline line-clamp-1 break-all"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {scan.content_preview}
-                        </a>
-                      ) : (
-                        <p className="text-sm text-muted-foreground line-clamp-2 break-words">
-                          {scan.content_preview}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {scan.content_preview && (() => {
+                    // Don't show content preview if it looks like a scam type description for safe/suspicious results
+                    const isScamTypeDescription = (scan.classification === 'safe' || scan.classification === 'suspicious') &&
+                      (scan.content_preview.toLowerCase().includes('scam') || 
+                       scan.content_preview.toLowerCase().includes('phishing') ||
+                       scan.content_preview.toLowerCase().includes('credential'));
+                    
+                    if (isScamTypeDescription) {
+                      return null; // Don't show scam type info for safe/suspicious results
+                    }
+                    
+                    return (
+                      <div className="mb-2">
+                        {scan.scan_type === 'url' ? (
+                          <a
+                            href={scan.content_preview}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-400 hover:text-blue-300 underline line-clamp-1 break-all"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {scan.content_preview}
+                          </a>
+                        ) : (
+                          <p className="text-sm text-muted-foreground line-clamp-2 break-words">
+                            {scan.content_preview}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Metadata */}
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -267,7 +279,8 @@ function ScanHistory({ userId, onScanClick, onRefresh }) {
                       <Clock className="h-3 w-3" />
                       {formatDate(scan.created_at)}
                     </div>
-                    {scan.analysis_result?.scam_type && (
+                    {/* Only show scam_type for scam results */}
+                    {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
                       <span className="capitalize">
                         {scan.analysis_result.scam_type.replace(/_/g, ' ')}
                       </span>
