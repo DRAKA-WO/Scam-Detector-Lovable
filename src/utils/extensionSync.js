@@ -38,11 +38,11 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
     // Get plan from parameter, or fetch from Supabase, or default to 'FREE'
     let userPlan = plan;
     
-    // Fetch plan from Supabase if not provided
-    if (userPlan === null && userId) {
+    // Fetch plan from Supabase if not provided (or if explicitly null/undefined)
+    if ((userPlan === null || userPlan === undefined) && userId) {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('users')
           .select('plan')
           .eq('id', userId)
@@ -50,12 +50,17 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
         
         if (!error && data?.plan) {
           userPlan = data.plan;
+          console.log('📤 ExtensionSync: Fetched plan from Supabase:', userPlan);
         } else {
           // Default to FREE if no plan found or on error
           userPlan = 'FREE';
+          if (error) {
+            console.warn('⚠️ ExtensionSync: Error fetching plan:', error);
+          }
         }
       } catch (e) {
         // Default to FREE on any error - don't block login
+        console.warn('⚠️ ExtensionSync: Exception fetching plan:', e);
         userPlan = 'FREE';
       }
     }
