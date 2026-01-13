@@ -1,26 +1,27 @@
 function HeroSection() {
-  // Simplified without scroll animations to fix Lovable build issue
-
   return (
     <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
-        <div 
+        <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] opacity-30"
           style={{
-            background: 'radial-gradient(ellipse at center, hsl(270 70% 60% / 0.4) 0%, transparent 70%)',
+            background:
+              "radial-gradient(ellipse at center, hsl(270 70% 60% / 0.4) 0%, transparent 70%)",
           }}
         />
-        <div 
+        <div
           className="absolute top-1/4 left-0 w-96 h-96 opacity-20"
           style={{
-            background: 'radial-gradient(circle, hsl(320 75% 55% / 0.5) 0%, transparent 70%)',
+            background:
+              "radial-gradient(circle, hsl(320 75% 55% / 0.5) 0%, transparent 70%)",
           }}
         />
-        <div 
+        <div
           className="absolute top-1/3 right-0 w-96 h-96 opacity-20"
           style={{
-            background: 'radial-gradient(circle, hsl(280 80% 55% / 0.5) 0%, transparent 70%)',
+            background:
+              "radial-gradient(circle, hsl(280 80% 55% / 0.5) 0%, transparent 70%)",
           }}
         />
       </div>
@@ -28,45 +29,38 @@ function HeroSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
-          <div 
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8 animate-fade-in"
-          >
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-sm text-muted-foreground">AI-Powered Protection</span>
           </div>
 
           {/* Main Heading */}
-          <h1 
-            className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in"
-            style={{ animationDelay: '0.1s' }}
-          >
-            Detect Scams{' '}
-            <span className="gradient-text">Before</span>
+          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
+            Detect Scams <span className="gradient-text">Before</span>
             <br />
             <span className="gradient-text">They Catch You</span>
           </h1>
 
           {/* Subtitle */}
-          <p 
-            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in"
-            style={{ animationDelay: '0.2s' }}
-          >
-            Upload suspicious images, paste URLs, or enter text messages to instantly identify 
-            phishing attempts, fraud schemes, and online scams with advanced AI analysis.
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+            Upload suspicious images, paste URLs, or enter text messages to instantly identify phishing attempts, fraud
+            schemes, and online scams with advanced AI analysis.
           </p>
 
           {/* CTA Buttons */}
-          <div 
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in"
-            style={{ animationDelay: '0.3s' }}
-          >
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
               href="#detector"
               className="gradient-button text-primary-foreground px-8 py-4 rounded-xl text-lg font-semibold inline-flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"
             >
               Start Scanning
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
               </svg>
             </a>
             <a
@@ -81,10 +75,7 @@ function HeroSection() {
           </div>
 
           {/* Stats */}
-          <div 
-            className="mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto animate-fade-in"
-            style={{ animationDelay: '0.5s' }}
-          >
+          <div className="mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto">
             <div className="text-center">
               <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">50K+</div>
               <div className="text-xs sm:text-sm text-muted-foreground mt-1">Scans Performed</div>
@@ -101,7 +92,7 @@ function HeroSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
-export default HeroSection
+export default HeroSection;
