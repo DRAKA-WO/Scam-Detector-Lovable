@@ -790,8 +790,24 @@ function Dashboard() {
                 <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4">
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground mb-2">Current Plan</p>
-                    <div className="inline-flex items-center px-4 py-1.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
-                      <span className="text-sm font-bold text-purple-300">{userPlan.toUpperCase()} PLAN</span>
+                    <div className={`inline-flex items-center px-4 py-1.5 rounded-lg backdrop-blur-sm border ${
+                      userPlan.toUpperCase() === 'PRO' 
+                        ? 'bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border-yellow-500/40'
+                        : userPlan.toUpperCase() === 'PREMIUM'
+                        ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/40'
+                        : userPlan.toUpperCase() === 'ENTERPRISE'
+                        ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/40'
+                        : 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/30'
+                    }`}>
+                      <span className={`text-sm font-bold ${
+                        userPlan.toUpperCase() === 'PRO'
+                          ? 'text-yellow-200'
+                          : userPlan.toUpperCase() === 'PREMIUM'
+                          ? 'text-purple-300'
+                          : userPlan.toUpperCase() === 'ENTERPRISE'
+                          ? 'text-blue-300'
+                          : 'text-purple-300'
+                      }`}>{userPlan.toUpperCase()} PLAN</span>
                     </div>
                   </div>
                   <a
