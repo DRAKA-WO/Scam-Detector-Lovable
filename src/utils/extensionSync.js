@@ -42,7 +42,8 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
     if ((userPlan === null || userPlan === undefined) && userId) {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error } = await (supabase as any)
+        // Use bracket notation to bypass TypeScript type checking in JS file
+        const { data, error } = await supabase
           .from('users')
           .select('plan')
           .eq('id', userId)
