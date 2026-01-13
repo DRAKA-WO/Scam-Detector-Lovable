@@ -134,6 +134,27 @@ function Dashboard() {
       const userStats = await getUserPermanentStats(user.id)
       console.log('🔄 Dashboard: Refreshed permanent stats', userStats)
       setStats(userStats)
+      
+      // Also refresh plan
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data, error } = await (supabase as any)
+          .from('users')
+          .select('plan')
+          .eq('id', user.id)
+          .maybeSingle()
+        
+        if (!error && data?.plan) {
+          setUserPlan(data.plan)
+          // Sync plan to extension
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            await syncSessionToExtension(session, user.id, null, data.plan)
+          }
+        }
+      } catch (planError) {
+        console.error('❌ Dashboard: Error refreshing plan:', planError)
+      }
     } catch (error) {
       console.error('❌ Dashboard: Error refreshing stats:', error)
     }
@@ -181,7 +202,7 @@ function Dashboard() {
       // Fetch user plan from users table
       try {
         const { supabase } = await import('@/integrations/supabase/client')
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('users')
           .select('plan')
           .eq('id', session.user.id)
