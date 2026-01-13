@@ -53,6 +53,7 @@ function Dashboard() {
     safeResults: 0,
     suspiciousResults: 0
   })
+  const [userPlan, setUserPlan] = useState('FREE')
   // Initialize loading state - check if we already have a session
   // IMPORTANT: Use the same logic as user state to ensure consistency
   const [loading, setLoading] = useState(() => {
@@ -175,6 +176,29 @@ function Dashboard() {
           safeResults: 0,
           suspiciousResults: 0
         })
+      }
+      
+      // Fetch user plan from users table
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data, error } = await supabase
+          .from('users')
+          .select('plan')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        
+        if (!error && data?.plan) {
+          console.log('📊 Dashboard: User plan', data.plan)
+          setUserPlan(data.plan)
+          // Sync plan to extension
+          await syncSessionToExtension(session, session.user.id, null, data.plan)
+        } else {
+          // Default to FREE if no plan found
+          setUserPlan('FREE')
+        }
+      } catch (error) {
+        console.error('❌ Dashboard: Error fetching plan:', error)
+        setUserPlan('FREE')
       }
       
       // Double-check effect is still active before setLoading
@@ -728,7 +752,7 @@ function Dashboard() {
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground mb-2">Current Plan</p>
                     <div className="inline-flex items-center px-4 py-1.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
-                      <span className="text-sm font-bold text-purple-300">FREE PLAN</span>
+                      <span className="text-sm font-bold text-purple-300">{userPlan.toUpperCase()} PLAN</span>
                     </div>
                   </div>
                   <a
