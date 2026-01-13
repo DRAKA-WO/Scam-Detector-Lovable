@@ -6,7 +6,6 @@ function HeroSection() {
   const { ref: subtitleRef, isVisible: subtitleVisible } = useScrollAnimation()
   const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation()
   const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation()
-  const { ref: extensionRef, isVisible: extensionVisible } = useScrollAnimation()
 
   return (
     <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
@@ -119,9 +118,8 @@ function HeroSection() {
 
           {/* Browser Extension Badge - Small & Modern */}
           <div 
-            ref={extensionRef}
-            className={`mt-12 transition-all duration-700 delay-600 ${
-              extensionVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            className={`mt-12 transition-all duration-700 delay-700 ${
+              statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
             }`}
           >
             <a
