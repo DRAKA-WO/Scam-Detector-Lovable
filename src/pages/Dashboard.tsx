@@ -94,8 +94,26 @@ function Dashboard() {
         
         if (session && session.user && !error) {
           console.log('🔍 Dashboard: Syncing session to extension...');
-          await syncSessionToExtension(session, session.user.id);
-          console.log('✅ Dashboard: Session synced to extension');
+          
+          // Fetch plan first, then sync with plan
+          let userPlan = 'FREE';
+          try {
+            const { data: planData, error: planError } = await (supabase as any)
+              .from('users')
+              .select('plan')
+              .eq('id', session.user.id)
+              .maybeSingle();
+            
+            if (!planError && planData?.plan) {
+              userPlan = planData.plan;
+              console.log('📊 Dashboard: Fetched plan for sync:', userPlan);
+            }
+          } catch (planErr) {
+            console.warn('⚠️ Dashboard: Error fetching plan for sync:', planErr);
+          }
+          
+          await syncSessionToExtension(session, session.user.id, null, userPlan);
+          console.log('✅ Dashboard: Session synced to extension with plan:', userPlan);
         }
       } catch (error) {
         console.error('Dashboard: Error syncing session to extension:', error);
