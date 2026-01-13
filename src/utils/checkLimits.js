@@ -65,7 +65,6 @@ export async function syncUserChecksFromSupabase(userId) {
       // Update localStorage with Supabase value
       const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
       localStorage.setItem(key, data.checks.toString())
-      console.log(`✅ Synced ${data.checks} checks from Supabase for user ${userId}`)
       
       // Dispatch event to update UI
       window.dispatchEvent(new Event('checksUpdated'))
@@ -94,7 +93,6 @@ export async function initializeUserChecks(userId, forceInit = false) {
   // Force init for new signups, or initialize if user doesn't have checks yet
   if (forceInit || !existing || parseInt(existing) === 0) {
     localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
-    console.log(`✅ Initialized ${SIGNUP_BONUS_CHECKS} checks for user ${userId} (force: ${forceInit})`)
     
     // Also ensure Supabase has the user record
     try {
@@ -115,8 +113,6 @@ export async function initializeUserChecks(userId, forceInit = false) {
         
         if (insertError) {
           console.error('Error creating user record in Supabase:', insertError)
-        } else {
-          console.log(`✅ Created user record in Supabase with ${SIGNUP_BONUS_CHECKS} checks`)
         }
       } else if (forceInit) {
         // Update existing user with signup bonus
@@ -127,8 +123,6 @@ export async function initializeUserChecks(userId, forceInit = false) {
         
         if (updateError) {
           console.error('Error updating checks in Supabase:', updateError)
-        } else {
-          console.log(`✅ Reset checks to ${SIGNUP_BONUS_CHECKS} in Supabase`)
         }
       }
     } catch (error) {
@@ -168,8 +162,6 @@ export async function useUserCheck(userId) {
       if (error) {
         console.error('Error updating checks in Supabase:', error)
         // Don't fail - localStorage is already updated
-      } else {
-        console.log(`✅ Decremented checks in Supabase: ${remaining} → ${newCount}`)
       }
     } catch (error) {
       console.error('Exception updating checks in Supabase:', error)
