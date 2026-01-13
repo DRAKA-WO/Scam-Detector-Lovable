@@ -1,11 +1,5 @@
-import { useScrollAnimation } from '../../hooks/useScrollAnimation'
-
 function HeroSection() {
-  const { ref: badgeRef, isVisible: badgeVisible } = useScrollAnimation()
-  const { ref: headingRef, isVisible: headingVisible } = useScrollAnimation()
-  const { ref: subtitleRef, isVisible: subtitleVisible } = useScrollAnimation()
-  const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation()
-  const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation()
+  // Simplified without scroll animations to fix Lovable build issue
 
   return (
     <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
@@ -35,10 +29,7 @@ function HeroSection() {
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
           <div 
-            ref={badgeRef}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8 transition-all duration-700 ${
-              badgeVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-8 animate-fade-in"
           >
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-sm text-muted-foreground">AI-Powered Protection</span>
@@ -46,10 +37,8 @@ function HeroSection() {
 
           {/* Main Heading */}
           <h1 
-            ref={headingRef}
-            className={`font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 transition-all duration-700 delay-100 ${
-              headingVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}
+            className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in"
+            style={{ animationDelay: '0.1s' }}
           >
             Detect Scams{' '}
             <span className="gradient-text">Before</span>
@@ -59,10 +48,8 @@ function HeroSection() {
 
           {/* Subtitle */}
           <p 
-            ref={subtitleRef}
-            className={`text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed transition-all duration-700 delay-200 ${
-              subtitleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}
+            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in"
+            style={{ animationDelay: '0.2s' }}
           >
             Upload suspicious images, paste URLs, or enter text messages to instantly identify 
             phishing attempts, fraud schemes, and online scams with advanced AI analysis.
@@ -70,10 +57,8 @@ function HeroSection() {
 
           {/* CTA Buttons */}
           <div 
-            ref={ctaRef}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-300 ${
-              ctaVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in"
+            style={{ animationDelay: '0.3s' }}
           >
             <a
               href="#detector"
@@ -97,10 +82,8 @@ function HeroSection() {
 
           {/* Stats */}
           <div 
-            ref={statsRef}
-            className={`mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto transition-all duration-700 delay-500 ${
-              statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}
+            className="mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto animate-fade-in"
+            style={{ animationDelay: '0.5s' }}
           >
             <div className="text-center">
               <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">50K+</div>
@@ -118,9 +101,8 @@ function HeroSection() {
 
           {/* Browser Extension Badge - Small & Modern */}
           <div 
-            className={`mt-12 transition-all duration-700 delay-700 ${
-              statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}
+            className="mt-12 animate-fade-in"
+            style={{ animationDelay: '0.7s' }}
           >
             <a
               href="https://chrome.google.com/webstore"
