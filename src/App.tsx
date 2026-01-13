@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { syncSessionToExtension, initializeExtensionSync } from "./utils/extensionSync";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import Business from "./pages/Business";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -444,6 +445,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/business" element={<Business />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
