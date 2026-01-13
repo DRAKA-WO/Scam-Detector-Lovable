@@ -117,36 +117,11 @@ const OAuthCallback = () => {
               await syncSessionToExtension(session, session.user.id);
               
               try {
-                // Initialize user checks - check Supabase to see if user is new or existing
-                console.log('📦 [OAuthCallback] Checking user status in database...');
-                const { initializeUserChecks, syncUserChecksFromSupabase } = await import('./utils/checkLimits');
-                
-                // Check if user exists in Supabase database
-                const { data: existingUser, error: fetchError } = await supabase
-                  .from('users')
-                  .select('id, checks')
-                  .eq('id', session.user.id)
-                  .maybeSingle();
-                
-                if (fetchError) {
-                  console.error('❌ [OAuthCallback] Error checking if user exists:', fetchError);
-                }
-                
-                if (!existingUser) {
-                  // Truly new user - doesn't exist in database yet
-                  console.log('🆕 [OAuthCallback] NEW USER detected in database - giving 5 checks');
-                  await initializeUserChecks(session.user.id, true);
-                  console.log('✅ [OAuthCallback] Initialized 5 checks for first-time user');
-                } else {
-                  // Existing user - sync their checks from database
-                  console.log('👤 [OAuthCallback] EXISTING USER detected in database');
-                  const dbChecks = existingUser.checks || 0;
-                  console.log(`📊 [OAuthCallback] User has ${dbChecks} checks in database - syncing to localStorage`);
-                  
-                  // Sync checks from Supabase to localStorage
-                  await syncUserChecksFromSupabase(session.user.id);
-                  console.log('✅ [OAuthCallback] Synced existing user checks from database');
-                }
+                // Initialize user checks using localStorage-based approach
+                console.log('📦 [OAuthCallback] Initializing user checks...');
+                const { initializeUserChecks } = await import('./utils/checkLimits');
+                await initializeUserChecks(session.user.id, true);
+                console.log('✅ [OAuthCallback] User checks initialized');
               } catch (error) {
                 console.error('❌ [OAuthCallback] Error initializing checks:', error);
               }
@@ -300,36 +275,11 @@ const OAuthCallback = () => {
               const proceedWithRedirect = async () => {
                 console.log('🚀 [OAuthCallback-v2] Starting proceedWithRedirect...');
                 
-                // Initialize user checks - check Supabase to see if user is new or existing
-                console.log('📦 [OAuthCallback-v2] Checking user status in database...');
-                const { initializeUserChecks, syncUserChecksFromSupabase } = await import('./utils/checkLimits');
-                
-                // Check if user exists in Supabase database
-                const { data: existingUser, error: fetchError } = await supabase
-                  .from('users')
-                  .select('id, checks')
-                  .eq('id', session.user.id)
-                  .maybeSingle();
-                
-                if (fetchError) {
-                  console.error('❌ [OAuthCallback-v2] Error checking if user exists:', fetchError);
-                }
-                
-                if (!existingUser) {
-                  // Truly new user - doesn't exist in database yet
-                  console.log('🆕 [OAuthCallback-v2] NEW USER detected in database - giving 5 checks');
-                  await initializeUserChecks(session.user.id, true);
-                  console.log('✅ [OAuthCallback-v2] Initialized 5 checks for first-time user');
-                } else {
-                  // Existing user - sync their checks from database
-                  console.log('👤 [OAuthCallback-v2] EXISTING USER detected in database');
-                  const dbChecks = existingUser.checks || 0;
-                  console.log(`📊 [OAuthCallback-v2] User has ${dbChecks} checks in database - syncing to localStorage`);
-                  
-                  // Sync checks from Supabase to localStorage
-                  await syncUserChecksFromSupabase(session.user.id);
-                  console.log('✅ [OAuthCallback-v2] Synced existing user checks from database');
-                }
+                // Initialize user checks using localStorage-based approach
+                console.log('📦 [OAuthCallback-v2] Initializing user checks...');
+                const { initializeUserChecks } = await import('./utils/checkLimits');
+                await initializeUserChecks(session.user.id, true);
+                console.log('✅ [OAuthCallback-v2] User checks initialized');
                 
                 // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
                 console.log('🔍 [OAuthCallback-v2] Checking for pending scan...');
