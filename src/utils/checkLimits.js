@@ -27,6 +27,7 @@ export function getRemainingFreeChecks() {
 
 /**
  * Get remaining checks for logged-in users
+ * Always syncs from Supabase if localStorage is empty (e.g., after clearing localStorage)
  * @param {string} userId - User ID from Supabase
  * @returns {number} Number of remaining checks
  */
@@ -35,7 +36,17 @@ export function getRemainingUserChecks(userId) {
   
   const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
   const stored = localStorage.getItem(key)
-  return stored ? parseInt(stored) : 0
+  
+  // If localStorage is empty, sync from Supabase (async, but return 0 for immediate response)
+  if (!stored) {
+    // Trigger async sync (don't await - return 0 immediately)
+    syncUserChecksFromSupabase(userId).catch(err => {
+      console.warn('Background sync of checks failed:', err);
+    });
+    return 0
+  }
+  
+  return parseInt(stored)
 }
 
 /**
@@ -80,7 +91,7 @@ export async function syncUserChecksFromSupabase(userId) {
 }
 
 /**
- * Initialize user checks (give 5 checks on signup)
+ * Initialize user checks (give 5 checks on signup ONLY for new users)
  * @param {string} userId - User ID from Supabase
  * @param {boolean} forceInit - Force initialization even if checks exist (for new signups)
  */
@@ -88,54 +99,66 @@ export async function initializeUserChecks(userId, forceInit = false) {
   if (typeof window === 'undefined' || !userId) return
   
   const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
-  const existing = localStorage.getItem(key)
   
-  // Force init for new signups, or initialize if user doesn't have checks yet
-  if (forceInit || !existing || parseInt(existing) === 0) {
-    localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
-    console.log(`✅ Initialized ${SIGNUP_BONUS_CHECKS} checks for user ${userId} (force: ${forceInit})`)
+  try {
+    const { supabase } = await import('@/integrations/supabase/client')
     
-    // Also ensure Supabase has the user record
-    try {
-      const { supabase } = await import('@/integrations/supabase/client')
+    // ALWAYS check Supabase first - this is the source of truth
+    // Check if user record exists in database
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select('id, checks')
+      .eq('id', userId)
+      .maybeSingle() // Use maybeSingle to handle missing rows gracefully
+    
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      // Error other than "no rows" - log and use fallback
+      console.error('Error checking user in Supabase:', fetchError)
+    }
+    
+    if (existingUser) {
+      // User EXISTS in database - sync their existing check count
+      const dbChecks = typeof existingUser.checks === 'number' ? existingUser.checks : 0
+      localStorage.setItem(key, dbChecks.toString())
+      console.log(`✅ Existing user found - synced ${dbChecks} checks from database for user ${userId}`)
       
-      // Check if user record exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id, checks')
-        .eq('id', userId)
-        .single()
-      
-      if (!existingUser) {
-        // Create new user record if it doesn't exist
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert({ id: userId, checks: SIGNUP_BONUS_CHECKS })
-        
-        if (insertError) {
-          console.error('Error creating user record in Supabase:', insertError)
-        } else {
-          console.log(`✅ Created user record in Supabase with ${SIGNUP_BONUS_CHECKS} checks`)
-        }
-      } else if (forceInit) {
-        // Update existing user with signup bonus
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ checks: SIGNUP_BONUS_CHECKS })
-          .eq('id', userId)
-        
-        if (updateError) {
-          console.error('Error updating checks in Supabase:', updateError)
-        } else {
-          console.log(`✅ Reset checks to ${SIGNUP_BONUS_CHECKS} in Supabase`)
-        }
-      }
-    } catch (error) {
-      console.error('Exception initializing checks in Supabase:', error)
+      // Dispatch event to update UI
+      window.dispatchEvent(new Event('checksUpdated'))
+      return
+    }
+    
+    // User DOES NOT exist in database - this is a NEW user
+    // Give them 5 signup bonus checks
+    console.log(`🆕 New user detected - giving ${SIGNUP_BONUS_CHECKS} signup bonus checks`)
+    
+    // Create new user record in Supabase with signup bonus
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert({ id: userId, checks: SIGNUP_BONUS_CHECKS })
+    
+    if (insertError) {
+      console.error('❌ Error creating user record in Supabase:', insertError)
+      // Still update localStorage as fallback
+      localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
+    } else {
+      console.log(`✅ Created new user record in Supabase with ${SIGNUP_BONUS_CHECKS} checks`)
+      // Update localStorage to match database
+      localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
     }
     
     // Dispatch event to update UI
     window.dispatchEvent(new Event('checksUpdated'))
+    
+  } catch (error) {
+    console.error('❌ Exception initializing checks in Supabase:', error)
+    // Fallback: only set localStorage if forceInit is true (shouldn't happen often)
+    if (forceInit) {
+      const existing = localStorage.getItem(key)
+      if (!existing || parseInt(existing) === 0) {
+        localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
+        window.dispatchEvent(new Event('checksUpdated'))
+      }
+    }
   }
 }
 

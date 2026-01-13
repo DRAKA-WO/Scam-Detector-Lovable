@@ -60,16 +60,10 @@ function DetectorSection() {
             setUserId(session.user.id)
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
             
-            // Check if user has ever been initialized
-            const checksInitializedKey = `checks_initialized_${session.user.id}`;
-            const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
-            
-            if (!hasBeenInitialized) {
-              // First time - give 5 checks
-              console.log('🆕 First-time user on mount - giving 5 checks');
-              await initializeUserChecks(session.user.id, true);
-              localStorage.setItem(checksInitializedKey, 'true');
-            }
+            // Initialize/sync checks - will check database to determine if new or existing user
+            // Database is the source of truth - no need for localStorage flags
+            console.log('🔄 Syncing user checks on mount...');
+            await initializeUserChecks(session.user.id, false);
             
             const checks = getRemainingUserChecks(session.user.id)
             console.log('📊 User checks:', checks)
@@ -109,16 +103,10 @@ function DetectorSection() {
             
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
             
-            // Check if user has ever been initialized
-            const checksInitializedKey = `checks_initialized_${session.user.id}`;
-            const hasBeenInitialized = localStorage.getItem(checksInitializedKey) === 'true';
-            
-            if (!hasBeenInitialized) {
-              // First time - give 5 checks
-              console.log('🆕 First-time user on auth change - giving 5 checks');
-              await initializeUserChecks(session.user.id, true);
-              localStorage.setItem(checksInitializedKey, 'true');
-            }
+            // Initialize/sync checks - will check database to determine if new or existing user
+            // Database is the source of truth - no need for localStorage flags
+            console.log('🔄 Syncing user checks on auth change...');
+            await initializeUserChecks(session.user.id, false);
             
             const checks = getRemainingUserChecks(session.user.id)
             setRemainingChecks(checks)

@@ -117,11 +117,11 @@ const OAuthCallback = () => {
               await syncSessionToExtension(session, session.user.id);
               
               try {
-                // Initialize user checks using localStorage-based approach
-                console.log('📦 [OAuthCallback] Initializing user checks...');
+                // Initialize/sync user checks - will check database first to determine if new or existing user
+                console.log('📦 [OAuthCallback] Initializing/syncing user checks...');
                 const { initializeUserChecks } = await import('./utils/checkLimits');
-                await initializeUserChecks(session.user.id, true);
-                console.log('✅ [OAuthCallback] User checks initialized');
+                await initializeUserChecks(session.user.id, false);
+                console.log('✅ [OAuthCallback] User checks initialized/synced');
               } catch (error) {
                 console.error('❌ [OAuthCallback] Error initializing checks:', error);
               }
@@ -275,11 +275,11 @@ const OAuthCallback = () => {
               const proceedWithRedirect = async () => {
                 console.log('🚀 [OAuthCallback-v2] Starting proceedWithRedirect...');
                 
-                // Initialize user checks using localStorage-based approach
-                console.log('📦 [OAuthCallback-v2] Initializing user checks...');
+                // Initialize/sync user checks - will check database first to determine if new or existing user
+                console.log('📦 [OAuthCallback-v2] Initializing/syncing user checks...');
                 const { initializeUserChecks } = await import('./utils/checkLimits');
-                await initializeUserChecks(session.user.id, true);
-                console.log('✅ [OAuthCallback-v2] User checks initialized');
+                await initializeUserChecks(session.user.id, false);
+                console.log('✅ [OAuthCallback-v2] User checks initialized/synced');
                 
                 // 🎯 HANDLE PENDING SCAN AFTER SIGNUP
                 console.log('🔍 [OAuthCallback-v2] Checking for pending scan...');
