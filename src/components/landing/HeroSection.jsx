@@ -90,20 +90,20 @@ function HeroSection() {
             </div>
           </div>
 
-          {/* Browser Extension - Compact Pill */}
+          {/* Browser Extension - Dark Theme Pill */}
           <div className="mt-12">
             <a
               href="https://chrome.google.com/webstore"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-white/95 hover:bg-white shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105"
+              className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105"
             >
               {/* Shield Icon */}
               <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
               </svg>
               
-              <span className="text-sm font-medium text-gray-800">
+              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                 Add to Chrome - it's free!
               </span>
               
