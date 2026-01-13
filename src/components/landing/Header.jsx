@@ -191,7 +191,7 @@ function Header() {
             <a href="/blog" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
               Blog
             </a>
-            <a href="/for-business" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+            <a href="/business" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
               For Business
             </a>
           </nav>
@@ -409,7 +409,7 @@ function Header() {
               <a href="/blog" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
                 Blog
               </a>
-              <a href="/for-business" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+              <a href="/business" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
                 For Business
               </a>
               {isLoggedIn ? (
