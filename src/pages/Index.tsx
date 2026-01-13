@@ -5,7 +5,6 @@ import Header from '../components/landing/Header'
 import HeroSection from '../components/landing/HeroSection'
 import DetectorSection from '../components/landing/DetectorSection'
 import FeaturesSection from '../components/landing/FeaturesSection'
-import ExtensionSection from '../components/landing/ExtensionSection'
 import HowItWorksSection from '../components/landing/HowItWorksSection'
 import FAQSection from '../components/landing/FAQSection'
 import Footer from '../components/landing/Footer'
@@ -55,7 +54,6 @@ const Index = () => {
         <HeroSection />
         <DetectorSection />
         <FeaturesSection />
-        <ExtensionSection />
         <HowItWorksSection />
         <FAQSection />
       </main>
