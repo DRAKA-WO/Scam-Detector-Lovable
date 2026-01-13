@@ -35,39 +35,9 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
       }
     }
     
-    // Get plan from Supabase if not provided (non-blocking - don't await)
+    // Get plan from parameter or default to 'FREE'
+    // Note: Plan column doesn't exist in users table yet, so we default to FREE
     let userPlan = plan || 'FREE';
-    
-    // Fetch plan asynchronously without blocking login
-    if (userPlan === 'FREE' && userId) {
-      // Don't await - fetch in background
-      (async () => {
-        try {
-          const { supabase } = await import('@/integrations/supabase/client');
-          const { data, error } = await supabase
-            .from('users')
-            .select('plan')
-            .eq('id', userId)
-            .single();
-          
-          if (!error && data?.plan) {
-            // Update plan in a follow-up sync (non-blocking)
-            const updateEvent = new CustomEvent('scamChecker:syncSession', {
-              detail: {
-                session: session,
-                userId: userId,
-                checks: checksCount,
-                plan: data.plan,
-                timestamp: Date.now()
-              }
-            });
-            window.dispatchEvent(updateEvent);
-          }
-        } catch (e) {
-          // Silently fail - plan fetching is optional
-        }
-      })();
-    }
     
     // Only log in development mode
     if (import.meta.env.DEV) {
