@@ -6,6 +6,7 @@ function HeroSection() {
   const { ref: subtitleRef, isVisible: subtitleVisible } = useScrollAnimation()
   const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation()
   const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation()
+  const { ref: extensionRef, isVisible: extensionVisible } = useScrollAnimation()
 
   return (
     <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
@@ -114,6 +115,38 @@ function HeroSection() {
               <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">Free</div>
               <div className="text-xs sm:text-sm text-muted-foreground mt-1">To Use</div>
             </div>
+          </div>
+
+          {/* Browser Extension Badge - Small & Modern */}
+          <div 
+            ref={extensionRef}
+            className={`mt-12 transition-all duration-700 delay-600 ${
+              extensionVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}
+          >
+            <a
+              href="https://chrome.google.com/webstore"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-card/50 backdrop-blur-sm border border-border hover:border-purple-500/50 transition-all duration-300 group hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20"
+            >
+              {/* Chrome Icon */}
+              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              
+              {/* Text */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground group-hover:text-purple-400 transition-colors">
+                  Get Browser Extension
+                </span>
+                <svg className="w-3 h-3 text-muted-foreground group-hover:text-purple-400 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </a>
           </div>
         </div>
       </div>
