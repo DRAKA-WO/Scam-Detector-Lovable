@@ -107,15 +107,22 @@ function HeroSection() {
                 Add to Chrome - it's free!
               </span>
               
-              {/* Chrome Logo */}
+              {/* Chrome Logo - Original */}
               <svg className="w-6 h-6" viewBox="0 0 48 48" fill="none">
-                <circle cx="24" cy="24" r="20" fill="white" />
-                <path d="M24 8C15.163 8 8 15.163 8 24H16C16 19.582 19.582 16 24 16V8Z" fill="#EA4335" />
-                <path d="M24 8V16C28.418 16 32 19.582 32 24H40C40 15.163 32.837 8 24 8Z" fill="#FBBC05" />
-                <path d="M40 24H32C32 28.418 28.418 32 24 32L20 40.928C32.837 40.928 40 32.837 40 24Z" fill="#34A853" />
-                <path d="M24 32C19.582 32 16 28.418 16 24H8C8 32.837 15.163 40 24 40V32Z" fill="#4285F4" />
-                <circle cx="24" cy="24" r="8" fill="white" />
-                <circle cx="24" cy="24" r="6" fill="#4285F4" />
+                <path d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z" fill="url(#chrome-outer)" />
+                <path d="M24 14c-5.523 0-10 4.477-10 10h10V14z" fill="#EA4335" />
+                <path d="M24 14v10h10c0-5.523-4.477-10-10-10z" fill="#FBBC05" />
+                <path d="M34 24c0 5.523-4.477 10-10 10v-10h10z" fill="#34A853" />
+                <path d="M14 24c0 5.523 4.477 10 10 10V24H14z" fill="#4285F4" />
+                <circle cx="24" cy="24" r="6" fill="white" />
+                <defs>
+                  <linearGradient id="chrome-outer" x1="4" y1="4" x2="44" y2="44">
+                    <stop stopColor="#EA4335" />
+                    <stop offset="0.33" stopColor="#FBBC05" />
+                    <stop offset="0.66" stopColor="#34A853" />
+                    <stop offset="1" stopColor="#4285F4" />
+                  </linearGradient>
+                </defs>
               </svg>
             </a>
           </div>
