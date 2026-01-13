@@ -35,9 +35,35 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
       }
     }
     
-    // Get plan from parameter or default to 'FREE'
-    // Note: Plan column doesn't exist in users table yet, so we default to FREE
-    let userPlan = plan || 'FREE';
+    // Get plan from parameter, or fetch from Supabase, or default to 'FREE'
+    let userPlan = plan;
+    
+    // Fetch plan from Supabase if not provided
+    if (userPlan === null && userId) {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data, error } = await supabase
+          .from('users')
+          .select('plan')
+          .eq('id', userId)
+          .maybeSingle(); // Use maybeSingle() instead of single() to handle missing rows
+        
+        if (!error && data?.plan) {
+          userPlan = data.plan;
+        } else {
+          // Default to FREE if no plan found or on error
+          userPlan = 'FREE';
+        }
+      } catch (e) {
+        // Default to FREE on any error - don't block login
+        userPlan = 'FREE';
+      }
+    }
+    
+    // Ensure plan is always set
+    if (!userPlan) {
+      userPlan = 'FREE';
+    }
     
     // Only log in development mode
     if (import.meta.env.DEV) {
