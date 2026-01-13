@@ -18,18 +18,15 @@ export async function syncSessionToExtension(session, userId, checks = null) {
         // First, try to sync from Supabase users table
         const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
         checksCount = await syncUserChecksFromSupabase(userId);
-        console.log(`📊 Synced ${checksCount} checks from Supabase for extension sync`);
       } catch (e) {
-        console.warn('Could not sync checks from Supabase, trying localStorage:', e);
-        // Fallback to localStorage
+        // Fallback to localStorage silently
         try {
           const checksKey = `scam_checker_user_checks_${userId}`;
           const storedChecks = localStorage.getItem(checksKey);
           if (storedChecks !== null) {
             checksCount = parseInt(storedChecks, 10);
-            console.log(`📊 Got ${checksCount} checks from localStorage for syncing to extension`);
-          } else {
-            console.warn(`⚠️ No checks found in localStorage with key: ${checksKey}`);
+          } else if (import.meta.env.DEV) {
+            console.warn(`⚠️ No checks found for user ${userId}`);
           }
         } catch (fallbackError) {
           console.warn('Could not get checks from localStorage:', fallbackError);
@@ -37,16 +34,10 @@ export async function syncSessionToExtension(session, userId, checks = null) {
       }
     }
     
-    // Log session structure before syncing
-    console.log('📤 Syncing session to extension:', {
-      userId,
-      checks: checksCount,
-      hasAccessToken: !!session?.access_token,
-      hasRefreshToken: !!session?.refresh_token,
-      hasUser: !!session?.user,
-      sessionKeys: session ? Object.keys(session) : [],
-      expiresAt: session?.expires_at
-    });
+    // Only log in development mode
+    if (import.meta.env.DEV) {
+      console.log('📤 Syncing to extension:', { userId, checks: checksCount });
+    }
     
     // Dispatch custom event that content script will listen for
     const event = new CustomEvent('scamChecker:syncSession', {
@@ -59,7 +50,6 @@ export async function syncSessionToExtension(session, userId, checks = null) {
     });
     
     window.dispatchEvent(event);
-    console.log('✅ Session sync event dispatched:', { userId, syncTime: new Date().toLocaleTimeString() });
     
     // Small delay to let extension process
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -89,4 +79,72 @@ export async function clearExtensionSession() {
   } catch (error) {
     console.warn('⚠️ Failed to dispatch session clear event:', error);
   }
+}
+
+/**
+ * Initialize real-time check sync listener with throttling
+ * Call this once when app starts to enable automatic extension sync
+ */
+export function initializeExtensionSync() {
+  let syncTimeout = null;
+  let lastSyncTime = 0;
+  const SYNC_THROTTLE_MS = 3000; // Sync at most once every 3 seconds
+  
+  // Listen for checksUpdated events and sync to extension (throttled)
+  const handleChecksUpdate = async () => {
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncTime;
+    
+    // If we synced less than 1 second ago, schedule a delayed sync
+    if (timeSinceLastSync < SYNC_THROTTLE_MS) {
+      // Clear any pending sync
+      if (syncTimeout) {
+        clearTimeout(syncTimeout);
+      }
+      
+      // Schedule sync for later
+      syncTimeout = setTimeout(async () => {
+        await performSync();
+        lastSyncTime = Date.now();
+      }, SYNC_THROTTLE_MS - timeSinceLastSync);
+      
+      return;
+    }
+    
+    // Enough time has passed, sync immediately
+    await performSync();
+    lastSyncTime = now;
+  };
+  
+  // Actual sync function
+  const performSync = async () => {
+    try {
+      // Get current session
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Sync silently - no need to log every time
+        await syncSessionToExtension(session, session.user.id);
+      }
+    } catch (error) {
+      // Only log errors
+      console.warn('⚠️ Failed to sync checks to extension:', error);
+    }
+  };
+  
+  // Add event listener
+  window.addEventListener('checksUpdated', handleChecksUpdate);
+  // Only log initialization once
+  if (import.meta.env.DEV) {
+    console.log('🔄 Extension sync listener initialized (throttled to 3s)');
+  }
+  
+  // Return cleanup function
+  return () => {
+    if (syncTimeout) {
+      clearTimeout(syncTimeout);
+    }
+    window.removeEventListener('checksUpdated', handleChecksUpdate);
+  };
 }

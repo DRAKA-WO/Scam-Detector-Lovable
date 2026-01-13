@@ -65,7 +65,6 @@ export async function syncUserChecksFromSupabase(userId) {
       // Update localStorage with Supabase value
       const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
       localStorage.setItem(key, data.checks.toString())
-      console.log(`✅ Synced ${data.checks} checks from Supabase for user ${userId}`)
       
       // Dispatch event to update UI
       window.dispatchEvent(new Event('checksUpdated'))

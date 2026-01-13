@@ -67,6 +67,12 @@ function LoginModal({ isOpen, onClose, onLogin, onSwitchToSignup }) {
 
   const handleGoogleLogin = async () => {
     try {
+      // Close modal BEFORE OAuth redirect to prevent DOM cleanup issues
+      onClose();
+      
+      // Small delay to allow modal to cleanly unmount
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const { error, data } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

@@ -327,6 +327,8 @@ function DetectorSection() {
         const after = getRemainingUserChecks(userId)
         console.log(`💳 After using user check: ${after}`)
         setRemainingChecks(after)
+        // Notify header and extension to update
+        window.dispatchEvent(new Event('checksUpdated'))
       } else {
         const before = getRemainingFreeChecks()
         console.log(`💳 Before using free check: ${before}`)
@@ -334,6 +336,8 @@ function DetectorSection() {
         const after = getRemainingFreeChecks()
         console.log(`💳 After using free check: ${after}`)
         setRemainingChecks(after)
+        // Notify header and extension to update
+        window.dispatchEvent(new Event('checksUpdated'))
       }
 
       const formData = new FormData()

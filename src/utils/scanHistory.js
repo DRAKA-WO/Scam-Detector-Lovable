@@ -236,14 +236,14 @@ export async function getUserPermanentStats(userId) {
   try {
     console.log('📊 Fetching permanent stats for user:', userId);
     
-    // Try to get existing stats
+    // Try to get existing stats - use maybeSingle() to avoid errors when no rows exist
     const { data, error } = await supabase
       .from('user_stats')
-      .select('*')
+      .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+    if (error) {
       console.error('❌ Error fetching permanent stats:', error)
       return {
         totalScans: 0,
@@ -259,7 +259,7 @@ export async function getUserPermanentStats(userId) {
       const { data: newStats, error: insertError } = await supabase
         .from('user_stats')
         .insert({ user_id: userId })
-        .select()
+        .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
         .single()
 
       if (insertError) {
@@ -315,26 +315,25 @@ export async function incrementUserStats(userId, classification) {
     // Get current stats or create if not exists
     let { data: stats, error } = await supabase
       .from('user_stats')
-      .select('*')
+      .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle() // Use maybeSingle() instead of single() to avoid errors when no rows exist
 
-    if (error && error.code === 'PGRST116') {
-      // Create initial record
+    // If no record exists or there was an error, create initial record
+    if (error || !stats) {
       console.log('📝 Creating initial stats record during increment');
-      const { error: insertError } = await supabase
+      const { data: newStats, error: insertError } = await supabase
         .from('user_stats')
         .insert({ user_id: userId })
+        .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
+        .single()
 
-      if (!insertError) {
-        // Fetch the newly created record
-        const { data: newStats } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', userId)
-          .single()
-        stats = newStats
+      if (insertError) {
+        console.error('❌ Error creating initial stats record:', insertError);
+        return
       }
+      
+      stats = newStats
     }
 
     if (!stats) {

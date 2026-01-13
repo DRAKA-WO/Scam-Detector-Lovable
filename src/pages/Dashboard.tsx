@@ -8,7 +8,7 @@ import Footer from '@/components/landing/Footer'
 import ScanHistory from '@/components/ScanHistory'
 import ResultCard from '@/components/ResultCard'
 import { getRemainingUserChecks } from '@/utils/checkLimits'
-import { syncSessionToExtension } from '@/utils/extensionSync'
+import { syncSessionToExtension, clearExtensionSession } from '@/utils/extensionSync'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -103,6 +103,26 @@ function Dashboard() {
     
     syncExistingSession();
   }, []); // Empty dependency array = runs once on mount
+
+  // Listen for checks updates in real-time (sync with Header)
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const handleChecksUpdate = () => {
+      const checks = getRemainingUserChecks(user.id);
+      console.log('🔄 Dashboard: Checks updated in real-time', checks);
+      setRemainingChecks(checks);
+    };
+    
+    // Listen for both storage changes (cross-tab) and custom event (same-tab)
+    window.addEventListener('storage', handleChecksUpdate);
+    window.addEventListener('checksUpdated', handleChecksUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleChecksUpdate);
+      window.removeEventListener('checksUpdated', handleChecksUpdate);
+    };
+  }, [user?.id]);
 
   // Function to refresh stats from database
   const refreshStats = async () => {
@@ -313,6 +333,7 @@ function Dashboard() {
     try {
       const { supabase } = await import('@/integrations/supabase/client')
       await supabase.auth.signOut()
+      await clearExtensionSession() // Clear extension session on logout
       navigate('/')
     } catch (error) {
       console.error('Error logging out:', error)
