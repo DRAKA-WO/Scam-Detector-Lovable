@@ -96,19 +96,20 @@ function HeroSection() {
               href="https://chrome.google.com/webstore"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105"
+              className="inline-flex items-center gap-4 px-6 py-3.5 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105"
             >
-              {/* Shield Icon */}
-              <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+              {/* Shield Icon - SIZE: w-6 h-6 */}
+              <svg className="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
               </svg>
               
-              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+              {/* TEXT - SIZE: text-base */}
+              <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
                 Add to Chrome - it's free!
               </span>
               
-              {/* Chrome Logo */}
-              <svg className="w-6 h-6" viewBox="0 0 48 48" fill="none">
+              {/* Chrome Logo - SIZE: w-7 h-7 */}
+              <svg className="w-7 h-7" viewBox="0 0 48 48" fill="none">
                 <circle cx="24" cy="24" r="20" fill="white" />
                 <path d="M24 8C15.163 8 8 15.163 8 24H16C16 19.582 19.582 16 24 16V8Z" fill="#EA4335" />
                 <path d="M24 8V16C28.418 16 32 19.582 32 24H40C40 15.163 32.837 8 24 8Z" fill="#FBBC05" />
