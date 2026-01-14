@@ -5,17 +5,11 @@ function HeroSection() {
     <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
       {/* Floating Diamonds */}
       <FloatingDiamond className="top-32 left-[10%]" delay={0} size="md" />
-      <FloatingDiamond className="top-48 right-[15%]" delay={0.5} size="lg" />
-      <FloatingDiamond className="bottom-24 left-[20%]" delay={1} size="sm" />
-      <FloatingDiamond className="top-64 right-[8%]" delay={1.5} size="md" />
-      <FloatingDiamond className="bottom-32 right-[25%]" delay={2} size="sm" />
-      <FloatingDiamond className="top-40 left-[5%]" delay={2.5} size="lg" />
-      <FloatingDiamond className="top-20 right-[5%]" delay={0.3} size="sm" />
-      <FloatingDiamond className="bottom-48 left-[8%]" delay={1.2} size="md" />
-      <FloatingDiamond className="top-56 left-[25%]" delay={1.8} size="sm" />
-      <FloatingDiamond className="bottom-16 right-[12%]" delay={2.2} size="lg" />
-      <FloatingDiamond className="top-72 right-[22%]" delay={0.8} size="sm" />
-      <FloatingDiamond className="bottom-40 left-[15%]" delay={1.6} size="md" />
+      <FloatingDiamond className="top-48 right-[12%]" delay={0.6} size="lg" />
+      <FloatingDiamond className="bottom-24 left-[18%]" delay={1.2} size="sm" />
+      <FloatingDiamond className="top-64 right-[8%]" delay={1.8} size="md" />
+      <FloatingDiamond className="bottom-32 right-[20%]" delay={0.4} size="sm" />
+      <FloatingDiamond className="top-40 left-[5%]" delay={1} size="lg" />
 
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">

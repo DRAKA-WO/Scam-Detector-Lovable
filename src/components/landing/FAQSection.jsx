@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+import FloatingDiamond from "../ui/FloatingDiamond"
 
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState(null)
@@ -34,7 +35,14 @@ function FAQSection() {
   }
 
   return (
-    <section id="faq" className="py-20 relative">
+    <section id="faq" className="py-20 relative overflow-hidden">
+      {/* Floating Diamonds */}
+      <FloatingDiamond className="top-20 left-[10%]" delay={0.2} size="md" />
+      <FloatingDiamond className="top-32 right-[8%]" delay={0.7} size="lg" />
+      <FloatingDiamond className="bottom-24 left-[12%]" delay={1.2} size="sm" />
+      <FloatingDiamond className="top-1/2 right-[6%]" delay={1.7} size="md" />
+      <FloatingDiamond className="bottom-16 right-[15%]" delay={0.5} size="sm" />
+      <FloatingDiamond className="top-40 left-[5%]" delay={1} size="lg" />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div 
