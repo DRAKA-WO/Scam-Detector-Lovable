@@ -1,6 +1,16 @@
+import FloatingDiamond from "../ui/FloatingDiamond";
+
 function HeroSection() {
   return (
     <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-16 overflow-hidden">
+      {/* Floating Diamonds */}
+      <FloatingDiamond className="top-32 left-[10%]" delay={0} size="md" />
+      <FloatingDiamond className="top-48 right-[15%]" delay={0.5} size="lg" />
+      <FloatingDiamond className="bottom-24 left-[20%]" delay={1} size="sm" />
+      <FloatingDiamond className="top-64 right-[8%]" delay={1.5} size="md" />
+      <FloatingDiamond className="bottom-32 right-[25%]" delay={2} size="sm" />
+      <FloatingDiamond className="top-40 left-[5%]" delay={2.5} size="lg" />
+
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div
