@@ -65,12 +65,10 @@ function FeaturesSection() {
   return (
     <section id="features" className="py-20 relative overflow-hidden">
       {/* Floating Diamonds */}
-      <FloatingDiamond className="top-20 right-[10%]" delay={0.3} size="md" />
-      <FloatingDiamond className="top-1/2 left-[8%]" delay={0.9} size="lg" />
-      <FloatingDiamond className="bottom-24 right-[15%]" delay={1.5} size="sm" />
-      <FloatingDiamond className="top-1/3 left-[5%]" delay={0.6} size="sm" />
-      <FloatingDiamond className="bottom-32 left-[12%]" delay={1.2} size="md" />
-      <FloatingDiamond className="top-40 right-[6%]" delay={1.8} size="lg" />
+      <FloatingDiamond className="top-20 right-[10%]" delay={0} size="md" />
+      <FloatingDiamond className="top-1/2 left-[8%]" delay={0.6} size="lg" />
+      <FloatingDiamond className="bottom-24 right-[15%]" delay={1.2} size="sm" />
+      <FloatingDiamond className="bottom-32 left-[12%]" delay={1.8} size="md" />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
