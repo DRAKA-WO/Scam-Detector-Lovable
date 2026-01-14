@@ -65,16 +65,12 @@ function FeaturesSection() {
   return (
     <section id="features" className="py-20 relative overflow-hidden">
       {/* Floating Diamonds */}
-      <FloatingDiamond className="top-20 right-[12%]" delay={0.3} size="md" />
-      <FloatingDiamond className="top-1/2 left-[8%]" delay={0.8} size="lg" />
-      <FloatingDiamond className="bottom-20 right-[18%]" delay={1.3} size="sm" />
-      <FloatingDiamond className="top-1/3 right-[5%]" delay={1.8} size="sm" />
-      <FloatingDiamond className="top-16 left-[15%]" delay={0.5} size="md" />
-      <FloatingDiamond className="bottom-32 left-[5%]" delay={1.1} size="sm" />
-      <FloatingDiamond className="top-2/3 right-[8%]" delay={1.5} size="lg" />
-      <FloatingDiamond className="bottom-40 right-[6%]" delay={2} size="md" />
-      <FloatingDiamond className="top-28 left-[22%]" delay={0.7} size="sm" />
-      <FloatingDiamond className="bottom-16 left-[18%]" delay={1.9} size="md" />
+      <FloatingDiamond className="top-20 right-[10%]" delay={0.3} size="md" />
+      <FloatingDiamond className="top-1/2 left-[8%]" delay={0.9} size="lg" />
+      <FloatingDiamond className="bottom-24 right-[15%]" delay={1.5} size="sm" />
+      <FloatingDiamond className="top-1/3 left-[5%]" delay={0.6} size="sm" />
+      <FloatingDiamond className="bottom-32 left-[12%]" delay={1.2} size="md" />
+      <FloatingDiamond className="top-40 right-[6%]" delay={1.8} size="lg" />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
