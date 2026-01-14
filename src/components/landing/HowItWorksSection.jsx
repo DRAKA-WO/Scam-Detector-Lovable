@@ -1,4 +1,5 @@
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+import FloatingDiamond from "../ui/FloatingDiamond"
 
 function HowItWorksSection() {
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
@@ -23,7 +24,13 @@ function HowItWorksSection() {
   ]
 
   return (
-    <section id="how-it-works" className="py-20 relative">
+    <section id="how-it-works" className="py-20 relative overflow-hidden">
+      {/* Floating Diamonds */}
+      <FloatingDiamond className="top-16 left-[15%]" delay={0.2} size="md" />
+      <FloatingDiamond className="top-32 right-[10%]" delay={0.7} size="lg" />
+      <FloatingDiamond className="bottom-16 left-[10%]" delay={1.2} size="sm" />
+      <FloatingDiamond className="bottom-24 right-[20%]" delay={1.7} size="md" />
+      
       {/* Background Effect */}
       <div className="absolute inset-0 pointer-events-none">
         <div 

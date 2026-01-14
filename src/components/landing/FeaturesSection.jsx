@@ -1,4 +1,5 @@
 import { useScrollAnimation, useStaggeredAnimation } from '../../hooks/useScrollAnimation'
+import FloatingDiamond from "../ui/FloatingDiamond"
 
 function FeaturesSection() {
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
@@ -62,7 +63,13 @@ function FeaturesSection() {
   ]
 
   return (
-    <section id="features" className="py-20 relative">
+    <section id="features" className="py-20 relative overflow-hidden">
+      {/* Floating Diamonds */}
+      <FloatingDiamond className="top-20 right-[12%]" delay={0.3} size="md" />
+      <FloatingDiamond className="top-1/2 left-[8%]" delay={0.8} size="lg" />
+      <FloatingDiamond className="bottom-20 right-[18%]" delay={1.3} size="sm" />
+      <FloatingDiamond className="top-1/3 right-[5%]" delay={1.8} size="sm" />
+      
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div 
