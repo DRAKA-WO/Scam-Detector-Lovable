@@ -6,10 +6,8 @@ function HeroSection() {
       {/* Floating Diamonds */}
       <FloatingDiamond className="top-32 left-[10%]" delay={0} size="md" />
       <FloatingDiamond className="top-48 right-[12%]" delay={0.6} size="lg" />
-      <FloatingDiamond className="bottom-24 left-[18%]" delay={1.2} size="sm" />
-      <FloatingDiamond className="top-64 right-[8%]" delay={1.8} size="md" />
-      <FloatingDiamond className="bottom-32 right-[20%]" delay={0.4} size="sm" />
-      <FloatingDiamond className="top-40 left-[5%]" delay={1} size="lg" />
+      <FloatingDiamond className="bottom-24 left-[15%]" delay={1.2} size="sm" />
+      <FloatingDiamond className="bottom-32 right-[18%]" delay={1.8} size="md" />
 
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">

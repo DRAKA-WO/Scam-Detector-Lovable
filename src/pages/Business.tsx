@@ -133,9 +133,9 @@ function Business() {
 
         {/* Floating decorations */}
         <FloatingDiamond className="top-32 left-[10%]" delay={0} />
-        <FloatingDiamond className="top-48 right-[15%]" delay={0.5} />
-        <FloatingDiamond className="bottom-24 left-[20%]" delay={1} />
-        <FloatingDiamond className="top-1/3 right-[8%]" delay={1.5} />
+        <FloatingDiamond className="top-48 right-[15%]" delay={0.6} />
+        <FloatingDiamond className="bottom-24 left-[20%]" delay={1.2} />
+        <FloatingDiamond className="bottom-32 right-[12%]" delay={1.8} />
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -294,8 +294,10 @@ function Business() {
 
       {/* Benefits Section */}
       <section className="py-20 sm:py-28 relative">
-        <FloatingDiamond className="top-20 left-[5%]" delay={0.2} />
-        <FloatingDiamond className="bottom-32 right-[10%]" delay={0.8} />
+        <FloatingDiamond className="top-20 left-[5%]" delay={0} />
+        <FloatingDiamond className="top-40 right-[8%]" delay={0.6} />
+        <FloatingDiamond className="bottom-32 right-[10%]" delay={1.2} />
+        <FloatingDiamond className="bottom-20 left-[12%]" delay={1.8} />
         
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <AnimatedSection className="text-center mb-16">
@@ -385,8 +387,10 @@ function Business() {
 
       {/* Why ScamGuard Section */}
       <section id="why-scamguard" className="py-20 sm:py-28 bg-card/30 border-y border-border relative">
-        <FloatingDiamond className="top-16 right-[12%]" delay={0.3} />
-        <FloatingDiamond className="bottom-20 left-[8%]" delay={0.9} />
+        <FloatingDiamond className="top-16 right-[12%]" delay={0} />
+        <FloatingDiamond className="top-32 left-[6%]" delay={0.6} />
+        <FloatingDiamond className="bottom-20 left-[8%]" delay={1.2} />
+        <FloatingDiamond className="bottom-28 right-[10%]" delay={1.8} />
         
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
@@ -484,8 +488,10 @@ function Business() {
 
       {/* Use Cases Section */}
       <section className="py-20 sm:py-28 relative">
-        <FloatingDiamond className="top-24 left-[15%]" delay={0.4} />
-        <FloatingDiamond className="bottom-16 right-[20%]" delay={1.1} />
+        <FloatingDiamond className="top-24 left-[15%]" delay={0} />
+        <FloatingDiamond className="top-40 right-[10%]" delay={0.6} />
+        <FloatingDiamond className="bottom-16 right-[20%]" delay={1.2} />
+        <FloatingDiamond className="bottom-28 left-[8%]" delay={1.8} />
         
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <AnimatedSection className="text-center mb-16">
@@ -552,8 +558,10 @@ function Business() {
           />
         </motion.div>
 
-        <FloatingDiamond className="top-12 left-[10%]" delay={0.2} />
-        <FloatingDiamond className="bottom-24 right-[15%]" delay={0.7} />
+        <FloatingDiamond className="top-12 left-[10%]" delay={0} />
+        <FloatingDiamond className="top-28 right-[8%]" delay={0.6} />
+        <FloatingDiamond className="bottom-24 right-[15%]" delay={1.2} />
+        <FloatingDiamond className="bottom-16 left-[12%]" delay={1.8} />
         
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <AnimatedSection className="max-w-3xl mx-auto text-center">

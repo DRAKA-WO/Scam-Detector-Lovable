@@ -26,12 +26,10 @@ function HowItWorksSection() {
   return (
     <section id="how-it-works" className="py-20 relative overflow-hidden">
       {/* Floating Diamonds */}
-      <FloatingDiamond className="top-16 left-[12%]" delay={0.2} size="md" />
-      <FloatingDiamond className="top-32 right-[10%]" delay={0.8} size="lg" />
-      <FloatingDiamond className="bottom-20 left-[8%]" delay={1.4} size="sm" />
-      <FloatingDiamond className="bottom-28 right-[15%]" delay={0.5} size="md" />
-      <FloatingDiamond className="top-1/2 right-[6%]" delay={1.1} size="sm" />
-      <FloatingDiamond className="top-24 left-[5%]" delay={1.7} size="lg" />
+      <FloatingDiamond className="top-16 left-[12%]" delay={0} size="md" />
+      <FloatingDiamond className="top-32 right-[10%]" delay={0.6} size="lg" />
+      <FloatingDiamond className="bottom-20 left-[8%]" delay={1.2} size="sm" />
+      <FloatingDiamond className="bottom-28 right-[15%]" delay={1.8} size="md" />
       
       {/* Background Effect */}
       <div className="absolute inset-0 pointer-events-none">

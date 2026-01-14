@@ -664,9 +664,7 @@ function DetectorSection() {
       <FloatingDiamond className="top-20 left-[8%]" delay={0} size="md" />
       <FloatingDiamond className="top-32 right-[10%]" delay={0.6} size="lg" />
       <FloatingDiamond className="bottom-28 left-[12%]" delay={1.2} size="sm" />
-      <FloatingDiamond className="top-1/2 right-[6%]" delay={0.4} size="md" />
-      <FloatingDiamond className="bottom-20 right-[15%]" delay={1} size="sm" />
-      <FloatingDiamond className="top-40 left-[5%]" delay={1.6} size="lg" />
+      <FloatingDiamond className="bottom-20 right-[15%]" delay={1.8} size="md" />
 
       {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none">
