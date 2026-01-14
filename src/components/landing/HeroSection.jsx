@@ -2,7 +2,7 @@ import FloatingDiamond from "../ui/FloatingDiamond";
 import chromeLogo from "@/assets/chrome-logo.svg";
 import edgeLogo from "@/assets/edge-logo.svg";
 import braveLogo from "@/assets/brave-logo.svg";
-import operaLogo from "@/assets/opera-logo.svg";
+import operaLogo from "@/assets/opera-logo.png";
 
 function HeroSection() {
   return (
