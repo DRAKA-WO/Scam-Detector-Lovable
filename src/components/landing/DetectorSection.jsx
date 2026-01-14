@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
+import FloatingDiamond from "../ui/FloatingDiamond"
 import ImageUpload from '../ImageUpload'
 import UrlInput from '../UrlInput'
 import TextInput from '../TextInput'
@@ -658,7 +659,21 @@ function DetectorSection() {
   ]
 
   return (
-    <section id="detector" className="py-20 relative">
+    <section id="detector" className="py-20 relative overflow-hidden">
+      {/* Floating Diamonds */}
+      <FloatingDiamond className="top-16 left-[8%]" delay={0} size="md" />
+      <FloatingDiamond className="top-24 right-[12%]" delay={0.4} size="lg" />
+      <FloatingDiamond className="top-40 left-[15%]" delay={0.8} size="sm" />
+      <FloatingDiamond className="top-32 right-[6%]" delay={1.2} size="md" />
+      <FloatingDiamond className="bottom-32 left-[10%]" delay={1.6} size="lg" />
+      <FloatingDiamond className="bottom-24 right-[15%]" delay={2} size="sm" />
+      <FloatingDiamond className="top-1/2 left-[5%]" delay={0.3} size="sm" />
+      <FloatingDiamond className="top-1/3 right-[8%]" delay={0.7} size="md" />
+      <FloatingDiamond className="bottom-40 left-[18%]" delay={1.1} size="md" />
+      <FloatingDiamond className="bottom-16 right-[10%]" delay={1.5} size="lg" />
+      <FloatingDiamond className="top-48 right-[20%]" delay={1.9} size="sm" />
+      <FloatingDiamond className="bottom-48 left-[6%]" delay={2.3} size="sm" />
+
       {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div 
