@@ -1,4 +1,5 @@
 import FloatingDiamond from "../ui/FloatingDiamond";
+import chromeLogo from "@/assets/chrome-logo.svg";
 
 function HeroSection() {
   return (
@@ -117,15 +118,7 @@ function HeroSection() {
               </span>
               
               {/* Chrome Logo - SIZE: w-7 h-7 */}
-              <svg className="w-7 h-7" viewBox="0 0 48 48" fill="none">
-                <circle cx="24" cy="24" r="20" fill="white" />
-                <path d="M24 8C15.163 8 8 15.163 8 24H16C16 19.582 19.582 16 24 16V8Z" fill="#EA4335" />
-                <path d="M24 8V16C28.418 16 32 19.582 32 24H40C40 15.163 32.837 8 24 8Z" fill="#FBBC05" />
-                <path d="M40 24H32C32 28.418 28.418 32 24 32L20 40.928C32.837 40.928 40 32.837 40 24Z" fill="#34A853" />
-                <path d="M24 32C19.582 32 16 28.418 16 24H8C8 32.837 15.163 40 24 40V32Z" fill="#4285F4" />
-                <circle cx="24" cy="24" r="8" fill="white" />
-                <circle cx="24" cy="24" r="6" fill="#4285F4" />
-              </svg>
+              <img src={chromeLogo} alt="Chrome" className="w-7 h-7" />
             </a>
           </div>
         </div>
