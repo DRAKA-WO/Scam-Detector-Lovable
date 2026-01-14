@@ -30,6 +30,12 @@ function HowItWorksSection() {
       <FloatingDiamond className="top-32 right-[10%]" delay={0.7} size="lg" />
       <FloatingDiamond className="bottom-16 left-[10%]" delay={1.2} size="sm" />
       <FloatingDiamond className="bottom-24 right-[20%]" delay={1.7} size="md" />
+      <FloatingDiamond className="top-24 right-[5%]" delay={0.4} size="sm" />
+      <FloatingDiamond className="top-48 left-[8%]" delay={0.9} size="lg" />
+      <FloatingDiamond className="bottom-32 right-[8%]" delay={1.4} size="sm" />
+      <FloatingDiamond className="top-20 left-[5%]" delay={1.9} size="md" />
+      <FloatingDiamond className="bottom-40 left-[22%]" delay={0.6} size="sm" />
+      <FloatingDiamond className="top-40 right-[18%]" delay={1.1} size="md" />
       
       {/* Background Effect */}
       <div className="absolute inset-0 pointer-events-none">

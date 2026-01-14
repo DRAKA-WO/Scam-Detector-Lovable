@@ -69,6 +69,12 @@ function FeaturesSection() {
       <FloatingDiamond className="top-1/2 left-[8%]" delay={0.8} size="lg" />
       <FloatingDiamond className="bottom-20 right-[18%]" delay={1.3} size="sm" />
       <FloatingDiamond className="top-1/3 right-[5%]" delay={1.8} size="sm" />
+      <FloatingDiamond className="top-16 left-[15%]" delay={0.5} size="md" />
+      <FloatingDiamond className="bottom-32 left-[5%]" delay={1.1} size="sm" />
+      <FloatingDiamond className="top-2/3 right-[8%]" delay={1.5} size="lg" />
+      <FloatingDiamond className="bottom-40 right-[6%]" delay={2} size="md" />
+      <FloatingDiamond className="top-28 left-[22%]" delay={0.7} size="sm" />
+      <FloatingDiamond className="bottom-16 left-[18%]" delay={1.9} size="md" />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
