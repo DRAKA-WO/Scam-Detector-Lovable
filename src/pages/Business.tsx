@@ -4,12 +4,20 @@ import Header from "../components/landing/Header";
 import Footer from "../components/landing/Footer";
 
 // Floating diamond decoration component
+const sizeClasses = {
+  sm: "w-4 h-4",
+  md: "w-8 h-8",
+  lg: "w-16 h-16",
+};
+
 const FloatingDiamond = ({
   className,
-  delay = 0
+  delay = 0,
+  size = "md"
 }: {
   className?: string;
   delay?: number;
+  size?: "sm" | "md" | "lg";
 }) => <motion.div className={`absolute pointer-events-none ${className}`} initial={{
   opacity: 0,
   y: 20
@@ -23,7 +31,7 @@ const FloatingDiamond = ({
   repeat: Infinity,
   ease: "easeInOut"
 }}>
-    <div className="w-8 h-8 border-2 border-purple-500/30 rotate-45 rounded-sm" />
+    <div className={`${sizeClasses[size]} border-2 border-purple-500/30 rotate-45 rounded-sm`} />
   </motion.div>;
 
 // Animated section wrapper with scroll reveal
@@ -263,6 +271,12 @@ function Business() {
               }} />
                 
                 <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-transparent border border-border/50 backdrop-blur-sm" />
+                
+                {/* Big floating diamond in corner */}
+                <div className="absolute -top-6 -right-6 z-10">
+                  <FloatingDiamond className="!relative !opacity-80" size="lg" delay={0.3} />
+                </div>
+                
                 <div className="absolute inset-8 rounded-2xl bg-card/80 border border-border flex items-center justify-center">
                   <div className="text-center p-6">
                     <motion.div className="w-20 h-20 mx-auto mb-4 rounded-2xl gradient-button flex items-center justify-center" animate={{
@@ -286,10 +300,7 @@ function Business() {
         </div>
       </section>
 
-      {/* Trusted By Section */}
-      <AnimatedSection>
-        
-      </AnimatedSection>
+      {/* Trusted By Section - Removed empty section */}
 
       {/* Benefits Section */}
       <section className="py-20 sm:py-28 relative">
