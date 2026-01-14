@@ -1,0 +1,10 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="opera-a" x1="50%" x2="50%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF1B2D"/>
+      <stop offset="100%" stop-color="#A70014"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="128" fill="url(#opera-a)"/>
+  <ellipse cx="128" cy="128" rx="44" ry="80" fill="#FFFFFF"/>
+</svg>

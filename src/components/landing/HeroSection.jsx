@@ -1,5 +1,8 @@
 import FloatingDiamond from "../ui/FloatingDiamond";
 import chromeLogo from "@/assets/chrome-logo.svg";
+import edgeLogo from "@/assets/edge-logo.svg";
+import braveLogo from "@/assets/brave-logo.svg";
+import operaLogo from "@/assets/opera-logo.svg";
 
 function HeroSection() {
   return (
@@ -114,11 +117,16 @@ function HeroSection() {
               
               {/* TEXT - SIZE: text-base */}
               <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
-                Add to Chrome - it's free!
+                Add to your browser - it's free!
               </span>
               
-              {/* Chrome Logo - SIZE: w-7 h-7 */}
-              <img src={chromeLogo} alt="Chrome" className="w-7 h-7" />
+              {/* Browser Logos */}
+              <div className="flex items-center gap-1.5">
+                <img src={chromeLogo} alt="Chrome" className="w-6 h-6" />
+                <img src={edgeLogo} alt="Edge" className="w-6 h-6" />
+                <img src={braveLogo} alt="Brave" className="w-6 h-6" />
+                <img src={operaLogo} alt="Opera" className="w-6 h-6" />
+              </div>
             </a>
           </div>
         </div>
