@@ -151,7 +151,6 @@ function Business() {
 
         {/* Floating decorations */}
         <FloatingDiamond className="top-32 left-[10%]" delay={0} />
-        <FloatingDiamond className="top-48 right-[15%]" delay={0.6} />
         <FloatingDiamond className="bottom-24 left-[20%]" delay={1.2} />
         <FloatingDiamond className="bottom-32 right-[12%]" delay={1.8} />
 
@@ -272,8 +271,8 @@ function Business() {
                 
                 <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-transparent border border-border/50 backdrop-blur-sm" />
                 
-                {/* Big floating diamond in corner */}
-                <div className="absolute -top-6 -right-6 z-10">
+                {/* Big floating diamond in corner - behind the box */}
+                <div className="absolute -top-6 -right-6 -z-10">
                   <FloatingDiamond className="!relative !opacity-80" size="lg" delay={0.3} />
                 </div>
                 
