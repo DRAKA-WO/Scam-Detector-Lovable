@@ -246,15 +246,19 @@ function DetectorSection() {
             throw new Error('Supabase client not initialized')
           }
           
+          const redirectUrl = `${window.location.origin}/auth/callback`;
+          console.log('🔵 [DETECTOR] Google OAuth redirect URL:', redirectUrl);
+          
           const { error, data } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-              redirectTo: `${window.location.origin}/auth/callback`
+              redirectTo: redirectUrl
             }
           })
           
           if (error) {
-            console.error('Supabase OAuth error:', error)
+            console.error('Supabase OAuth error:', error);
+            console.error('Redirect URL used:', redirectUrl);
             // Check for specific error types
             if (error.message?.includes('provider is not enabled') || 
                 error.message?.includes('Unsupported provider')) {

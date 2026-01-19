@@ -105,15 +105,26 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
       // Small delay to allow modal to cleanly unmount
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      console.log('🔵 [GOOGLE SIGNUP] Redirect URL:', redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectUrl
         }
       });
 
       if (error) {
-        setError(error.message || "Google signup failed. Please try again.");
+        console.error('❌ [GOOGLE SIGNUP] OAuth error:', error);
+        console.error('❌ [GOOGLE SIGNUP] Redirect URL used:', redirectUrl);
+        
+        // Provide helpful error message for 403/redirect issues
+        if (error.message?.includes('403') || error.message?.toLowerCase().includes('redirect')) {
+          setError(`OAuth redirect URL not authorized. Please add this URL to Supabase:\n${redirectUrl}\n\nGo to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs`);
+        } else {
+          setError(error.message || "Google signup failed. Please try again.");
+        }
         return;
       }
 

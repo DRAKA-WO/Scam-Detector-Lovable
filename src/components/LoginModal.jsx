@@ -48,17 +48,28 @@ function LoginModal({ isOpen, onClose, onLogin, preventRedirect = false }) {
       // Small delay to allow modal to cleanly unmount
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      const redirectUrl = `${window.location.origin}/auth/callback`;
       console.log('🔵 [GOOGLE OAUTH] Initiating OAuth sign-in...');
+      console.log('🔵 [GOOGLE OAUTH] Redirect URL:', redirectUrl);
+      console.log('🔵 [GOOGLE OAUTH] Current origin:', window.location.origin);
+      
       const { error, data } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectUrl
         }
       });
 
       if (error) {
         console.error('❌ [GOOGLE OAUTH] OAuth error:', error);
-        setError(error.message || "Google login failed. Please try again.");
+        console.error('❌ [GOOGLE OAUTH] Redirect URL used:', redirectUrl);
+        
+        // Provide helpful error message for 403/redirect issues
+        if (error.message?.includes('403') || error.message?.toLowerCase().includes('redirect')) {
+          setError(`OAuth redirect URL not authorized. Please add this URL to Supabase:\n${redirectUrl}\n\nGo to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs`);
+        } else {
+          setError(error.message || "Google login failed. Please try again.");
+        }
         return;
       }
 
