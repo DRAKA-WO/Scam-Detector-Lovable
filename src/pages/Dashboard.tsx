@@ -18,6 +18,7 @@ import ResultCard from '@/components/ResultCard'
 import { getRemainingUserChecks } from '@/utils/checkLimits'
 import { syncSessionToExtension, clearExtensionSession } from '@/utils/extensionSync'
 import { supabase } from '@/integrations/supabase/client'
+import { useAlerts } from '@/contexts/AlertsContext'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -104,7 +105,29 @@ function Dashboard() {
     isRiskAlert?: boolean
   }>>([])
   const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
-  const [currentRiskLevel, setCurrentRiskLevel] = useState<string | null>(null)
+  
+  // Use alerts from context (for global notifications)
+  let alertsContext
+  try {
+    alertsContext = useAlerts()
+  } catch (e) {
+    alertsContext = null
+  }
+  
+  // Keep local alerts state for backward compatibility, but prefer context
+  const [localAlerts, setLocalAlerts] = useState<Array<{ 
+    id: string
+    type: string
+    message: string
+    severity: 'info' | 'warning' | 'error'
+    scamType?: string
+    isRiskAlert?: boolean
+  }>>([])
+  const [localCurrentRiskLevel, setLocalCurrentRiskLevel] = useState<string | null>(null)
+  
+  // Use context values if available, otherwise use local state
+  const alerts = alertsContext?.alerts || localAlerts
+  const currentRiskLevel = alertsContext?.currentRiskLevel || localCurrentRiskLevel
   const [isTipExpanded, setIsTipExpanded] = useState(true) // Tip expanded by default
 
   // Helper functions for dismissed alerts persistence
@@ -208,13 +231,13 @@ function Dashboard() {
   // Function to generate smart alerts based on scan history
   const generateAlerts = useCallback(async (history: any[]) => {
     if (!history || history.length === 0) {
-      setAlerts([])
-      setCurrentRiskLevel(null)
+      setLocalAlerts([])
+      setLocalCurrentRiskLevel(null)
       return
     }
 
     if (!user?.id) {
-      setAlerts([])
+      setLocalAlerts([])
       return
     }
 
@@ -228,7 +251,7 @@ function Dashboard() {
         historyLength: history.length,
         weeklyComparison,
         riskLevel,
-        currentRiskLevel,
+        currentRiskLevel: localCurrentRiskLevel,
         scamTypesCount: Object.keys(scamTypes).length
       })
       
@@ -245,7 +268,7 @@ function Dashboard() {
       const dismissed = getDismissedAlerts(user.id)
       
       // Handle risk level alerts - always show for current risk level, only hide when level changes
-      const riskLevelChanged = currentRiskLevel !== null && currentRiskLevel !== riskLevel
+      const riskLevelChanged = localCurrentRiskLevel !== null && localCurrentRiskLevel !== riskLevel
       
       // Always show risk alert for current risk level (non-dismissible)
       if (riskLevel === 'high') {
@@ -268,8 +291,8 @@ function Dashboard() {
         })
       }
       
-      // Update current risk level
-      setCurrentRiskLevel(riskLevel)
+      // Update current risk level (local state for backward compatibility)
+      setLocalCurrentRiskLevel(riskLevel)
       
       // Alert for unusual spike in scams (relaxed condition: >1 scam and >30% increase)
       // Use week-based ID so dismissal persists for the week
@@ -362,12 +385,12 @@ function Dashboard() {
       })
       
       console.log('🔔 Generated alerts:', sortedAlerts)
-      setAlerts(sortedAlerts)
+      setLocalAlerts(sortedAlerts)
     } catch (error) {
       console.error('Error generating alerts:', error)
-      setAlerts([])
+      setLocalAlerts([])
     }
-  }, [user?.id, currentRiskLevel])
+  }, [user?.id, localCurrentRiskLevel])
 
   // Regenerate alerts whenever scan history changes
   useEffect(() => {
@@ -1487,10 +1510,16 @@ function Dashboard() {
           const alert = alerts.find(a => a.id === alertId)
           if (alert?.isRiskAlert) return
           
-          if (user?.id && alertId) {
-            dismissAlert(user.id, alertId)
+          // Use context dismiss if available, otherwise handle locally
+          if (alertsContext?.dismissAlert) {
+            alertsContext.dismissAlert(alertId)
+          } else {
+            // Local dismissal logic (for backward compatibility)
+            if (user?.id && alertId) {
+              dismissAlert(user.id, alertId)
+            }
+            setLocalAlerts(prev => prev.filter(a => a.id !== alertId))
           }
-          setAlerts(alerts.filter(alert => alert.id !== alertId))
         }}
       />
       <main 

@@ -14,8 +14,20 @@ import { clearExtensionSession } from '@/utils/extensionSync'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { useAlerts } from '../../contexts/AlertsContext'
 
-function Header({ alerts = [], onDismissAlert }) {
+function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
+  // Use context alerts if available, otherwise fall back to props (for backward compatibility)
+  let alertsContext
+  try {
+    alertsContext = useAlerts()
+  } catch (e) {
+    // Context not available, use props
+    alertsContext = null
+  }
+  
+  const alerts = alertsContext?.alerts || propsAlerts || []
+  const onDismissAlert = alertsContext?.dismissAlert || propsOnDismissAlert || (() => {})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)

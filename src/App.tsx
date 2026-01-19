@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { syncSessionToExtension, initializeExtensionSync } from "./utils/extensionSync";
+import { AlertsProvider } from "./contexts/AlertsContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Business from "./pages/Business";
@@ -467,19 +468,21 @@ const OAuthCallback = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/business" element={<Business />} />
-          <Route path="/extension-auth" element={<ExtensionAuth />} />
-          <Route path="/auth/callback" element={<OAuthCallback />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AlertsProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/business" element={<Business />} />
+            <Route path="/extension-auth" element={<ExtensionAuth />} />
+            <Route path="/auth/callback" element={<OAuthCallback />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AlertsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
