@@ -2126,10 +2126,10 @@ function Dashboard() {
 
         {/* Scan History Section */}
         <Card id="scan-history-section" className={`mb-10 border-border bg-card/50 backdrop-blur-sm ${!showHistory ? 'hidden' : ''}`}>
-          <CardHeader className="pb-4">
+          <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <CardTitle className="text-xl font-display mb-1">Scan History</CardTitle>
+                <CardTitle>Scan History</CardTitle>
                 <CardDescription>View your scan history (last 30 days)</CardDescription>
               </div>
             </div>
@@ -2165,8 +2165,8 @@ function Dashboard() {
 
         {/* Browser Extension Section */}
         <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-display">Browser Extension</CardTitle>
+          <CardHeader>
+            <CardTitle>Browser Extension</CardTitle>
             <CardDescription>Download our extension to browse securely and scan content on the go</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -2196,8 +2196,8 @@ function Dashboard() {
 
         {/* Features Section */}
         <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-display">Dashboard Features</CardTitle>
+          <CardHeader>
+            <CardTitle>Dashboard Features</CardTitle>
             <CardDescription>What you can do with your account</CardDescription>
           </CardHeader>
           <CardContent>
