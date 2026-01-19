@@ -1725,6 +1725,28 @@ function Dashboard() {
               <CardDescription>Start scanning or manage your activity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Risk Pattern Level Metric */}
+              {currentRiskLevel && (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                  currentRiskLevel === 'high' 
+                    ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                    : currentRiskLevel === 'medium'
+                    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                    : 'bg-green-500/10 border-green-500/30 text-green-400'
+                }`}>
+                  {currentRiskLevel === 'high' ? (
+                    <AlertTriangle className="w-4 h-4" />
+                  ) : currentRiskLevel === 'medium' ? (
+                    <AlertCircle className="w-4 h-4" />
+                  ) : (
+                    <Shield className="w-4 h-4" />
+                  )}
+                  <span className="text-sm font-medium capitalize">
+                    {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern
+                  </span>
+                </div>
+              )}
+              
               <Button
                 onClick={() => {
                   // Navigate to home page with hash, then scroll smoothly
