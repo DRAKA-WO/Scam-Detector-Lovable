@@ -1727,43 +1727,89 @@ function Dashboard() {
             <CardContent className="space-y-3">
               {/* Risk Pattern Level Metric */}
               {currentRiskLevel && (
-                <div className="space-y-2">
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                <div className={`relative overflow-hidden rounded-lg border p-4 ${
+                  currentRiskLevel === 'high' 
+                    ? 'bg-gradient-to-br from-red-500/15 via-red-500/10 to-red-500/5 border-red-500/30 shadow-lg shadow-red-500/10' 
+                    : currentRiskLevel === 'medium'
+                    ? 'bg-gradient-to-br from-yellow-500/15 via-yellow-500/10 to-yellow-500/5 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
+                    : 'bg-gradient-to-br from-green-500/15 via-green-500/10 to-green-500/5 border-green-500/30 shadow-lg shadow-green-500/10'
+                }`}>
+                  {/* Decorative background pattern */}
+                  <div className={`absolute inset-0 opacity-5 ${
                     currentRiskLevel === 'high' 
-                      ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                      ? 'bg-[radial-gradient(circle_at_50%_50%,_var(--tw-gradient-stops))] from-red-400 to-transparent' 
                       : currentRiskLevel === 'medium'
-                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
-                      : 'bg-green-500/10 border-green-500/30 text-green-400'
-                  }`}>
-                    {currentRiskLevel === 'high' ? (
-                      <AlertTriangle className="w-4 h-4" />
-                    ) : currentRiskLevel === 'medium' ? (
-                      <AlertCircle className="w-4 h-4" />
-                    ) : (
-                      <Shield className="w-4 h-4" />
-                    )}
-                    <span className="text-sm font-medium capitalize">
-                      {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern
-                    </span>
-                  </div>
+                      ? 'bg-[radial-gradient(circle_at_50%_50%,_var(--tw-gradient-stops))] from-yellow-400 to-transparent'
+                      : 'bg-[radial-gradient(circle_at_50%_50%,_var(--tw-gradient-stops))] from-green-400 to-transparent'
+                  }`}></div>
                   
-                  {/* Risk Level Tip */}
-                  <div className={`px-3 py-2 rounded-lg text-xs ${
-                    currentRiskLevel === 'high' 
-                      ? 'bg-red-500/5 border border-red-500/20 text-red-300/90' 
-                      : currentRiskLevel === 'medium'
-                      ? 'bg-yellow-500/5 border border-yellow-500/20 text-yellow-300/90'
-                      : 'bg-green-500/5 border border-green-500/20 text-green-300/90'
-                  }`}>
-                    <div className="flex items-start gap-2">
-                      <span className="mt-0.5">💡</span>
-                      <span className="leading-relaxed">
+                  <div className="relative space-y-3">
+                    {/* Risk Level Header */}
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg ${
+                        currentRiskLevel === 'high' 
+                          ? 'bg-red-500/20' 
+                          : currentRiskLevel === 'medium'
+                          ? 'bg-yellow-500/20'
+                          : 'bg-green-500/20'
+                      }`}>
+                        {currentRiskLevel === 'high' ? (
+                          <AlertTriangle className={`w-4 h-4 ${
+                            currentRiskLevel === 'high' ? 'text-red-400' : ''
+                          }`} />
+                        ) : currentRiskLevel === 'medium' ? (
+                          <AlertCircle className={`w-4 h-4 ${
+                            currentRiskLevel === 'medium' ? 'text-yellow-400' : ''
+                          }`} />
+                        ) : (
+                          <Shield className={`w-4 h-4 ${
+                            currentRiskLevel === 'low' ? 'text-green-400' : ''
+                          }`} />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className={`text-sm font-semibold capitalize ${
+                          currentRiskLevel === 'high' 
+                            ? 'text-red-400' 
+                            : currentRiskLevel === 'medium'
+                            ? 'text-yellow-400'
+                            : 'text-green-400'
+                        }`}>
+                          {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern Detected
+                        </h4>
+                      </div>
+                    </div>
+                    
+                    {/* Risk Level Tip */}
+                    <div className={`flex items-start gap-2.5 pt-2 border-t ${
+                      currentRiskLevel === 'high' 
+                        ? 'border-red-500/20' 
+                        : currentRiskLevel === 'medium'
+                        ? 'border-yellow-500/20'
+                        : 'border-green-500/20'
+                    }`}>
+                      <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                        currentRiskLevel === 'high' 
+                          ? 'bg-red-500/20 text-red-300' 
+                          : currentRiskLevel === 'medium'
+                          ? 'bg-yellow-500/20 text-yellow-300'
+                          : 'bg-green-500/20 text-green-300'
+                      }`}>
+                        💡
+                      </div>
+                      <p className={`text-xs leading-relaxed ${
+                        currentRiskLevel === 'high' 
+                          ? 'text-red-300/90' 
+                          : currentRiskLevel === 'medium'
+                          ? 'text-yellow-300/90'
+                          : 'text-green-300/90'
+                      }`}>
                         {currentRiskLevel === 'high' 
                           ? 'You\'re encountering many scams. Be extra cautious with links, emails, and requests for personal information. Verify sources before clicking or sharing data.'
                           : currentRiskLevel === 'medium'
                           ? 'You\'ve detected some suspicious content. Stay vigilant and always verify the source before taking action. When in doubt, don\'t click or share information.'
                           : 'Great job staying safe! Continue scanning content before clicking links or sharing information to maintain your protection.'}
-                      </span>
+                      </p>
                     </div>
                   </div>
                 </div>
