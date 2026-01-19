@@ -93,7 +93,6 @@ function Dashboard() {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedScan, setSelectedScan] = useState(null)
   const [scanHistoryFilter, setScanHistoryFilter] = useState('all') // 'all', 'safe', 'suspicious', 'scam'
-  const [refreshKey, setRefreshKey] = useState(0)
   const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
   const [scanHistory, setScanHistory] = useState<any[]>([])
   const [alerts, setAlerts] = useState<Array<{ 
@@ -2126,19 +2125,9 @@ function Dashboard() {
 
         {/* Scan History Section */}
         <Card id="scan-history-section" className={`mb-8 ${!showHistory ? 'hidden' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="mb-2">Scan History</CardTitle>
-              <CardDescription>View your scan history (last 30 days)</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRefreshKey(prev => prev + 1)}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+          <CardHeader>
+            <CardTitle className="mb-2">Scan History</CardTitle>
+            <CardDescription>View your scan history (last 30 days)</CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
             {selectedScan ? (
@@ -2158,7 +2147,6 @@ function Dashboard() {
               </div>
             ) : (
               <ScanHistory
-                key={refreshKey}
                 userId={user?.id}
                 onScanClick={(scan) => setSelectedScan(scan)}
                 onRefresh={refreshStats}
