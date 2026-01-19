@@ -96,14 +96,6 @@ function Dashboard() {
   const [scanHistoryFilter, setScanHistoryFilter] = useState('all') // 'all', 'safe', 'suspicious', 'scam'
   const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
   const [scanHistory, setScanHistory] = useState<any[]>([])
-  const [alerts, setAlerts] = useState<Array<{ 
-    id: string
-    type: string
-    message: string
-    severity: 'info' | 'warning' | 'error'
-    scamType?: string
-    isRiskAlert?: boolean
-  }>>([])
   const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
   
   // Use alerts from context (for global notifications)
