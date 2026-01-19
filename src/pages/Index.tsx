@@ -78,7 +78,7 @@ const Index = () => {
   }, [location]) // Re-run when location changes (including hash changes)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main>
         <HeroSection />
