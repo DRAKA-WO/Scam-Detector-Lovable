@@ -1725,98 +1725,44 @@ function Dashboard() {
               <CardDescription>Start scanning or manage your activity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Risk Pattern Level Gauge */}
+              {/* Risk Pattern Level Metric */}
               {currentRiskLevel && (
-                <div className="flex flex-col items-center py-4 px-2">
-                  <div className="relative w-full max-w-[200px] mx-auto">
-                    <svg viewBox="0 0 200 120" className="w-full h-auto">
-                      {/* Background arc */}
-                      <defs>
-                        <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#16a34a" />
-                          <stop offset="100%" stopColor="#22c55e" />
-                        </linearGradient>
-                        <linearGradient id="yellowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#eab308" />
-                          <stop offset="100%" stopColor="#f59e0b" />
-                        </linearGradient>
-                        <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#f59e0b" />
-                          <stop offset="100%" stopColor="#ef4444" />
-                        </linearGradient>
-                      </defs>
-                      
-                      {/* Arc segments */}
-                      <path
-                        d="M 20 100 A 80 80 0 0 1 56 36"
-                        fill="none"
-                        stroke="url(#greenGradient)"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M 56 36 A 80 80 0 0 1 100 20"
-                        fill="none"
-                        stroke="#22c55e"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M 100 20 A 80 80 0 0 1 144 36"
-                        fill="none"
-                        stroke="url(#yellowGradient)"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M 144 36 A 80 80 0 0 1 180 100"
-                        fill="none"
-                        stroke="url(#redGradient)"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                      />
-                      
-                      {/* Needle */}
-                      <g transform={`rotate(${
-                        currentRiskLevel === 'high' ? 135 : 
-                        currentRiskLevel === 'medium' ? 90 : 
-                        45
-                      } 100 100)`}>
-                        <line
-                          x1="100"
-                          y1="100"
-                          x2="100"
-                          y2="30"
-                          stroke="#1f2937"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                        />
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="6"
-                          fill="#ffffff"
-                          stroke="#1f2937"
-                          strokeWidth="2"
-                        />
-                      </g>
-                      
-                      {/* Labels */}
-                      <text x="30" y="110" fill="#6b7280" fontSize="10" fontWeight="500">Low</text>
-                      <text x="92" y="15" fill="#6b7280" fontSize="10" fontWeight="500">Med</text>
-                      <text x="165" y="110" fill="#6b7280" fontSize="10" fontWeight="500">High</text>
-                    </svg>
-                    
-                    {/* Risk Level Text */}
-                    <div className="text-center mt-2">
-                      <span className={`text-sm font-semibold ${
-                        currentRiskLevel === 'high' 
-                          ? 'text-red-400' 
+                <div className="space-y-2">
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                    currentRiskLevel === 'high' 
+                      ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                      : currentRiskLevel === 'medium'
+                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                      : 'bg-green-500/10 border-green-500/30 text-green-400'
+                  }`}>
+                    {currentRiskLevel === 'high' ? (
+                      <AlertTriangle className="w-4 h-4" />
+                    ) : currentRiskLevel === 'medium' ? (
+                      <AlertCircle className="w-4 h-4" />
+                    ) : (
+                      <Shield className="w-4 h-4" />
+                    )}
+                    <span className="text-sm font-medium capitalize">
+                      {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern
+                    </span>
+                  </div>
+                  
+                  {/* Risk Level Tip */}
+                  <div className={`px-3 py-2 rounded-lg text-xs ${
+                    currentRiskLevel === 'high' 
+                      ? 'bg-red-500/5 border border-red-500/20 text-red-300/90' 
+                      : currentRiskLevel === 'medium'
+                      ? 'bg-yellow-500/5 border border-yellow-500/20 text-yellow-300/90'
+                      : 'bg-green-500/5 border border-green-500/20 text-green-300/90'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5">💡</span>
+                      <span className="leading-relaxed">
+                        {currentRiskLevel === 'high' 
+                          ? 'You\'re encountering many scams. Be extra cautious with links, emails, and requests for personal information. Verify sources before clicking or sharing data.'
                           : currentRiskLevel === 'medium'
-                          ? 'text-yellow-400'
-                          : 'text-green-400'
-                      }`}>
-                        {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern
+                          ? 'You\'ve detected some suspicious content. Stay vigilant and always verify the source before taking action. When in doubt, don\'t click or share information.'
+                          : 'Great job staying safe! Continue scanning content before clicking links or sharing information to maintain your protection.'}
                       </span>
                     </div>
                   </div>
