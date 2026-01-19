@@ -47,7 +47,7 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
     // Increment permanent stats (cumulative, never decrease)
     await incrementUserStats(userId, classification);
     
-    // The trigger will automatically clean up old scans (keep only 3)
+    // The trigger will automatically clean up old scans (keep only 10)
     return data
   } catch (error) {
     console.error('❌ Exception saving scan to history:', error);
@@ -57,7 +57,7 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
 }
 
 /**
- * Get user's scan history (latest 3)
+ * Get user's scan history (last 30 days)
  * @param {string} userId - User ID
  * @returns {Promise<Array>} Array of scan records
  */
@@ -67,12 +67,15 @@ export async function getScanHistory(userId) {
   }
 
   try {
+    // Calculate date 30 days ago
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    
     const { data, error } = await supabase
       .from('scan_history')
       .select('*')
       .eq('user_id', userId)
+      .gte('created_at', thirtyDaysAgo)
       .order('created_at', { ascending: false })
-      .limit(3)
 
     if (error) {
       console.error('Error fetching scan history:', error)
@@ -141,23 +144,34 @@ export async function uploadScanImage(imageFile, userId) {
  */
 export async function getSignedImageUrl(imagePath) {
   if (!imagePath) {
+    console.warn('⚠️ getSignedImageUrl: No image path provided')
     return null
   }
 
   try {
+    console.log('🔗 Generating signed URL for path:', imagePath)
     // Generate a signed URL that expires in 1 hour
     const { data, error } = await supabase.storage
       .from('scan-images')
       .createSignedUrl(imagePath, 3600) // 1 hour expiry
 
     if (error) {
-      console.error('Error creating signed URL:', error)
+      console.error('❌ Error creating signed URL:', error)
+      console.error('   Path:', imagePath)
+      console.error('   Error details:', JSON.stringify(error, null, 2))
       return null
     }
 
+    if (!data || !data.signedUrl) {
+      console.error('❌ No signed URL returned from Supabase')
+      return null
+    }
+
+    console.log('✅ Successfully generated signed URL for:', imagePath)
     return data.signedUrl
   } catch (error) {
-    console.error('Exception creating signed URL:', error)
+    console.error('❌ Exception creating signed URL:', error)
+    console.error('   Path:', imagePath)
     return null
   }
 }

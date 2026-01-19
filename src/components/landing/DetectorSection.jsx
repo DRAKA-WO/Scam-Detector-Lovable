@@ -6,8 +6,8 @@ import UrlInput from '../UrlInput'
 import TextInput from '../TextInput'
 import ResultCard from '../ResultCard'
 import ReportModal from '../ReportModal'
-import SignupModal from '../SignupModal'
 import LoginModal from '../LoginModal'
+import SignupModal from '../SignupModal'
 import BlurredResultPreview from '../BlurredResultPreview'
 import AnalyzingSteps from '../AnalyzingSteps'
 import OutOfChecksModal from '../OutOfChecksModal'
@@ -34,8 +34,8 @@ function DetectorSection() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const [remainingChecks, setRemainingChecks] = useState(getRemainingFreeChecks())
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -99,7 +99,7 @@ function DetectorSection() {
           setIsLoggedIn(loggedIn)
           if (session?.user) {
             setUserId(session.user.id)
-            setShowSignupModal(false)
+            setShowAuthModal(false)
             setShowBlurredPreview(false) // Hide blurred preview on login
             
             const { getRemainingUserChecks, initializeUserChecks } = await import('../../utils/checkLimits')
@@ -221,9 +221,9 @@ function DetectorSection() {
     const currentRemaining = getRemainingFreeChecks()
     console.log('📊 Anonymous user - remaining free checks:', currentRemaining)
     
-    // If no checks remaining, show modal and block
-    if (currentRemaining === 0) {
-      console.log('🚫 No free checks remaining, showing signup modal')
+    // If no checks remaining, show signup modal and block (only for anonymous users)
+    if (currentRemaining === 0 && !isLoggedIn) {
+      console.log('🚫 No free checks remaining, showing signup modal for anonymous user')
       setShowSignupModal(true)
       setRemainingChecks(0) // Sync state
       return false
@@ -353,40 +353,47 @@ function DetectorSection() {
         // Store this scan for after signup (await since it's async now)
         await storePendingScan('image', file, null, null, data.classification, data)
         
-        // Show blurred preview and signup modal
+        // Show blurred preview and signup modal (only for anonymous users)
         setResult(data)
         setShowBlurredPreview(true)
+        if (!isLoggedIn) {
         setShowSignupModal(true)
         console.log('✅ Blurred preview and signup modal should now be visible');
+        }
       } else {
         console.log('ℹ️ Normal flow - not last free check');
         // Normal flow - show full result
         setResult(data)
+        // FIX: Stop loading immediately so result shows without delay
+        setLoading(false)
         
-        // Save to history if logged in (stats will be auto-incremented)
+        // Save to history if logged in (in background, don't block UI)
         if (isLoggedIn && userId && data) {
-          try {
-            // Upload image to Supabase Storage
-            const imageUrl = await uploadScanImage(file, userId)
-            
-            // Save scan to history (stats auto-incremented in Supabase)
-            await saveScanToHistory(
-              userId,
-              'image',
-              imageUrl,
-              null, // No content preview for images
-              data.classification,
-              data
-            )
-          } catch (error) {
-            console.error('Error saving scan to history:', error)
-            // Don't block the user if history save fails
-          }
+          // Don't await - save in background so it doesn't block showing the result
+          (async () => {
+            try {
+              // Upload image to Supabase Storage
+              const imageUrl = await uploadScanImage(file, userId)
+              
+              // Save scan to history (stats auto-incremented in Supabase)
+              await saveScanToHistory(
+                userId,
+                'image',
+                imageUrl,
+                null, // No content preview for images
+                data.classification,
+                data
+              )
+              console.log('✅ Scan saved to history')
+            } catch (error) {
+              console.error('Error saving scan to history:', error)
+              // Don't block the user if history save fails
+            }
+          })()
         }
       }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'image'))
-    } finally {
       setLoading(false)
     }
   }
@@ -450,39 +457,46 @@ function DetectorSection() {
         // Store this scan for after signup (await since it's async now)
         await storePendingScan('url', null, null, contentPreview, data.classification, data)
         
-        // Show blurred preview and signup modal
+        // Show blurred preview and signup modal (only for anonymous users)
         setResult(data)
         setShowBlurredPreview(true)
+        if (!isLoggedIn) {
         setShowSignupModal(true)
         console.log('🎯 Last free check used - showing blurred preview and signup modal')
+        }
       } else {
         // Normal flow - show full result
         setResult(data)
+        // FIX: Stop loading immediately so result shows without delay
+        setLoading(false)
         
-        // Save to history if logged in (stats will be auto-incremented)
+        // Save to history if logged in (in background, don't block UI)
         if (isLoggedIn && userId && data) {
-          try {
-            // Create preview (first 200 chars of URL)
-            const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
-            
-            // Save scan to history (stats auto-incremented in Supabase)
-            await saveScanToHistory(
-              userId,
-              'url',
-              null, // No image for URL scans
-              contentPreview,
-              data.classification,
-              data
-            )
-          } catch (error) {
-            console.error('Error saving scan to history:', error)
-            // Don't block the user if history save fails
-          }
+          // Don't await - save in background so it doesn't block showing the result
+          (async () => {
+            try {
+              // Create preview (first 200 chars of URL)
+              const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
+              
+              // Save scan to history (stats auto-incremented in Supabase)
+              await saveScanToHistory(
+                userId,
+                'url',
+                null, // No image for URL scans
+                contentPreview,
+                data.classification,
+                data
+              )
+              console.log('✅ Scan saved to history')
+            } catch (error) {
+              console.error('Error saving scan to history:', error)
+              // Don't block the user if history save fails
+            }
+          })()
         }
       }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'url'))
-    } finally {
       setLoading(false)
     }
   }
@@ -546,39 +560,46 @@ function DetectorSection() {
         // Store this scan for after signup (await since it's async now)
         await storePendingScan('text', null, null, contentPreview, data.classification, data)
         
-        // Show blurred preview and signup modal
+        // Show blurred preview and signup modal (only for anonymous users)
         setResult(data)
         setShowBlurredPreview(true)
+        if (!isLoggedIn) {
         setShowSignupModal(true)
         console.log('🎯 Last free check used - showing blurred preview and signup modal')
+        }
       } else {
         // Normal flow - show full result
         setResult(data)
+        // FIX: Stop loading immediately so result shows without delay
+        setLoading(false)
         
-        // Save to history if logged in (stats will be auto-incremented)
+        // Save to history if logged in (in background, don't block UI)
         if (isLoggedIn && userId && data) {
-          try {
-            // Create preview (first 200 chars of text)
-            const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
-            
-            // Save scan to history (stats auto-incremented in Supabase)
-            await saveScanToHistory(
-              userId,
-              'text',
-              null, // No image for text scans
-              contentPreview,
-              data.classification,
-              data
-            )
-          } catch (error) {
-            console.error('Error saving scan to history:', error)
-            // Don't block the user if history save fails
-          }
+          // Don't await - save in background so it doesn't block showing the result
+          (async () => {
+            try {
+              // Create preview (first 200 chars of text)
+              const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
+              
+              // Save scan to history (stats auto-incremented in Supabase)
+              await saveScanToHistory(
+                userId,
+                'text',
+                null, // No image for text scans
+                contentPreview,
+                data.classification,
+                data
+              )
+              console.log('✅ Scan saved to history')
+            } catch (error) {
+              console.error('Error saving scan to history:', error)
+              // Don't block the user if history save fails
+            }
+          })()
         }
       }
     } catch (err) {
       setError(getUserFriendlyError(err.message, 'text'))
-    } finally {
       setLoading(false)
     }
   }
@@ -763,27 +784,24 @@ function DetectorSection() {
         isSubmitting={isSubmittingReport}
       />
 
-      <SignupModal
-        isOpen={showSignupModal}
-        onClose={() => setShowSignupModal(false)}
-        onSignup={handleSignup}
-        onSwitchToLogin={() => {
-          setShowSignupModal(false)
-          setShowLoginModal(true)
-        }}
-        remainingChecks={remainingChecks}
+      <LoginModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
       />
 
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLogin={async (method) => {
-          // This is handled inside LoginModal
+      {/* SignupModal - Only for anonymous users who have exhausted free checks */}
+      <SignupModal
+        isOpen={showSignupModal}
+        onClose={() => {
+          setShowSignupModal(false)
+          // Don't show result if user closes without signing up
+          if (!isLoggedIn) {
+            setResult(null)
+            setShowBlurredPreview(false)
+          }
         }}
-        onSwitchToSignup={() => {
-          setShowLoginModal(false)
-          setShowSignupModal(true)
-        }}
+        onSignup={handleSignup}
+        remainingChecks={remainingChecks}
       />
 
       <OutOfChecksModal

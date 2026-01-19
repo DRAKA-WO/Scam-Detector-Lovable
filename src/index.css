@@ -8,7 +8,7 @@
   :root {
     --background: 220 20% 4%;
     --foreground: 0 0% 98%;
-    --card: 220 18% 8%;
+    --card: 220 18% 12%;
     --card-foreground: 0 0% 98%;
     --popover: 220 18% 8%;
     --popover-foreground: 0 0% 98%;
@@ -16,8 +16,8 @@
     --primary-foreground: 0 0% 100%;
     --secondary: 220 15% 12%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 220 15% 18%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 220 15% 25%;
+    --muted-foreground: 220 10% 65%;
     --accent: 270 70% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
@@ -39,6 +39,12 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 220 15% 16%;
     --sidebar-ring: 270 70% 60%;
+    
+    --chart-1: 0 72% 51%;
+    --chart-2: 43 96% 56%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 221 83% 53%;
+    --chart-5: 280 100% 70%;
   }
 }
 
@@ -162,6 +168,35 @@ body {
   .dark-input:focus {
     border-color: hsla(270, 100%, 60%, 0.6);
     outline: none;
+  }
+
+  .dark-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar {
+    width: 16px;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(155, 155, 155, 0.5);
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    border-radius: 8px;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(155, 155, 155, 0.7);
+    background-clip: padding-box;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 

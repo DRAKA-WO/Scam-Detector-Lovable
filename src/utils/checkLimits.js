@@ -5,6 +5,11 @@ const USER_CHECKS_KEY_PREFIX = 'scam_checker_user_checks_'
 const USER_STATS_KEY_PREFIX = 'scam_checker_user_stats_'
 const SIGNUP_BONUS_CHECKS = 5 // Checks given on signup
 
+// Global throttle to prevent too many concurrent requests to Supabase
+// This prevents ERR_HTTP2_PROTOCOL_ERROR from too many simultaneous connections
+let lastFetchTime = 0;
+const MIN_FETCH_INTERVAL = 150; // Minimum 150ms between any Supabase fetches
+
 /**
  * Get remaining free checks for anonymous users
  * @returns {number} Number of remaining free checks
@@ -54,21 +59,84 @@ export function getRemainingUserChecks(userId) {
  * @param {string} userId - User ID from Supabase
  * @returns {Promise<number>} Number of checks
  */
-export async function syncUserChecksFromSupabase(userId) {
+export async function syncUserChecksFromSupabase(userId, retryCount = 0, maxRetries = 2) {
   if (typeof window === 'undefined' || !userId) return 0
   
   try {
     const { supabase } = await import('@/integrations/supabase/client')
     
-    // Fetch user data from Supabase
-    const { data, error } = await supabase
+    // CRITICAL FIX: Throttle requests to prevent HTTP/2 connection resets
+    // Too many concurrent requests after email login cause ERR_HTTP2_PROTOCOL_ERROR
+    // OAuth works because redirects naturally space out requests
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime;
+    if (timeSinceLastFetch < MIN_FETCH_INTERVAL) {
+      await new Promise(resolve => setTimeout(resolve, MIN_FETCH_INTERVAL - timeSinceLastFetch));
+    }
+    lastFetchTime = Date.now();
+    
+    // Get session - should already be in localStorage from signInWithPassword
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    // If no valid session, skip fetch and return localStorage value
+    if (sessionError || !session || !session.access_token) {
+      return getRemainingUserChecks(userId);
+    }
+    
+    // CRITICAL FIX: Wait significantly longer after email login to avoid HTTP/2 connection resets
+    // OAuth redirects naturally provide 1-2 seconds of delay, email login needs explicit delay
+    // The HTTP/2 connection needs time to stabilize before we can make API requests
+    if (retryCount === 0) {
+      // Wait longer to match OAuth's natural delay from redirect flow
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay like OAuth redirect
+    }
+    
+    // Debug logging removed to prevent console errors
+    
+    // CRITICAL: Try to manually verify the Supabase client has the session
+    // Check if we need to re-import the client to get a fresh instance
+    const { data: { session: verifySession } } = await supabase.auth.getSession();
+    
+    // Use Supabase client directly (same as Dashboard.tsx)
+    // The Chrome extension frame_ant.js intercepts both fetch and XHR, so we use Supabase client
+    // which may have different behavior/timing that the extension allows
+    
+    let data = null;
+    let error = null;
+    
+    // Use Supabase client directly (same approach as Dashboard.tsx uses for OAuth)
+    try {
+      const fetchResult = await supabase
       .from('users')
       .select('checks')
       .eq('id', userId)
-      .single()
+        .maybeSingle();
+      data = fetchResult.data;
+      error = fetchResult.error;
+    } catch (supabaseException) {
+      error = supabaseException;
+    }
+    
+    // Debug logging removed to prevent console errors
     
     if (error) {
-      console.error('Error fetching checks from Supabase:', error)
+      // Retry on network errors ("Failed to fetch")
+      const isNetworkError = error.message?.includes('Failed to fetch') || 
+                             error.message?.includes('ERR_CONNECTION') ||
+                             error.message?.includes('NetworkError');
+      
+      if (isNetworkError && retryCount < maxRetries) {
+        // Exponential backoff
+        const delay = 200 * Math.pow(2, retryCount);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        // Retry the fetch
+        return await syncUserChecksFromSupabase(userId, retryCount + 1, maxRetries);
+      }
+      
+      // Silent error handling - only log in DEV mode
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Error fetching checks from Supabase after all retries:', error)
+      }
       return getRemainingUserChecks(userId) // Fallback to localStorage
     }
     
@@ -85,7 +153,22 @@ export async function syncUserChecksFromSupabase(userId) {
     
     return getRemainingUserChecks(userId)
   } catch (error) {
-    console.error('Exception syncing checks from Supabase:', error)
+    // CRITICAL FIX: Retry on network errors in catch block too
+    const isNetworkError = error?.message?.includes('Failed to fetch') || 
+                           error?.message?.includes('ERR_CONNECTION') ||
+                           error?.message?.includes('NetworkError');
+    
+    if (isNetworkError && retryCount < maxRetries) {
+      // Wait before retry (exponential backoff: 200ms, 400ms)
+      await new Promise(resolve => setTimeout(resolve, 200 * Math.pow(2, retryCount)));
+      // Retry the fetch
+      return await syncUserChecksFromSupabase(userId, retryCount + 1, maxRetries);
+    }
+    
+    // Silent error handling - only log in DEV mode to match OAuth sync behavior
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ Exception syncing checks from Supabase:', error)
+    }
     return getRemainingUserChecks(userId)
   }
 }
@@ -179,24 +262,25 @@ export async function useUserCheck(userId) {
     // Update localStorage immediately (for instant UI update)
     localStorage.setItem(key, newCount.toString())
     
-    // Also update Supabase (for persistence)
-    try {
-      const { supabase } = await import('@/integrations/supabase/client')
-      const { error } = await supabase
-        .from('users')
-        .update({ checks: newCount })
-        .eq('id', userId)
-      
-      if (error) {
-        console.error('Error updating checks in Supabase:', error)
-        // Don't fail - localStorage is already updated
-      } else {
-        console.log(`✅ Decremented checks in Supabase: ${remaining} → ${newCount}`)
+    // FIX: Don't await Supabase update - sync in background to prevent blocking
+    // Update Supabase in background (fire and forget) so it doesn't block the UI
+    ;(async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { error } = await supabase
+          .from('users')
+          .update({ checks: newCount })
+          .eq('id', userId)
+        
+        if (error) {
+          console.error('Error updating checks in Supabase:', error)
+        } else {
+          console.log(`✅ Decremented checks in Supabase: ${remaining} → ${newCount}`)
+        }
+      } catch (error) {
+        console.error('Exception updating checks in Supabase:', error)
       }
-    } catch (error) {
-      console.error('Exception updating checks in Supabase:', error)
-      // Don't fail - localStorage is already updated
-    }
+    })()
     
     return true
   }

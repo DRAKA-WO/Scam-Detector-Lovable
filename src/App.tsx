@@ -9,6 +9,7 @@ import { syncSessionToExtension, initializeExtensionSync } from "./utils/extensi
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Business from "./pages/Business";
+import ExtensionAuth from "./pages/ExtensionAuth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -188,6 +189,9 @@ const OAuthCallback = () => {
                     console.log('✅ [OAuthCallback] Successfully saved pending scan to history!', savedScan);
                     console.log('✅ [OAuthCallback] Permanent stats automatically incremented');
                     
+                    // Set flag to show latest scan result on Dashboard (user came from signup modal)
+                    localStorage.setItem('show_latest_scan_after_signup', 'true');
+                    
                     // Clear pending scan
                     localStorage.removeItem(PENDING_SCAN_KEY);
                     console.log('🗑️ [OAuthCallback] Cleared pending scan from localStorage');
@@ -210,12 +214,22 @@ const OAuthCallback = () => {
               // Small delay to ensure everything is settled
               await new Promise(resolve => setTimeout(resolve, 500));
               
-              // Redirect to dashboard
-              if (mounted) {
-                console.log('✅ Redirecting to dashboard...');
-                // Use window.location.href instead of navigate() to force a full page navigation
-                // This ensures React Router fully commits the route change and Dashboard renders immediately
-                window.location.href = '/dashboard';
+              // Check if user came from extension-auth page
+              const fromExtensionAuth = sessionStorage.getItem('oauth_from_extension_auth');
+              if (fromExtensionAuth) {
+                sessionStorage.removeItem('oauth_from_extension_auth');
+                // Redirect back to extension-auth to show success message
+                if (mounted) {
+                  window.location.href = '/extension-auth';
+                }
+              } else {
+                // Redirect to dashboard
+                if (mounted) {
+                  console.log('✅ Redirecting to dashboard...');
+                  // Use window.location.href instead of navigate() to force a full page navigation
+                  // This ensures React Router fully commits the route change and Dashboard renders immediately
+                  window.location.href = '/dashboard';
+                }
               }
             };
             
@@ -327,6 +341,10 @@ const OAuthCallback = () => {
                       );
                       
                       console.log('✅ [OAuthCallback-v2] Successfully saved pending scan!', savedScan);
+                      
+                      // Set flag to show latest scan result on Dashboard (user came from signup modal)
+                      localStorage.setItem('show_latest_scan_after_signup', 'true');
+                      
                       localStorage.removeItem(PENDING_SCAN_KEY);
                       console.log('🗑️ [OAuthCallback-v2] Cleared pending scan');
                     } catch (saveError) {
@@ -345,10 +363,20 @@ const OAuthCallback = () => {
                 // Clear hash from URL
                 window.history.replaceState(null, '', window.location.pathname);
                 
-                // Redirect to dashboard
-                if (mounted) {
-                  console.log('✅ Redirecting to dashboard...');
-                  window.location.href = '/dashboard';
+                // Check if user came from extension-auth page
+                const fromExtensionAuth = sessionStorage.getItem('oauth_from_extension_auth');
+                if (fromExtensionAuth) {
+                  sessionStorage.removeItem('oauth_from_extension_auth');
+                  // Redirect back to extension-auth to show success message
+                  if (mounted) {
+                    window.location.href = '/extension-auth';
+                  }
+                } else {
+                  // Redirect to dashboard
+                  if (mounted) {
+                    console.log('✅ Redirecting to dashboard...');
+                    window.location.href = '/dashboard';
+                  }
                 }
               };
               
@@ -446,6 +474,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/business" element={<Business />} />
+          <Route path="/extension-auth" element={<ExtensionAuth />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

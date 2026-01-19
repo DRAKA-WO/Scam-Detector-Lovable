@@ -1,14 +1,23 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff } from 'lucide-react'
+import chromeLogo from "@/assets/chrome-logo.svg"
+import edgeLogo from "@/assets/edge-logo.svg"
+import braveLogo from "@/assets/brave-logo.svg"
+import operaLogo from "@/assets/opera-logo.png"
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import Header from '@/components/landing/Header'
 import Footer from '@/components/landing/Footer'
 import ScanHistory from '@/components/ScanHistory'
 import ResultCard from '@/components/ResultCard'
 import { getRemainingUserChecks } from '@/utils/checkLimits'
 import { syncSessionToExtension, clearExtensionSession } from '@/utils/extensionSync'
+import { supabase } from '@/integrations/supabase/client'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -53,6 +62,7 @@ function Dashboard() {
     safeResults: 0,
     suspiciousResults: 0
   })
+  const [monthlyScans, setMonthlyScans] = useState(0)
   const [userPlan, setUserPlan] = useState('FREE')
   // Initialize loading state - check if we already have a session
   // IMPORTANT: Use the same logic as user state to ensure consistency
@@ -82,8 +92,59 @@ function Dashboard() {
   const hasLoadedRef = useRef(!!user)
   const [showHistory, setShowHistory] = useState(false)
   const [selectedScan, setSelectedScan] = useState(null)
-  const [latestScan, setLatestScan] = useState(null)
-  const [showLatestScan, setShowLatestScan] = useState(false)
+  const [scanHistoryFilter, setScanHistoryFilter] = useState('all') // 'all', 'safe', 'suspicious', 'scam'
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
+  const [scanHistory, setScanHistory] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<Array<{ 
+    id: string
+    type: string
+    message: string
+    severity: 'info' | 'warning' | 'error'
+    scamType?: string
+    isRiskAlert?: boolean
+  }>>([])
+  const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
+  const [currentRiskLevel, setCurrentRiskLevel] = useState<string | null>(null)
+
+  // Helper functions for dismissed alerts persistence
+  const getDismissedAlerts = (userId: string): Record<string, boolean> => {
+    try {
+      const key = `scam_checker_dismissed_alerts_${userId}`
+      const stored = localStorage.getItem(key)
+      return stored ? JSON.parse(stored) : {}
+    } catch (error) {
+      console.warn('Error loading dismissed alerts:', error)
+      return {}
+    }
+  }
+
+  const dismissAlert = (userId: string, alertId: string) => {
+    try {
+      const key = `scam_checker_dismissed_alerts_${userId}`
+      const dismissed = getDismissedAlerts(userId)
+      dismissed[alertId] = true
+      localStorage.setItem(key, JSON.stringify(dismissed))
+    } catch (error) {
+      console.warn('Error saving dismissed alert:', error)
+    }
+  }
+
+  const isAlertDismissed = (userId: string, alertId: string): boolean => {
+    const dismissed = getDismissedAlerts(userId)
+    return dismissed[alertId] === true
+  }
+  
+  // Account editing state
+  const [editingSection, setEditingSection] = useState<'none' | 'profile'>('none')
+  const [editingUsername, setEditingUsername] = useState('')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [shouldRemoveAvatar, setShouldRemoveAvatar] = useState(false)
+  const [accountError, setAccountError] = useState('')
+  const [accountSuccess, setAccountSuccess] = useState('')
+  const [accountLoading, setAccountLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-sync existing session to extension on Dashboard load
   useEffect(() => {
@@ -143,36 +204,550 @@ function Dashboard() {
     };
   }, [user?.id]);
 
+
+  // Function to generate smart alerts based on scan history
+  const generateAlerts = useCallback(async (history: any[]) => {
+    if (!history || history.length === 0) {
+      setAlerts([])
+      setCurrentRiskLevel(null)
+      return
+    }
+
+    if (!user?.id) {
+      setAlerts([])
+      return
+    }
+
+    try {
+      const { calculateWeeklyComparison, calculateRiskLevel, calculateScamTypeBreakdown } = await import('@/utils/insightsCalculator')
+      const weeklyComparison = calculateWeeklyComparison(history)
+      const riskLevel = calculateRiskLevel(history)
+      const scamTypes = calculateScamTypeBreakdown(history)
+      
+      console.log('🔔 Generating alerts from scan history:', {
+        historyLength: history.length,
+        weeklyComparison,
+        riskLevel,
+        currentRiskLevel,
+        scamTypesCount: Object.keys(scamTypes).length
+      })
+      
+      const newAlerts: Array<{ 
+        id: string
+        type: string
+        message: string
+        severity: 'info' | 'warning' | 'error'
+        scamType?: string
+        isRiskAlert?: boolean
+      }> = []
+      
+      // Check dismissed alerts (for non-risk alerts only)
+      const dismissed = getDismissedAlerts(user.id)
+      
+      // Handle risk level alerts - always show for current risk level, only hide when level changes
+      const riskLevelChanged = currentRiskLevel !== null && currentRiskLevel !== riskLevel
+      
+      // Always show risk alert for current risk level (non-dismissible)
+      if (riskLevel === 'high') {
+        newAlerts.push({
+          id: 'high-risk',
+          type: 'high-risk',
+          message: '🔴 High-risk pattern detected: You\'re encountering a high percentage of scams. Be extra cautious!',
+          severity: 'error',
+          isRiskAlert: true
+        })
+      }
+      
+      if (riskLevel === 'medium') {
+        newAlerts.push({
+          id: 'medium-risk',
+          type: 'medium-risk',
+          message: '⚠️ Medium-risk pattern detected: You\'re encountering some scams. Stay vigilant!',
+          severity: 'warning',
+          isRiskAlert: true
+        })
+      }
+      
+      // Update current risk level
+      setCurrentRiskLevel(riskLevel)
+      
+      // Alert for unusual spike in scams (relaxed condition: >1 scam and >30% increase)
+      // Use week-based ID so dismissal persists for the week
+      const now = new Date()
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - now.getDay()) // Start of week (Sunday)
+      weekStart.setHours(0, 0, 0, 0)
+      const weekId = Math.floor(weekStart.getTime() / (7 * 24 * 60 * 60 * 1000)) // Week number since epoch
+      const spikeAlertId = `spike-week-${weekId}`
+      
+      if (weeklyComparison.changes.scams > 1 && weeklyComparison.percentageChanges.scams > 30) {
+        if (!isAlertDismissed(user.id, spikeAlertId)) {
+          newAlerts.push({
+            id: spikeAlertId,
+            type: 'spike',
+            message: `⚠️ Unusual spike detected: ${weeklyComparison.changes.scams} more scams this week (${weeklyComparison.percentageChanges.scams}% increase)`,
+            severity: 'warning'
+          })
+        }
+      }
+      
+      // Alert for significant scan activity increase (new)
+      // Use week-based ID so dismissal persists for the week
+      const activityAlertId = `high-activity-week-${weekId}`
+      if (weeklyComparison.changes.total > 5 && weeklyComparison.percentageChanges.total > 50) {
+        if (!isAlertDismissed(user.id, activityAlertId)) {
+          newAlerts.push({
+            id: activityAlertId,
+            type: 'high-activity',
+            message: `📊 High scan activity: ${weeklyComparison.changes.total} more scans this week (${weeklyComparison.percentageChanges.total}% increase) - Great job staying protected!`,
+            severity: 'info'
+          })
+        }
+      }
+      
+      // Alert for new scam type detected - CREATE INDIVIDUAL ALERTS FOR EACH TYPE
+      if (Object.keys(scamTypes).length > 0 && history.length >= 2) {
+        const recentScams = history
+          .filter(scan => scan.classification === 'scam' && scan.created_at > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+          .map(scan => scan.analysis_result?.scam_type)
+          .filter(Boolean)
+        
+        if (recentScams.length > 0) {
+          const uniqueRecentTypes = [...new Set(recentScams)]
+          const oldScams = history
+            .filter(scan => scan.classification === 'scam' && scan.created_at <= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+            .map(scan => scan.analysis_result?.scam_type)
+            .filter(Boolean)
+          const oldTypes = [...new Set(oldScams)]
+          
+          const newTypes = uniqueRecentTypes.filter(type => !oldTypes.includes(type))
+          
+          // Create individual alert for each new scam type
+          newTypes.forEach(scamType => {
+            const alertId = `new-scam-type-${scamType}`
+            if (!isAlertDismissed(user.id, alertId)) {
+              const formattedType = scamType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+              
+              newAlerts.push({
+                id: alertId,
+                type: 'new-scam-type',
+                message: `🆕 New scam type detected: ${formattedType}`,
+                severity: 'info',
+                scamType
+              })
+            }
+          })
+        }
+      }
+      
+      // Alert for first scam detected (new)
+      // Use week-based ID so dismissal persists for the week
+      const firstScamAlertId = `first-scam-week-${weekId}`
+      if (weeklyComparison.thisWeek.scams === 1 && weeklyComparison.lastWeek.scams === 0) {
+        if (!isAlertDismissed(user.id, firstScamAlertId)) {
+          newAlerts.push({
+            id: firstScamAlertId,
+            type: 'first-scam',
+            message: '⚠️ Scam detected this week - Review the details and stay cautious!',
+            severity: 'warning'
+          })
+        }
+      }
+      
+      // Sort alerts: risk alerts first, then others
+      const sortedAlerts = newAlerts.sort((a, b) => {
+        if (a.isRiskAlert && !b.isRiskAlert) return -1
+        if (!a.isRiskAlert && b.isRiskAlert) return 1
+        return 0
+      })
+      
+      console.log('🔔 Generated alerts:', sortedAlerts)
+      setAlerts(sortedAlerts)
+    } catch (error) {
+      console.error('Error generating alerts:', error)
+      setAlerts([])
+    }
+  }, [user?.id, currentRiskLevel])
+
+  // Regenerate alerts whenever scan history changes
+  useEffect(() => {
+    generateAlerts(scanHistory)
+  }, [scanHistory, generateAlerts])
+
+  // Calculate filtered stats based on time filter
+  const filteredStats = useMemo(() => {
+    if (!scanHistory || scanHistory.length === 0) {
+      return {
+        totalScans: 0,
+        scamsDetected: 0,
+        safeResults: 0,
+        suspiciousResults: 0
+      }
+    }
+
+    const now = new Date()
+    let startDate: Date
+    let endDate: Date
+
+    // Helper to get start of day in local timezone
+    const getStartOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
+
+    // Helper to get end of day in local timezone
+    const getEndOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(23, 59, 59, 999)
+      return d
+    }
+
+    switch (statsTimeFilter) {
+      case 'today':
+        // Start and end of today in local timezone
+        startDate = getStartOfDay(now)
+        endDate = getEndOfDay(now)
+        break
+      case 'thisWeek':
+        // Start of week (Sunday 00:00:00) in local timezone
+        const dayOfWeek = now.getDay()
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - dayOfWeek)
+        startDate = getStartOfDay(startDate)
+        // End of today
+        endDate = getEndOfDay(now)
+        break
+      case 'thisMonth':
+        // Start of month (1st day 00:00:00) in local timezone
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate = getStartOfDay(startDate)
+        // End of today
+        endDate = getEndOfDay(now)
+        break
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate = getStartOfDay(startDate)
+        endDate = getEndOfDay(now)
+    }
+
+    console.log('🔍 Filtering stats:', {
+      filter: statsTimeFilter,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      startTime: startDate.getTime(),
+      endTime: endDate.getTime(),
+      totalScans: scanHistory.length,
+      now: now.toISOString()
+    })
+
+    const filtered = scanHistory.filter(scan => {
+      if (!scan.created_at) return false
+      
+      // Parse the scan date - scan.created_at is in UTC/ISO format
+      const scanDate = new Date(scan.created_at)
+      
+      // Check if date is valid
+      if (isNaN(scanDate.getTime())) {
+        console.warn('⚠️ Invalid date for scan:', scan.id, scan.created_at)
+        return false
+      }
+      
+      // Convert scan date to local date components for comparison
+      // This ensures we're comparing "today" in the user's local timezone
+      const scanLocalYear = scanDate.getFullYear()
+      const scanLocalMonth = scanDate.getMonth()
+      const scanLocalDate = scanDate.getDate()
+      
+      // Get local date components for start/end boundaries
+      const startLocalYear = startDate.getFullYear()
+      const startLocalMonth = startDate.getMonth()
+      const startLocalDate = startDate.getDate()
+      const startLocalHours = startDate.getHours()
+      const startLocalMinutes = startDate.getMinutes()
+      const startLocalSeconds = startDate.getSeconds()
+      
+      const endLocalYear = endDate.getFullYear()
+      const endLocalMonth = endDate.getMonth()
+      const endLocalDate = endDate.getDate()
+      const endLocalHours = endDate.getHours()
+      const endLocalMinutes = endDate.getMinutes()
+      const endLocalSeconds = endDate.getSeconds()
+      
+      // Compare using timestamps (this handles timezone correctly)
+      // getTime() returns UTC milliseconds since epoch, so comparison is timezone-agnostic
+      const scanTime = scanDate.getTime()
+      const startTime = startDate.getTime()
+      const endTime = endDate.getTime()
+      
+      // Double-check: also compare local date strings to ensure we're filtering correctly
+      const scanLocalDateStr = `${scanLocalYear}-${String(scanLocalMonth + 1).padStart(2, '0')}-${String(scanLocalDate).padStart(2, '0')}`
+      const startLocalDateStr = `${startLocalYear}-${String(startLocalMonth + 1).padStart(2, '0')}-${String(startLocalDate).padStart(2, '0')}`
+      const endLocalDateStr = `${endLocalYear}-${String(endLocalMonth + 1).padStart(2, '0')}-${String(endLocalDate).padStart(2, '0')}`
+      
+      // Use timestamp comparison (most reliable)
+      const isInRange = scanTime >= startTime && scanTime <= endTime
+      
+      // For "today" filter, use local date string comparison to avoid timezone edge cases
+      let finalInRange = isInRange
+      if (statsTimeFilter === 'today') {
+        // For today, the scan's local date must match today's local date exactly
+        // This ensures we only get scans from today, not yesterday or tomorrow
+        finalInRange = scanLocalDateStr === startLocalDateStr
+      } else {
+        // For week/month filters, use timestamp comparison
+        finalInRange = isInRange
+      }
+      
+      // Log all scans for debugging (limited to avoid spam)
+      if (scanHistory.length <= 25) {
+        console.log(`🔍 Scan ${scanHistory.indexOf(scan) + 1}/${scanHistory.length}:`, {
+          scanId: scan.id?.substring(0, 8),
+          scanDateISO: scanDate.toISOString(),
+          scanLocalDate: scanLocalDateStr,
+          startLocalDate: startLocalDateStr,
+          endLocalDate: endLocalDateStr,
+          scanTime,
+          startTime,
+          endTime,
+          isInRange: isInRange ? '✅' : '❌',
+          finalInRange: finalInRange ? '✅' : '❌',
+          filter: statsTimeFilter
+        })
+      }
+      
+      return finalInRange
+    })
+
+    const result = {
+      totalScans: filtered.length,
+      scamsDetected: filtered.filter(s => s.classification === 'scam').length,
+      safeResults: filtered.filter(s => s.classification === 'safe').length,
+      suspiciousResults: filtered.filter(s => s.classification === 'suspicious').length
+    }
+
+    // Log date distribution to understand why filters might show same results
+    const dateDistribution = scanHistory.reduce((acc, scan) => {
+      const scanDate = new Date(scan.created_at)
+      const dateKey = scanDate.toISOString().split('T')[0] // YYYY-MM-DD
+      acc[dateKey] = (acc[dateKey] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    console.log('📊 Filtered stats result:', {
+      filter: statsTimeFilter,
+      ...result,
+      filteredCount: filtered.length,
+      totalScansInHistory: scanHistory.length,
+      dateDistribution,
+      dateRange: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      }
+    })
+
+    return result
+  }, [scanHistory, statsTimeFilter])
+
+  // Calculate filtered scam type breakdown based on time filter
+  const filteredScamTypeBreakdown = useMemo(() => {
+    if (!scanHistory || scanHistory.length === 0) {
+      return {}
+    }
+
+    const now = new Date()
+    let startDate: Date
+    let endDate: Date
+
+    // Helper to get start of day in local timezone
+    const getStartOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
+
+    // Helper to get end of day in local timezone
+    const getEndOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(23, 59, 59, 999)
+      return d
+    }
+
+    switch (statsTimeFilter) {
+      case 'today':
+        startDate = getStartOfDay(now)
+        endDate = getEndOfDay(now)
+        break
+      case 'thisWeek':
+        const dayOfWeek = now.getDay()
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - dayOfWeek)
+        startDate = getStartOfDay(startDate)
+        endDate = getEndOfDay(now)
+        break
+      case 'thisMonth':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate = getStartOfDay(startDate)
+        endDate = getEndOfDay(now)
+        break
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate = getStartOfDay(startDate)
+        endDate = getEndOfDay(now)
+    }
+
+    const filtered = scanHistory.filter(scan => {
+      if (!scan.created_at || scan.classification !== 'scam') return false
+      
+      const scanDate = new Date(scan.created_at)
+      if (isNaN(scanDate.getTime())) return false
+      
+      const scanTime = scanDate.getTime()
+      const startTime = startDate.getTime()
+      const endTime = endDate.getTime()
+      
+      // Use same filtering logic as filteredStats
+      if (statsTimeFilter === 'today') {
+        const scanLocalYear = scanDate.getFullYear()
+        const scanLocalMonth = scanDate.getMonth()
+        const scanLocalDate = scanDate.getDate()
+        const scanLocalDateStr = `${scanLocalYear}-${String(scanLocalMonth + 1).padStart(2, '0')}-${String(scanLocalDate).padStart(2, '0')}`
+        const startLocalYear = startDate.getFullYear()
+        const startLocalMonth = startDate.getMonth()
+        const startLocalDate = startDate.getDate()
+        const startLocalDateStr = `${startLocalYear}-${String(startLocalMonth + 1).padStart(2, '0')}-${String(startLocalDate).padStart(2, '0')}`
+        return scanLocalDateStr === startLocalDateStr
+      } else {
+        return scanTime >= startTime && scanTime <= endTime
+      }
+    })
+
+    // Calculate breakdown from filtered scans
+    const breakdown: Record<string, number> = {}
+    filtered.forEach(scan => {
+      if (scan.classification === 'scam' && scan.analysis_result?.scam_type) {
+        const scamType = scan.analysis_result.scam_type
+        breakdown[scamType] = (breakdown[scamType] || 0) + 1
+      }
+    })
+
+    return breakdown
+  }, [scanHistory, statsTimeFilter])
+
+  // Real-time subscription to scan_history table for automatic updates
+  useEffect(() => {
+    if (!user?.id) return
+
+    console.log('📡 Dashboard: Setting up real-time subscription to scan_history for user:', user.id)
+    
+    // Subscribe to changes in scan_history table
+    const channel = supabase
+      .channel(`scan_history_changes_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'scan_history',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          console.log('🔄 Dashboard: Scan history changed:', payload.eventType, payload.new || payload.old)
+          // Refresh scan history when any change occurs
+          try {
+            const { getScanHistory } = await import('@/utils/scanHistory')
+            const history = await getScanHistory(user.id)
+            setScanHistory(history)
+            console.log('✅ Dashboard: Scan history refreshed via real-time subscription, new length:', history.length)
+          } catch (error) {
+            console.error('❌ Dashboard: Error refreshing scan history:', error)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Dashboard: Subscription status:', status)
+      })
+
+    return () => {
+      console.log('📡 Dashboard: Unsubscribing from scan_history changes')
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id])
+
   // Function to refresh stats from database
   const refreshStats = async () => {
     if (!user?.id) return
     
     try {
-      const { getUserPermanentStats } = await import('@/utils/scanHistory')
+      const { getUserPermanentStats, getScanHistory } = await import('@/utils/scanHistory')
       const userStats = await getUserPermanentStats(user.id)
       console.log('🔄 Dashboard: Refreshed permanent stats', userStats)
       setStats(userStats)
       
-      // Also refresh plan
+      // Calculate scam type breakdown and monthly scans
       try {
-        const { supabase } = await import('@/integrations/supabase/client')
-        const { data, error } = await (supabase as any)
-          .from('users')
-          .select('plan')
-          .eq('id', user.id)
-          .maybeSingle()
+        const history = await getScanHistory(user.id)
+        setScanHistory(history)
         
-        if (!error && data?.plan) {
-          setUserPlan(data.plan)
-          // Sync plan to extension
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            await syncSessionToExtension(session, user.id, null, data.plan)
+        // Calculate monthly scans (last 30 days)
+        setMonthlyScans(history.length)
+        
+        // Calculate scam type breakdown if there are scams detected
+        if (userStats.scamsDetected > 0) {
+          const breakdown: Record<string, number> = {}
+          
+          history.forEach(scan => {
+            if (scan.classification === 'scam') {
+              // Count all scams, even if they don't have a scam_type
+              const scamType = scan.analysis_result?.scam_type || 'Unknown Scam Type'
+              breakdown[scamType] = (breakdown[scamType] || 0) + 1
+            }
+          })
+          
+          setScamTypeBreakdown(breakdown)
+        } else {
+          setScamTypeBreakdown({})
+        }
+
+        // Alerts will be generated automatically via useEffect when scanHistory changes
+      } catch (error) {
+        console.error('Error calculating scam type breakdown:', error)
+        setMonthlyScans(0)
+        setScanHistory([])
+      }
+      
+      // Also refresh plan with retry logic
+      const refreshPlanWithRetry = async (maxRetries = 2) => {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            const { supabase } = await import('@/integrations/supabase/client')
+            const { data, error } = await (supabase as any)
+              .from('users')
+              .select('plan')
+              .eq('id', user.id)
+              .maybeSingle()
+            
+            if (!error && data?.plan) {
+              setUserPlan(data.plan)
+              // Sync plan to extension
+              const { data: { session } } = await supabase.auth.getSession()
+              if (session) {
+                await syncSessionToExtension(session, user.id, null, data.plan)
+              }
+              return // Success
+            }
+            return // Not found or no error
+          } catch (planError: any) {
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 200 * Math.pow(2, attempt)))
+              continue
+            } else {
+              console.warn('⚠️ Dashboard: Error refreshing plan after retries:', planError)
+            }
           }
         }
-      } catch (planError) {
-        console.error('❌ Dashboard: Error refreshing plan:', planError)
       }
+      await refreshPlanWithRetry()
     } catch (error) {
       console.error('❌ Dashboard: Error refreshing stats:', error)
     }
@@ -180,7 +755,7 @@ function Dashboard() {
 
   useEffect(() => {
     const currentEffectId = ++effectIdRef.current
-    let subscription = null
+    let subscription: { unsubscribe?: () => void } | null = null
     
     // Helper to update user data
     const updateUserData = async (session) => {
@@ -203,10 +778,39 @@ function Dashboard() {
       
       // Get user stats from permanent stats table (cumulative, never decrease)
       try {
-        const { getUserPermanentStats } = await import('@/utils/scanHistory')
+        const { getUserPermanentStats, getScanHistory } = await import('@/utils/scanHistory')
         const userStats = await getUserPermanentStats(session.user.id)
         console.log('📊 Dashboard: User permanent stats', userStats)
         setStats(userStats)
+        
+        // Calculate scam type breakdown and monthly scans
+        try {
+          const history = await getScanHistory(session.user.id)
+          setScanHistory(history)
+          
+          // Calculate monthly scans (last 30 days)
+          setMonthlyScans(history.length)
+          
+          // Calculate scam type breakdown if there are scams detected
+          if (userStats.scamsDetected > 0) {
+            const breakdown: Record<string, number> = {}
+            
+            history.forEach(scan => {
+              if (scan.classification === 'scam' && scan.analysis_result?.scam_type) {
+                const scamType = scan.analysis_result.scam_type
+                breakdown[scamType] = (breakdown[scamType] || 0) + 1
+              }
+            })
+            
+            setScamTypeBreakdown(breakdown)
+          } else {
+            setScamTypeBreakdown({})
+          }
+        } catch (error) {
+          console.error('Error calculating scam type breakdown:', error)
+          setMonthlyScans(0)
+          setScanHistory([])
+        }
       } catch (error) {
         console.error('❌ Dashboard: Error fetching stats:', error)
         setStats({
@@ -217,28 +821,46 @@ function Dashboard() {
         })
       }
       
-      // Fetch user plan from users table
-      try {
+      // Fetch user plan from users table with retry logic
+      const fetchPlanWithRetry = async (maxRetries = 3) => {
         const { supabase } = await import('@/integrations/supabase/client')
-        const { data, error } = await (supabase as any)
-          .from('users')
-          .select('plan')
-          .eq('id', session.user.id)
-          .maybeSingle()
         
-        if (!error && data?.plan) {
-          console.log('📊 Dashboard: User plan', data.plan)
-          setUserPlan(data.plan)
-          // Sync plan to extension
-          await syncSessionToExtension(session, session.user.id, null, data.plan)
-        } else {
-          // Default to FREE if no plan found
-          setUserPlan('FREE')
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            const { data, error } = await (supabase as any)
+              .from('users')
+              .select('plan')
+              .eq('id', session.user.id)
+              .maybeSingle()
+            
+            if (!error && data?.plan) {
+              console.log('📊 Dashboard: User plan', data.plan)
+              setUserPlan(data.plan)
+              // Sync plan to extension
+              await syncSessionToExtension(session, session.user.id, null, data.plan)
+              return // Success
+            } else {
+              // Default to FREE if no plan found
+              setUserPlan('FREE')
+              return
+            }
+          } catch (error: any) {
+            if (attempt < maxRetries - 1) {
+              // Exponential backoff before retry
+              const delay = 200 * Math.pow(2, attempt)
+              await new Promise(resolve => setTimeout(resolve, delay))
+              continue
+            } else {
+              console.warn('⚠️ Dashboard: Error fetching plan after retries:', error)
+              setUserPlan('FREE')
+            }
+          }
         }
-      } catch (error) {
-        console.error('❌ Dashboard: Error fetching plan:', error)
-        setUserPlan('FREE')
       }
+      
+      // Delay plan fetch slightly to avoid concurrent requests after login
+      await new Promise(resolve => setTimeout(resolve, 300))
+      await fetchPlanWithRetry()
       
       // Double-check effect is still active before setLoading
       if (currentEffectId !== effectIdRef.current) {
@@ -293,7 +915,7 @@ function Dashboard() {
         }
         
         // Set up listener for future changes
-        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const authResponse = supabase.auth.onAuthStateChange(async (_event, session) => {
           // Check if this effect is still active before processing
           if (currentEffectId !== effectIdRef.current) {
             return
@@ -313,7 +935,8 @@ function Dashboard() {
             updateUserData(session)
           }
         })
-        subscription = data
+        // Handle both old and new Supabase client API formats
+        subscription = (authResponse as any)?.data?.subscription || (authResponse as any)?.data || authResponse || null
         
         // If we still don't have a session, check again after a short delay
         // This handles the case where Supabase is still processing
@@ -350,56 +973,332 @@ function Dashboard() {
     return () => {
       // Increment effect ID to invalidate any pending async operations
       effectIdRef.current++
-      if (subscription) {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
         subscription.unsubscribe()
       }
     }
   }, [navigate])
 
-  // Fetch latest scan on mount - only show once after signup
-  useEffect(() => {
-    const fetchLatestScan = async () => {
-      if (!user?.id) return
-      
-      // Check if user has already seen the latest scan result
-      const hasSeenKey = `has_seen_latest_scan_${user.id}`
-      const hasSeen = localStorage.getItem(hasSeenKey)
-      
-      if (hasSeen === 'true') {
-        console.log('📋 Dashboard: User has already seen latest scan, not showing')
-        return
-      }
-      
-      try {
-        const { getScanHistory } = await import('@/utils/scanHistory')
-        const scans = await getScanHistory(user.id)
-        
-        if (scans && scans.length > 0) {
-          console.log('📋 Dashboard: Loaded latest scan for first-time display:', scans[0])
-          setLatestScan(scans[0])
-          setShowLatestScan(true)
-          
-          // Mark as seen immediately
-          localStorage.setItem(hasSeenKey, 'true')
-        } else {
-          console.log('📋 Dashboard: No scans found')
-        }
-      } catch (error) {
-        console.error('Error fetching latest scan:', error)
-      }
-    }
-
-    fetchLatestScan()
-  }, [user?.id])
 
   const handleLogout = async () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client')
-      await supabase.auth.signOut()
-      await clearExtensionSession() // Clear extension session on logout
-      navigate('/')
+      
+      // Clear user state immediately
+      setUser(null)
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Error signing out:', error)
+      }
+      
+      // Clear all Supabase-related localStorage keys
+      const supabaseKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('sb-') || 
+        key.includes('supabase') ||
+        key.includes('auth-token')
+      )
+      
+      supabaseKeys.forEach(key => {
+        try {
+          localStorage.removeItem(key)
+        } catch (e) {
+          console.warn('Failed to remove localStorage key:', key, e)
+        }
+      })
+      
+      // Clear extension session
+      await clearExtensionSession()
+      
+      // Clear any user-specific localStorage items
+      if (user?.id) {
+        const hasSeenKey = `has_seen_latest_scan_${user.id}`
+        try {
+          localStorage.removeItem(hasSeenKey)
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
+      // Small delay to ensure localStorage is cleared
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Navigate to home page with page reload to ensure clean state
+      window.location.href = '/'
     } catch (error) {
       console.error('Error logging out:', error)
+      // Still try to navigate and clear localStorage even on error
+      try {
+        const supabaseKeys = Object.keys(localStorage).filter(key => 
+          key.startsWith('sb-') || 
+          key.includes('supabase') ||
+          key.includes('auth-token')
+        )
+        supabaseKeys.forEach(key => localStorage.removeItem(key))
+        await clearExtensionSession()
+        window.location.href = '/'
+      } catch (e) {
+        navigate('/')
+      }
+    }
+  }
+
+
+  const startEditingProfile = () => {
+    setEditingUsername(user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || '')
+    setAvatarFile(null)
+    setAvatarPreview(user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null)
+    setShouldRemoveAvatar(false)
+    setAccountError('')
+    setAccountSuccess('')
+    setEditingSection('profile')
+  }
+
+
+  const cancelEditing = () => {
+    setEditingSection('none')
+    setEditingUsername('')
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    setShouldRemoveAvatar(false)
+    setAccountError('')
+    setAccountSuccess('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setAccountError('Please select an image file')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setAccountError('Image size must be less than 5MB')
+        return
+      }
+      setAvatarFile(file)
+      setShouldRemoveAvatar(false) // Clear removal flag when new file selected
+      setAccountError('')
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveAvatar = () => {
+    // Only clear local state - actual removal will happen on Save
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    setShouldRemoveAvatar(true)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const uploadAvatar = async (file: File, userId: string): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${userId}/${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) {
+        if (file.size < 500 * 1024) {
+          return new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = () => resolve(null)
+            reader.readAsDataURL(file)
+          })
+        } else {
+          throw new Error('Avatar upload failed. Please ensure the storage bucket "avatars" exists in Supabase.')
+        }
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      return urlData?.publicUrl || null
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error)
+      return null
+    }
+  }
+
+
+  const saveProfileChanges = async () => {
+    if (!user) {
+      setAccountError('User not found. Please log in again.')
+      return
+    }
+
+    setAccountLoading(true)
+    setAccountError('')
+    setAccountSuccess('')
+
+    try {
+      // Verify session is still valid
+      const { data: { session }, error: sessionCheckError } = await supabase.auth.getSession()
+      if (sessionCheckError || !session) {
+        throw new Error('Session expired. Please log in again.')
+      }
+
+      // Start with existing user metadata as base
+      const baseMetadata = user.user_metadata || {}
+      const updates: { user_metadata?: any } = {}
+
+      // Handle avatar removal or upload
+      // Priority: New file upload takes precedence over removal
+      if (avatarFile) {
+        // Upload new avatar if file selected (this overrides any removal flag)
+        try {
+          const uploadedUrl = await uploadAvatar(avatarFile, user.id)
+          if (uploadedUrl) {
+            updates.user_metadata = {
+              ...baseMetadata,
+              avatar_url: uploadedUrl,
+              picture: uploadedUrl
+            }
+            // Clear removal flag since we're uploading a new avatar
+            setShouldRemoveAvatar(false)
+          } else {
+            throw new Error('Failed to upload avatar. Please try again or use a smaller image.')
+          }
+        } catch (avatarError: any) {
+          setAccountError(avatarError.message || 'Failed to upload avatar')
+          setAccountLoading(false)
+          return
+        }
+      } else if (shouldRemoveAvatar) {
+        // Remove avatar from user metadata (only if no new file is being uploaded)
+        // Only update if avatar actually exists (don't send unnecessary nulls)
+        const hasExistingAvatar = baseMetadata.avatar_url || baseMetadata.picture
+        if (hasExistingAvatar) {
+          updates.user_metadata = {
+            ...baseMetadata,
+            avatar_url: null,
+            picture: null
+          }
+        }
+      }
+
+      // Update username if changed
+      const currentUsername = baseMetadata.full_name || baseMetadata.name || user.email?.split('@')[0] || ''
+      if (editingUsername && editingUsername.trim() !== currentUsername) {
+        // Merge with existing updates if any, otherwise use base metadata
+        updates.user_metadata = {
+          ...(updates.user_metadata || baseMetadata),
+          full_name: editingUsername.trim(),
+          name: editingUsername.trim()
+        }
+      }
+
+      // Apply updates - check if we have actual metadata changes
+      const hasMetadataChanges = updates.user_metadata && Object.keys(updates.user_metadata).length > 0
+      
+      if (hasMetadataChanges) {
+        console.log('Updating profile with:', updates.user_metadata)
+        
+        try {
+          const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+            data: updates.user_metadata
+          })
+
+          if (updateError) {
+            console.error('Supabase updateUser error:', updateError)
+            // Handle specific error types
+            if (updateError.message?.includes('fetch') || updateError.message?.includes('network')) {
+              throw new Error('Network error: Unable to connect to server. Please check your internet connection and try again.')
+            }
+            throw new Error(updateError.message || 'Failed to update profile')
+          }
+
+          if (!updateData?.user) {
+            throw new Error('No user data returned from update')
+          }
+
+          // Step 2: Also update public.users table to keep it in sync
+          const usersTableUpdates: { full_name?: string | null; avatar_url?: string | null } = {}
+          
+          // Sync full_name if it was updated
+          if (updates.user_metadata.hasOwnProperty('full_name')) {
+            usersTableUpdates.full_name = updates.user_metadata.full_name || null
+          }
+          
+          // Sync avatar_url if it was updated
+          if (updates.user_metadata.hasOwnProperty('avatar_url')) {
+            usersTableUpdates.avatar_url = updates.user_metadata.avatar_url || null
+          }
+
+          // Update public.users table if we have changes
+          if (Object.keys(usersTableUpdates).length > 0) {
+            const { error: dbUpdateError } = await (supabase as any)
+              .from('users')
+              .update(usersTableUpdates)
+              .eq('id', user.id)
+
+            if (dbUpdateError) {
+              console.error('Error updating users table:', dbUpdateError)
+              // Don't throw here - auth update succeeded, just log the DB sync error
+              // The user will see success, but the DB might be slightly out of sync
+              // This is better than failing the entire operation
+            }
+          }
+
+        } catch (fetchError: any) {
+          // Catch network/fetch errors specifically
+          console.error('Fetch error during update:', fetchError)
+          if (fetchError.name === 'TypeError' && fetchError.message?.includes('fetch')) {
+            throw new Error('Network error: Unable to connect to server. Please check your internet connection and try again.')
+          }
+          throw fetchError
+        }
+
+        setAccountSuccess('Profile updated successfully!')
+        
+        // Reset avatar removal flag
+        setShouldRemoveAvatar(false)
+        
+        // Refresh user data
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error('Error getting session after update:', sessionError)
+        }
+        if (session?.user) {
+          setUser(session.user)
+          await syncSessionToExtension(session, session.user.id)
+        }
+        
+        // Close editing mode after delay
+        setTimeout(() => {
+          cancelEditing()
+        }, 1500)
+      } else {
+        setAccountSuccess('No changes to save')
+        setTimeout(() => {
+          cancelEditing()
+        }, 1000)
+      }
+    } catch (err: any) {
+      console.error('Error updating profile:', err)
+      const errorMessage = err?.message || 'Failed to update profile. Please check your connection and try again.'
+      setAccountError(errorMessage)
+    } finally {
+      setAccountLoading(false)
     }
   }
 
@@ -581,7 +1480,19 @@ function Dashboard() {
         paddingTop: '64px'
       }}
     >
-      <Header />
+      <Header 
+        alerts={alerts} 
+        onDismissAlert={(alertId) => {
+          // Don't allow dismissing risk alerts
+          const alert = alerts.find(a => a.id === alertId)
+          if (alert?.isRiskAlert) return
+          
+          if (user?.id && alertId) {
+            dismissAlert(user.id, alertId)
+          }
+          setAlerts(alerts.filter(alert => alert.id !== alertId))
+        }}
+      />
       <main 
         className="container mx-auto px-4 py-8 max-w-7xl" 
         style={{ 
@@ -593,13 +1504,13 @@ function Dashboard() {
       >
         
         {/* Welcome Section */}
-        <div style={{ marginBottom: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ marginBottom: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff' }}>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff', lineHeight: '1.2' }}>
                 Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! 👋
               </h1>
-              <p style={{ color: '#a1a1aa' }}>
+              <p style={{ color: '#a1a1aa', fontSize: '1rem' }}>
                 Manage your scam detection activity and track your protection stats
               </p>
             </div>
@@ -615,7 +1526,55 @@ function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="mb-6">
+          {/* Time Filter Buttons */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm text-muted-foreground">Filter by:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  console.log('🔄 Setting filter to: today')
+                  setStatsTimeFilter('today')
+                }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statsTimeFilter === 'today'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => {
+                  console.log('🔄 Setting filter to: thisWeek')
+                  setStatsTimeFilter('thisWeek')
+                }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statsTimeFilter === 'thisWeek'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                This Week
+              </button>
+              <button
+                onClick={() => {
+                  console.log('🔄 Setting filter to: thisMonth')
+                  setStatsTimeFilter('thisMonth')
+                }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statsTimeFilter === 'thisMonth'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                This Month
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8" style={{ marginBottom: '32px' }}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Remaining Checks</CardTitle>
@@ -644,50 +1603,113 @@ function Dashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Scans</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {statsTimeFilter === 'today' ? 'Scans Today' : 
+                 statsTimeFilter === 'thisWeek' ? 'Scans This Week' : 
+                 'Scans This Month'}
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalScans}</div>
+              <div className="text-2xl font-bold">{filteredStats.totalScans}</div>
               <p className="text-xs text-muted-foreground">
-                All-time scans performed
+                {statsTimeFilter === 'today' ? 'Today' : 
+                 statsTimeFilter === 'thisWeek' ? 'This week' : 
+                 'This month'}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Scams Detected</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.scamsDetected}</div>
-              <p className="text-xs text-muted-foreground">
-                Threats identified
-              </p>
-            </CardContent>
-          </Card>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card 
+                  className="cursor-pointer hover:shadow-lg hover:border-red-500/50 hover:bg-red-500/5 transition-all"
+                  onClick={() => {
+                    setScanHistoryFilter('scam')
+                    setShowHistory(true) // Show scan history section
+                    // Scroll to scan history section
+                    setTimeout(() => {
+                      document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }, 100)
+                  }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Scams Detected</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{filteredStats.scamsDetected}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Threats identified
+                    </p>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              {Object.keys(filteredScamTypeBreakdown).length > 0 && (
+                <TooltipContent side="top" className="max-w-xs bg-black border border-gray-800">
+                  <div className="space-y-1.5">
+                    <p className="font-semibold text-sm mb-2">Scam Types Detected:</p>
+                    {Object.entries(filteredScamTypeBreakdown)
+                      .sort(([, a], [, b]) => b - a)
+                      .slice(0, 5) // Show only top 5 most detected scam types
+                      .map(([scamType, count]) => (
+                        <div key={scamType} className="flex justify-between items-center text-xs">
+                          <span className="capitalize">{scamType.replace(/_/g, ' ')}</span>
+                          <span className="font-semibold ml-4">{count}</span>
+                        </div>
+                      ))}
+                    {Object.keys(filteredScamTypeBreakdown).length > 5 && (
+                      <div className="text-xs text-muted-foreground pt-1 border-t border-gray-700">
+                        +{Object.keys(filteredScamTypeBreakdown).length - 5} more type{Object.keys(filteredScamTypeBreakdown).length - 5 !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg hover:border-yellow-500/50 hover:bg-yellow-500/5 transition-all"
+            onClick={() => {
+              setScanHistoryFilter('suspicious')
+              setShowHistory(true) // Show scan history section
+              // Scroll to scan history section
+              setTimeout(() => {
+                document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 100)
+            }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Suspicious Results</CardTitle>
               <AlertCircle className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.suspiciousResults}</div>
+              <div className="text-2xl font-bold">{filteredStats.suspiciousResults}</div>
               <p className="text-xs text-muted-foreground">
                 Potentially risky content
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg hover:border-green-500/50 hover:bg-green-500/5 transition-all"
+            onClick={() => {
+              setScanHistoryFilter('safe')
+              setShowHistory(true) // Show scan history section
+              // Scroll to scan history section
+              setTimeout(() => {
+                document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 100)
+            }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Safe Results</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.safeResults}</div>
+              <div className="text-2xl font-bold">{filteredStats.safeResults}</div>
               <p className="text-xs text-muted-foreground">
                 Verified safe content
               </p>
@@ -695,12 +1717,12 @@ function Dashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Quick Actions & Account Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8" style={{ marginBottom: '32px' }}>
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Start a new scan or view your history</CardDescription>
+              <CardDescription>Start scanning or manage your activity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Button
@@ -727,140 +1749,305 @@ function Dashboard() {
               </Button>
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full h-12"
                 size="lg"
                 onClick={() => setShowHistory(!showHistory)}
               >
                 <History className="w-4 h-4 mr-2" />
                 {showHistory ? 'Hide' : 'View'} Scan History
               </Button>
+              
+              {/* Browser Extension Download */}
+              <div className="pt-3 mt-3 border-t border-border">
+                <a
+                  href="https://chrome.google.com/webstore"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-4 px-6 py-2.5 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105 w-full justify-center"
+                >
+                  <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
+                    Download our extension and browse securely
+                  </span>
+                  
+                  {/* Browser Logos */}
+                  <div className="flex items-center gap-1.5">
+                    <img src={chromeLogo} alt="Chrome" className="w-6 h-6" />
+                    <img src={edgeLogo} alt="Edge" className="w-6 h-6" />
+                    <img src={braveLogo} alt="Brave" className="w-6 h-6" />
+                    <img src={operaLogo} alt="Opera" className="w-6 h-6" />
+                  </div>
+                </a>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Account Info</CardTitle>
-              <CardDescription>Your account details</CardDescription>
+            <CardHeader className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Account Information</CardTitle>
+                  <CardDescription>Manage your account settings and subscription</CardDescription>
+                </div>
+                {editingSection === 'none' && (
+                  <button
+                    type="button"
+                    onClick={startEditingProfile}
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title="Edit Account"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* User Info and Plan - Side by Side */}
-              <div className="flex items-stretch gap-4">
-                {/* Left: User Info (50%) */}
-                <div className="flex-1 flex flex-col justify-between">
-                  <div className="flex items-center gap-3 mb-4">
-                    {(user?.user_metadata?.avatar_url || user?.user_metadata?.picture) ? (
+              {/* User Profile Section */}
+              <div className={`flex items-start gap-4 ${editingSection === 'none' ? 'pb-6 border-b border-border' : 'pb-4'}`}>
+                <div className="flex-shrink-0 flex flex-col items-center">
+                  <div className="relative">
+                    {editingSection === 'profile' && avatarPreview ? (
+                      <img
+                        src={avatarPreview}
+                        alt="Avatar preview"
+                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-500/20"
+                      />
+                    ) : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection === 'profile' && !shouldRemoveAvatar ? (
                       <img
                         src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
                         alt="Avatar"
-                        className="w-10 h-10 rounded-full object-cover"
+                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-500/20"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' ? (
+                      <img
+                        src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                        alt="Avatar"
+                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-500/20"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           e.currentTarget.nextElementSibling?.classList.remove('hidden');
                         }}
                       />
                     ) : null}
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ${(user?.user_metadata?.avatar_url || user?.user_metadata?.picture) ? 'hidden' : ''}`}>
-                      <User className="w-5 h-5 text-white" />
+                    {/* Avatar fallback - shown when no avatar image */}
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-2 ring-purple-500/20 ${((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' && !shouldRemoveAvatar) || (editingSection === 'profile' && avatarPreview) ? 'hidden' : ''}`}>
+                      <User className="w-6 h-6 text-white" />
                     </div>
-                    <div>
-                      <p className="font-semibold">
-                        {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'User'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    {/* X button - shown only when editing and avatar exists */}
+                    {editingSection === 'profile' && ((avatarPreview) || ((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && !shouldRemoveAvatar)) && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg z-10 cursor-pointer"
+                        title="Remove avatar"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  {editingSection === 'profile' && (
+                    <div className="mt-1 w-full">
+                      <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarSelect}
+                        className="hidden"
+                        id="avatar-upload"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full text-[10px] h-6 px-2"
+                      >
+                        <Upload className="w-2.5 h-2.5 mr-0.5" />
+                        {avatarPreview ? 'Change' : 'Upload'}
+                      </Button>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Member since</p>
-                    <p className="font-medium text-sm">
-                      {user?.created_at
-                        ? new Date(user.created_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })
-                        : 'Recently'}
-                    </p>
-                  </div>
+                  )}
                 </div>
-
-                {/* Divider */}
-                <div className="w-px bg-border"></div>
-
-                {/* Right: Current Plan & Upgrade - Centered (50%) */}
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4">
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground mb-2">Current Plan</p>
-                    <div className={`inline-flex items-center px-4 py-1.5 rounded-lg backdrop-blur-sm border ${
-                      userPlan.toUpperCase() === 'PRO' 
-                        ? 'bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border-yellow-500/40'
-                        : userPlan.toUpperCase() === 'PREMIUM'
-                        ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/40'
-                        : userPlan.toUpperCase() === 'ENTERPRISE'
-                        ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/40'
-                        : 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/30'
-                    }`}>
-                      <span className={`text-sm font-bold ${
-                        userPlan.toUpperCase() === 'PRO'
-                          ? 'text-yellow-200'
-                          : userPlan.toUpperCase() === 'PREMIUM'
-                          ? 'text-purple-300'
-                          : userPlan.toUpperCase() === 'ENTERPRISE'
-                          ? 'text-blue-300'
-                          : 'text-purple-300'
-                      }`}>{userPlan.toUpperCase()} PLAN</span>
+                <div className="flex-1">
+                  {editingSection === 'profile' ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="username" className="text-xs mb-1.5 block">Username</Label>
+                        <div className="relative max-w-[280px]">
+                          <Input
+                            id="username"
+                            type="text"
+                            value={editingUsername}
+                            onChange={(e) => setEditingUsername(e.target.value)}
+                            placeholder="Enter your username"
+                            className="h-8 pr-9 text-sm px-3 py-1.5 w-full"
+                            style={{
+                              backgroundColor: 'hsl(var(--input))',
+                              color: 'hsl(var(--foreground))',
+                              borderColor: 'hsl(var(--input))'
+                            }}
+                          />
+                          {editingUsername && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingUsername('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                              title="Clear"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{user?.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Member since {user?.created_at
+                          ? new Date(user.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })
+                          : 'Recently'}</span>
+                      </div>
                     </div>
-                  </div>
-                  <a
-                    href="/pricing"
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold transition-all hover:scale-105 shadow-md"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Upgrade Plan
-                  </a>
+                  ) : (
+                    <>
+                      <h3 className="font-semibold text-lg mb-1">
+                        {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
+                      </h3>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{user?.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Member since {user?.created_at
+                          ? new Date(user.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })
+                          : 'Recently'}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
+
+
+              {/* Error/Success Messages */}
+              {(accountError || accountSuccess) && (
+                <div className={`p-3 rounded-md border text-sm ${
+                  accountError 
+                    ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                    : 'bg-green-500/10 border-green-500/20 text-green-400'
+                }`}>
+                  {accountError || accountSuccess}
+                </div>
+              )}
+
+              {/* Save/Cancel Buttons when editing profile */}
+              {editingSection === 'profile' && (
+                <div className="flex gap-2 pt-3">
+                  <Button
+                    type="button"
+                    onClick={saveProfileChanges}
+                    disabled={accountLoading}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    {accountLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {!accountLoading && <Save className="w-4 h-4 mr-2" />}
+                    Save Changes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={cancelEditing}
+                    disabled={accountLoading}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                </div>
+              )}
+
+
+              {/* Subscription Plan Section - Hidden when editing */}
+              {editingSection === 'none' && (
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-muted-foreground" />
+                      Subscription Plan
+                    </h4>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-3">
+                        <div className={`px-3 py-1.5 rounded-md border ${
+                          userPlan.toUpperCase() === 'PRO' 
+                            ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/40'
+                            : userPlan.toUpperCase() === 'PREMIUM'
+                            ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/40'
+                            : userPlan.toUpperCase() === 'ENTERPRISE'
+                            ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-500/40'
+                            : 'bg-gradient-to-r from-purple-500/15 to-pink-500/15 border-purple-500/30'
+                        }`}>
+                          <span className={`text-sm font-bold ${
+                            userPlan.toUpperCase() === 'PRO'
+                              ? 'text-yellow-200'
+                              : userPlan.toUpperCase() === 'PREMIUM'
+                              ? 'text-purple-300'
+                              : userPlan.toUpperCase() === 'ENTERPRISE'
+                              ? 'text-blue-300'
+                              : 'text-purple-300'
+                          }`}>
+                            {userPlan.toUpperCase()} PLAN
+                          </span>
+                        </div>
+                        {userPlan.toUpperCase() === 'FREE' && (
+                          <span className="text-xs text-muted-foreground">Free tier with limited features</span>
+                        )}
+                      </div>
+                      <a
+                        href="/pricing"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold transition-all hover:scale-105 shadow-md"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        {userPlan.toUpperCase() === 'FREE' ? 'Upgrade' : 'Change Plan'}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Latest Scan Result - Auto Display */}
-        {latestScan && showLatestScan && (
-          <Card className="mb-8">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle>Latest Scan Result</CardTitle>
-                <CardDescription>Your most recent scan</CardDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowLatestScan(false)}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <ResultCard
-                result={latestScan.analysis_result}
-                onNewAnalysis={() => {
-                  window.location.href = '/#detector'
-                }}
-                onReportScam={() => {}}
-              />
-            </CardContent>
-          </Card>
-        )}
-
         {/* Scan History Section */}
-        <Card className={`mb-8 ${!showHistory ? 'hidden' : ''}`}>
-          <CardHeader>
-            <CardTitle>Scan History</CardTitle>
-            <CardDescription>View your latest 3 scans</CardDescription>
+        <Card id="scan-history-section" className={`mb-8 ${!showHistory ? 'hidden' : ''}`}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="mb-2">Scan History</CardTitle>
+              <CardDescription>View your scan history (last 30 days)</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRefreshKey(prev => prev + 1)}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {selectedScan ? (
               <div>
                 <Button
@@ -878,24 +2065,31 @@ function Dashboard() {
               </div>
             ) : (
               <ScanHistory
+                key={refreshKey}
                 userId={user?.id}
                 onScanClick={(scan) => setSelectedScan(scan)}
                 onRefresh={refreshStats}
+                initialFilter={scanHistoryFilter}
+                onFilterChange={setScanHistoryFilter}
+                scans={scanHistory}
               />
             )}
           </CardContent>
         </Card>
 
+
         {/* Features Section */}
-        <Card>
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle>Dashboard Features</CardTitle>
             <CardDescription>What you can do with your account</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                </div>
                 <div>
                   <h4 className="font-semibold mb-1">Unlimited Analysis</h4>
                   <p className="text-sm text-muted-foreground">
@@ -903,8 +2097,10 @@ function Dashboard() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <Shield className="w-5 h-5 text-purple-500 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <Shield className="w-5 h-5 text-purple-500" />
+                </div>
                 <div>
                   <h4 className="font-semibold mb-1">Full Detailed Reports</h4>
                   <p className="text-sm text-muted-foreground">
@@ -912,8 +2108,10 @@ function Dashboard() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <Clock className="w-5 h-5 text-blue-500 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <Clock className="w-5 h-5 text-blue-500" />
+                </div>
                 <div>
                   <h4 className="font-semibold mb-1">Priority Processing</h4>
                   <p className="text-sm text-muted-foreground">
@@ -921,12 +2119,14 @@ function Dashboard() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <TrendingUp className="w-5 h-5 text-orange-500 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <TrendingUp className="w-5 h-5 text-orange-500" />
+                </div>
                 <div>
                   <h4 className="font-semibold mb-1">Analysis History</h4>
                   <p className="text-sm text-muted-foreground">
-                    Track all your scans and results (coming soon)
+                    Track all your scans and results
                   </p>
                 </div>
               </div>

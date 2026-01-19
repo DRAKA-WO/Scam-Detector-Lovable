@@ -119,14 +119,31 @@ export async function clearExtensionSession() {
   }
 }
 
+// Global state to track if sync is initialized and store cleanup function
+let syncCleanup = null;
+let isInitialized = false;
+
 /**
  * Initialize real-time check sync listener with throttling
  * Call this once when app starts to enable automatic extension sync
  */
 export function initializeExtensionSync() {
+  // Prevent multiple initializations
+  if (isInitialized) {
+    return;
+  }
+  
+  // Clean up any existing sync before creating new one
+  if (syncCleanup) {
+    syncCleanup();
+    syncCleanup = null;
+  }
+  
+  isInitialized = true;
   let syncTimeout = null;
+  let periodicSyncInterval = null;
   let lastSyncTime = 0;
-  const SYNC_THROTTLE_MS = 3000; // Sync at most once every 3 seconds
+  const SYNC_THROTTLE_MS = 10000; // Sync at most once every 10 seconds
   
   // Listen for checksUpdated events and sync to extension (throttled)
   const handleChecksUpdate = async () => {
@@ -142,7 +159,7 @@ export function initializeExtensionSync() {
       
       // Schedule sync for later
       syncTimeout = setTimeout(async () => {
-        await performSync();
+        await performSyncToExtension();
         lastSyncTime = Date.now();
       }, SYNC_THROTTLE_MS - timeSinceLastSync);
       
@@ -150,39 +167,84 @@ export function initializeExtensionSync() {
     }
     
     // Enough time has passed, sync immediately
-    await performSync();
+    await performSyncToExtension();
     lastSyncTime = now;
   };
   
-  // Actual sync function
-  const performSync = async () => {
+  // Sync FROM Supabase TO extension (when web needs to send data to extension)
+  const performSyncToExtension = async () => {
     try {
       // Get current session
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (session?.user) {
-        // Sync silently - no need to log every time
-        await syncSessionToExtension(session, session.user.id);
+      if (!session?.user) {
+        return; // No session, skip
       }
+      
+      // Sync silently - no need to log every time
+      // This will fetch from Supabase and sync to extension
+      await syncSessionToExtension(session, session.user.id);
     } catch (error) {
       // Only log errors
       console.warn('⚠️ Failed to sync checks to extension:', error);
     }
   };
   
-  // Add event listener
+  // Sync FROM Supabase TO web (to pick up changes made by extension or admin)
+  const performSyncFromSupabase = async () => {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        return; // No session, skip
+      }
+      
+      const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
+      await syncUserChecksFromSupabase(session.user.id);
+    } catch (error) {
+      // Only log errors silently
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Failed to sync checks from Supabase:', error);
+      }
+    }
+  };
+  
+  // Add event listener for when web updates checks
   window.addEventListener('checksUpdated', handleChecksUpdate);
+  
+  // Periodic sync FROM Supabase every 3 seconds to pick up changes made by extension or admin
+  periodicSyncInterval = setInterval(async () => {
+    await performSyncFromSupabase();
+  }, SYNC_THROTTLE_MS);
+  
+  // Perform initial syncs
+  performSyncFromSupabase().then(() => {
+    performSyncToExtension();
+    lastSyncTime = Date.now();
+  });
+  
   // Only log initialization once
   if (import.meta.env.DEV) {
-    console.log('🔄 Extension sync listener initialized (throttled to 3s)');
+    console.log('🔄 Extension sync listener initialized (throttled to 10s)');
   }
   
-  // Return cleanup function
-  return () => {
+  // Store cleanup function globally
+  const cleanup = () => {
+    isInitialized = false;
     if (syncTimeout) {
       clearTimeout(syncTimeout);
+      syncTimeout = null;
+    }
+    if (periodicSyncInterval) {
+      clearInterval(periodicSyncInterval);
+      periodicSyncInterval = null;
     }
     window.removeEventListener('checksUpdated', handleChecksUpdate);
   };
+  
+  syncCleanup = cleanup;
+  
+  return cleanup;
 }

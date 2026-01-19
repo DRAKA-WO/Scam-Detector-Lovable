@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { syncSessionToExtension } from '@/utils/extensionSync'
 import Header from '../components/landing/Header'
@@ -11,6 +12,8 @@ import Footer from '../components/landing/Footer'
 import ScrollToAnalyze from '../components/landing/ScrollToAnalyze'
 
 const Index = () => {
+  const location = useLocation()
+
   // Auto-sync existing session to extension on page load
   useEffect(() => {
     const syncExistingSession = async () => {
@@ -34,18 +37,45 @@ const Index = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Handle hash navigation - scroll to section if hash is present
   useEffect(() => {
-    // Handle hash navigation - scroll to detector section if hash is present
-    if (window.location.hash === '#detector') {
-      // Small delay to ensure page is fully rendered
-      setTimeout(() => {
-        const detectorSection = document.getElementById('detector')
-        if (detectorSection) {
-          detectorSection.scrollIntoView({ behavior: 'smooth' })
-        }
-      }, 100)
+    const scrollToHash = () => {
+      const hash = window.location.hash || location.hash
+      if (hash) {
+        // Remove the # symbol to get the element ID
+        const elementId = hash.substring(1)
+        // Small delay to ensure page is fully rendered, especially when navigating from another route
+        setTimeout(() => {
+          const element = document.getElementById(elementId)
+          if (element) {
+            // Scroll to element with offset for fixed header
+            const headerHeight = 64 // Header height in pixels
+            const elementPosition = element.getBoundingClientRect().top + window.pageYOffset
+            const offsetPosition = elementPosition - headerHeight
+            
+            window.scrollTo({
+              top: offsetPosition,
+              behavior: 'smooth'
+            })
+          }
+        }, 300) // Increased delay to ensure DOM is fully rendered when navigating from other routes
+      }
     }
-  }, [])
+
+    // Scroll on mount and when location changes
+    scrollToHash()
+
+    // Also listen for hash changes
+    const handleHashChange = () => {
+      scrollToHash()
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange)
+    }
+  }, [location]) // Re-run when location changes (including hash changes)
 
   return (
     <div className="min-h-screen bg-background">

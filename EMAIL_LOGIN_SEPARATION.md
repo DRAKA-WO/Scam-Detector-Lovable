@@ -1,0 +1,150 @@
+# Email Login Separation from Google OAuth
+
+## Overview
+
+Email/password login has been separated from Google OAuth login to allow independent debugging and testing. All email login logic is now isolated in dedicated files.
+
+## New Files Created
+
+### 1. `src/components/EmailLoginModal.jsx`
+- **Purpose**: Dedicated component for email/password authentication
+- **Features**:
+  - Handles email/password form submission
+  - Uses Supabase `signInWithPassword` method
+  - Integrated with separate email login sync utility
+  - Comprehensive logging with `[EMAIL LOGIN]` prefix for easy debugging
+  - Independent from Google OAuth code
+
+### 2. `src/utils/emailLoginSync.js`
+- **Purpose**: Dedicated sync utility for email login extension synchronization
+- **Features**:
+  - `syncEmailLoginToExtension()` - Syncs email login session to browser extension
+  - `clearEmailLoginExtensionSession()` - Clears email login session from extension
+  - Comprehensive logging with `[EMAIL LOGIN SYNC]` prefix
+  - Separate error handling from OAuth sync
+  - Validates session and user data before syncing
+  - Fetches checks and plan from Supabase if not provided
+
+## Modified Files
+
+### 1. `src/components/LoginModal.jsx`
+- **Changes**:
+  - Removed email/password form code
+  - Now only handles Google OAuth login
+  - Delegates email login to `EmailLoginModal` component
+  - Shows "Sign in with Email" button that opens `EmailLoginModal`
+  - Added `[GOOGLE OAUTH]` logging prefix for debugging
+
+### 2. `src/pages/ExtensionAuth.tsx`
+- **Changes**:
+  - Added import for `EmailLoginModal` component
+  - Added import for `syncEmailLoginToExtension` utility
+  - Added state for `showEmailLoginModal` (available for direct use)
+  - Email login is handled through `LoginModal` → `EmailLoginModal` flow
+
+## Debugging Features
+
+### Email Login Logging
+All email login operations are prefixed with `[EMAIL LOGIN]`:
+- `🔐 [EMAIL LOGIN]` - Login attempts
+- `📊 [EMAIL LOGIN]` - Login responses
+- `✅ [EMAIL LOGIN]` - Successful operations
+- `❌ [EMAIL LOGIN]` - Errors
+- `⚠️ [EMAIL LOGIN]` - Warnings
+
+### Email Login Sync Logging
+All sync operations are prefixed with `[EMAIL LOGIN SYNC]`:
+- `📤 [EMAIL LOGIN SYNC]` - Sync start
+- `✅ [EMAIL LOGIN SYNC]` - Successful sync steps
+- `📊 [EMAIL LOGIN SYNC]` - Data fetching
+- `❌ [EMAIL LOGIN SYNC]` - Sync errors
+- `⚠️ [EMAIL LOGIN SYNC]` - Warnings
+
+### Google OAuth Logging
+All Google OAuth operations are prefixed with `[GOOGLE OAUTH]`:
+- `🔵 [GOOGLE OAUTH]` - OAuth flow steps
+- `✅ [GOOGLE OAUTH]` - Successful operations
+- `❌ [GOOGLE OAUTH]` - Errors
+
+## How Email Login Works Now
+
+1. **User clicks "Sign in with Email"** → Opens `EmailLoginModal`
+2. **User enters credentials** → `handleEmailLogin()` is called
+3. **Supabase authentication** → `supabase.auth.signInWithPassword()`
+4. **Session validation** → Checks for valid session and user
+5. **Extension sync** → `syncEmailLoginToExtension()` is called
+6. **Sync process**:
+   - Validates session and userId
+   - Fetches checks from Supabase (or localStorage fallback)
+   - Fetches plan from Supabase (defaults to 'FREE')
+   - Dispatches `scamChecker:syncSession` event to extension
+7. **Redirect** → User is redirected to dashboard (if `preventRedirect` is false)
+
+## How Google OAuth Works Now
+
+1. **User clicks "Sign in with Google"** → `handleGoogleLogin()` is called
+2. **OAuth redirect** → `supabase.auth.signInWithOAuth()` redirects to Google
+3. **Callback handling** → OAuth callback is handled by existing OAuth flow
+4. **Extension sync** → Uses `syncSessionToExtension()` from `extensionSync.js` (shared utility)
+
+## Testing Email Login Independently
+
+### Step 1: Open Browser Console
+Open developer tools console to see all `[EMAIL LOGIN]` and `[EMAIL LOGIN SYNC]` logs.
+
+### Step 2: Test Email Login Flow
+1. Navigate to login page
+2. Click "Sign in with Email"
+3. Enter email and password
+4. Watch console for email login logs
+5. Check for any errors with `[EMAIL LOGIN]` or `[EMAIL LOGIN SYNC]` prefix
+
+### Step 3: Debug Extension Sync
+1. After successful login, check console for sync logs
+2. Look for `[EMAIL LOGIN SYNC]` messages
+3. Check if `scamChecker:syncSession` event is dispatched
+4. Verify extension receives the session
+
+### Step 4: Compare with Google OAuth
+- Google OAuth uses `[GOOGLE OAUTH]` logs
+- Email login uses `[EMAIL LOGIN]` logs
+- Both are completely separate code paths
+
+## Benefits of Separation
+
+1. **Independent Debugging**: Email login issues can be debugged without OAuth code interference
+2. **Clear Logging**: All logs are prefixed for easy filtering
+3. **Isolated Testing**: Test email login without affecting OAuth
+4. **Easier Maintenance**: Changes to email login won't affect OAuth and vice versa
+5. **Better Error Tracking**: Errors are clearly identified by login method
+
+## File Structure
+
+```
+src/
+├── components/
+│   ├── EmailLoginModal.jsx      ← NEW: Email login component
+│   ├── LoginModal.jsx            ← MODIFIED: Only Google OAuth now
+│   └── ...
+├── utils/
+│   ├── emailLoginSync.js         ← NEW: Email login sync utility
+│   ├── extensionSync.js          ← EXISTING: Shared OAuth sync (still used)
+│   └── ...
+└── pages/
+    └── ExtensionAuth.tsx         ← MODIFIED: Uses EmailLoginModal
+```
+
+## Next Steps for Debugging
+
+1. **Check Console Logs**: Filter by `[EMAIL LOGIN]` prefix to see email login flow
+2. **Check Network Tab**: Look for Supabase API calls during email login
+3. **Check Extension Storage**: Verify session is stored in `chrome.storage.local`
+4. **Compare Logs**: Compare `[EMAIL LOGIN SYNC]` with `[GOOGLE OAUTH]` logs to identify differences
+
+## Common Issues to Check
+
+1. **Session Validation**: Check if `access_token` is present in session
+2. **User ID**: Verify `userId` is not null or undefined
+3. **Supabase Queries**: Check if `users` table queries succeed
+4. **Extension Events**: Verify `scamChecker:syncSession` event is dispatched
+5. **Extension Listener**: Ensure extension content script is listening for events

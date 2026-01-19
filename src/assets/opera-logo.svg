@@ -6,5 +6,5 @@
     </linearGradient>
   </defs>
   <circle cx="128" cy="128" r="128" fill="url(#opera-a)"/>
-  <ellipse cx="128" cy="128" rx="44" ry="80" fill="#FFFFFF"/>
+  <ellipse cx="128" cy="128" rx="44" ry="80" fill="none" stroke="#FFFFFF" stroke-width="16"/>
 </svg>
