@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react'
 import chromeLogo from "@/assets/chrome-logo.svg"
 import edgeLogo from "@/assets/edge-logo.svg"
 import braveLogo from "@/assets/brave-logo.svg"
@@ -106,6 +106,7 @@ function Dashboard() {
   }>>([])
   const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
   const [currentRiskLevel, setCurrentRiskLevel] = useState<string | null>(null)
+  const [isTipExpanded, setIsTipExpanded] = useState(true) // Tip expanded by default
 
   // Helper functions for dismissed alerts persistence
   const getDismissedAlerts = (userId: string): Record<string, boolean> => {
@@ -1744,73 +1745,97 @@ function Dashboard() {
                   }`}></div>
                   
                   <div className="relative space-y-3">
-                    {/* Risk Level Header */}
-                    <div className="flex items-center gap-2.5">
-                      <div className={`p-1.5 rounded-lg ${
-                        currentRiskLevel === 'high' 
-                          ? 'bg-red-500/20' 
-                          : currentRiskLevel === 'medium'
-                          ? 'bg-yellow-500/20'
-                          : 'bg-green-500/20'
-                      }`}>
-                        {currentRiskLevel === 'high' ? (
-                          <AlertTriangle className={`w-4 h-4 ${
-                            currentRiskLevel === 'high' ? 'text-red-400' : ''
-                          }`} />
-                        ) : currentRiskLevel === 'medium' ? (
-                          <AlertCircle className={`w-4 h-4 ${
-                            currentRiskLevel === 'medium' ? 'text-yellow-400' : ''
-                          }`} />
-                        ) : (
-                          <Shield className={`w-4 h-4 ${
-                            currentRiskLevel === 'low' ? 'text-green-400' : ''
-                          }`} />
-                        )}
+                    {/* Risk Level Header - Clickable to toggle tip */}
+                    <button
+                      onClick={() => setIsTipExpanded(!isTipExpanded)}
+                      className="flex items-center justify-between w-full gap-2.5 hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex items-center gap-2.5 flex-1">
+                        <div className={`p-1.5 rounded-lg ${
+                          currentRiskLevel === 'high' 
+                            ? 'bg-red-500/20' 
+                            : currentRiskLevel === 'medium'
+                            ? 'bg-yellow-500/20'
+                            : 'bg-green-500/20'
+                        }`}>
+                          {currentRiskLevel === 'high' ? (
+                            <AlertTriangle className={`w-4 h-4 ${
+                              currentRiskLevel === 'high' ? 'text-red-400' : ''
+                            }`} />
+                          ) : currentRiskLevel === 'medium' ? (
+                            <AlertCircle className={`w-4 h-4 ${
+                              currentRiskLevel === 'medium' ? 'text-yellow-400' : ''
+                            }`} />
+                          ) : (
+                            <Shield className={`w-4 h-4 ${
+                              currentRiskLevel === 'low' ? 'text-green-400' : ''
+                            }`} />
+                          )}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <h4 className={`text-sm font-semibold capitalize ${
+                            currentRiskLevel === 'high' 
+                              ? 'text-red-400' 
+                              : currentRiskLevel === 'medium'
+                              ? 'text-yellow-400'
+                              : 'text-green-400'
+                          }`}>
+                            {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern Detected
+                          </h4>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className={`text-sm font-semibold capitalize ${
+                      {isTipExpanded ? (
+                        <ChevronUp className={`w-4 h-4 ${
                           currentRiskLevel === 'high' 
                             ? 'text-red-400' 
                             : currentRiskLevel === 'medium'
                             ? 'text-yellow-400'
                             : 'text-green-400'
-                        }`}>
-                          {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern Detected
-                        </h4>
-                      </div>
-                    </div>
+                        }`} />
+                      ) : (
+                        <ChevronDown className={`w-4 h-4 ${
+                          currentRiskLevel === 'high' 
+                            ? 'text-red-400' 
+                            : currentRiskLevel === 'medium'
+                            ? 'text-yellow-400'
+                            : 'text-green-400'
+                        }`} />
+                      )}
+                    </button>
                     
-                    {/* Risk Level Tip */}
-                    <div className={`flex items-start gap-2.5 pt-2 border-t ${
-                      currentRiskLevel === 'high' 
-                        ? 'border-red-500/20' 
-                        : currentRiskLevel === 'medium'
-                        ? 'border-yellow-500/20'
-                        : 'border-green-500/20'
-                    }`}>
-                      <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                    {/* Risk Level Tip - Collapsible */}
+                    {isTipExpanded && (
+                      <div className={`flex items-start gap-2.5 pt-2 border-t animate-in slide-in-from-top-2 duration-200 ${
                         currentRiskLevel === 'high' 
-                          ? 'bg-red-500/20 text-red-300' 
+                          ? 'border-red-500/20' 
                           : currentRiskLevel === 'medium'
-                          ? 'bg-yellow-500/20 text-yellow-300'
-                          : 'bg-green-500/20 text-green-300'
+                          ? 'border-yellow-500/20'
+                          : 'border-green-500/20'
                       }`}>
-                        💡
+                        <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                          currentRiskLevel === 'high' 
+                            ? 'bg-red-500/20 text-red-300' 
+                            : currentRiskLevel === 'medium'
+                            ? 'bg-yellow-500/20 text-yellow-300'
+                            : 'bg-green-500/20 text-green-300'
+                        }`}>
+                          💡
+                        </div>
+                        <p className={`text-xs leading-relaxed ${
+                          currentRiskLevel === 'high' 
+                            ? 'text-red-300/90' 
+                            : currentRiskLevel === 'medium'
+                            ? 'text-yellow-300/90'
+                            : 'text-green-300/90'
+                        }`}>
+                          {currentRiskLevel === 'high' 
+                            ? 'You\'re encountering many scams. Be extra cautious with links, emails, and requests for personal information. Verify sources before clicking or sharing data.'
+                            : currentRiskLevel === 'medium'
+                            ? 'You\'ve detected some suspicious content. Stay vigilant and always verify the source before taking action. When in doubt, don\'t click or share information.'
+                            : 'Great job staying safe! Continue scanning content before clicking links or sharing information to maintain your protection.'}
+                        </p>
                       </div>
-                      <p className={`text-xs leading-relaxed ${
-                        currentRiskLevel === 'high' 
-                          ? 'text-red-300/90' 
-                          : currentRiskLevel === 'medium'
-                          ? 'text-yellow-300/90'
-                          : 'text-green-300/90'
-                      }`}>
-                        {currentRiskLevel === 'high' 
-                          ? 'You\'re encountering many scams. Be extra cautious with links, emails, and requests for personal information. Verify sources before clicking or sharing data.'
-                          : currentRiskLevel === 'medium'
-                          ? 'You\'ve detected some suspicious content. Stay vigilant and always verify the source before taking action. When in doubt, don\'t click or share information.'
-                          : 'Great job staying safe! Continue scanning content before clicking links or sharing information to maintain your protection.'}
-                      </p>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
