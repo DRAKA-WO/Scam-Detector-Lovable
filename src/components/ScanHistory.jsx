@@ -378,16 +378,16 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
         {/* Classification and Scam Type Filters */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           {/* Classification Filter Buttons */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap p-1 bg-card/50 rounded-lg border border-border">
         <button
           onClick={() => {
             setFilterClassification('all')
             if (onFilterChange) onFilterChange('all')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
             filterClassification === 'all'
-              ? 'bg-purple-500 text-white'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
           }`}
         >
           All
@@ -397,10 +397,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             setFilterClassification('safe')
             if (onFilterChange) onFilterChange('safe')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
             filterClassification === 'safe'
-              ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-lg shadow-green-500/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
           }`}
         >
           <CheckCircle className="h-4 w-4" />
@@ -411,10 +411,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             setFilterClassification('suspicious')
             if (onFilterChange) onFilterChange('suspicious')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
             filterClassification === 'suspicious'
-              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-lg shadow-yellow-500/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
           }`}
         >
           <AlertCircle className="h-4 w-4" />
@@ -425,10 +425,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             setFilterClassification('scam')
             if (onFilterChange) onFilterChange('scam')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
             filterClassification === 'scam'
-              ? 'bg-red-500/20 text-red-400 border border-red-500/50'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              ? 'bg-red-500/20 text-red-400 border border-red-500/50 shadow-lg shadow-red-500/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
           }`}
         >
           <AlertTriangle className="h-4 w-4" />
