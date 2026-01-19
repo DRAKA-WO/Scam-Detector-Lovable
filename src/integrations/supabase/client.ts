@@ -5,66 +5,26 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || '';
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || '';
 
-// Always log Supabase config (for debugging in production)
-console.log('🔧 Supabase Config Check:', {
-  url: SUPABASE_URL || '❌ MISSING',
-  urlLength: SUPABASE_URL?.length || 0,
-  urlPreview: SUPABASE_URL ? `${SUPABASE_URL.substring(0, 40)}...` : 'N/A',
-  keyExists: SUPABASE_PUBLISHABLE_KEY ? '✅ SET' : '❌ MISSING',
-  keyLength: SUPABASE_PUBLISHABLE_KEY?.length || 0,
-  keyPreview: SUPABASE_PUBLISHABLE_KEY ? `${SUPABASE_PUBLISHABLE_KEY.substring(0, 25)}...` : 'N/A',
-  isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : '❓ UNKNOWN',
-  allViteEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
-  rawEnvCheck: {
-    hasVITE_SUPABASE_URL: 'VITE_SUPABASE_URL' in import.meta.env,
-    hasVITE_SUPABASE_PUBLISHABLE_KEY: 'VITE_SUPABASE_PUBLISHABLE_KEY' in import.meta.env,
-    VITE_SUPABASE_URL_value: import.meta.env.VITE_SUPABASE_URL ? 'EXISTS' : 'UNDEFINED',
-    VITE_SUPABASE_PUBLISHABLE_KEY_value: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? 'EXISTS' : 'UNDEFINED',
-  }
+// Log Supabase config for debugging
+console.log('🔧 Supabase Config:', {
+  urlSet: !!SUPABASE_URL,
+  keySet: !!SUPABASE_PUBLISHABLE_KEY,
+  isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : '❓ CHECK URL'
 });
-
-// Validate environment variables - check for both undefined and empty strings
-if (!SUPABASE_URL || SUPABASE_URL.length === 0) {
-  const errorDetails = {
-    VITE_SUPABASE_URL: SUPABASE_URL ? `SET (but empty, length: ${SUPABASE_URL.length})` : 'MISSING',
-    VITE_SUPABASE_PUBLISHABLE_KEY: SUPABASE_PUBLISHABLE_KEY ? 'SET' : 'MISSING',
-    allEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
-    rawEnv: {
-      hasKey: 'VITE_SUPABASE_URL' in import.meta.env,
-      value: import.meta.env.VITE_SUPABASE_URL || 'UNDEFINED',
-    }
-  };
-  console.error('❌ VITE_SUPABASE_URL is missing or empty!', errorDetails);
-  throw new Error('VITE_SUPABASE_URL is required but not found. Please:\n1. Go to Lovable.dev → Secrets\n2. Add VITE_SUPABASE_URL with your Supabase project URL\n3. Save and redeploy your app');
-}
-
-if (!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.length === 0) {
-  const errorDetails = {
-    VITE_SUPABASE_URL: SUPABASE_URL ? 'SET' : 'MISSING',
-    VITE_SUPABASE_PUBLISHABLE_KEY: SUPABASE_PUBLISHABLE_KEY ? `SET (but empty, length: ${SUPABASE_PUBLISHABLE_KEY.length})` : 'MISSING',
-    allEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
-    rawEnv: {
-      hasKey: 'VITE_SUPABASE_PUBLISHABLE_KEY' in import.meta.env,
-      value: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'UNDEFINED',
-    }
-  };
-  console.error('❌ VITE_SUPABASE_PUBLISHABLE_KEY is missing or empty!', errorDetails);
-  throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY is required but not found. Please:\n1. Go to Lovable.dev → Secrets\n2. Add VITE_SUPABASE_PUBLISHABLE_KEY with your Supabase anon key\n3. Save and redeploy your app');
-}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL!, 
-  SUPABASE_PUBLISHABLE_KEY!, 
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
   {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'implicit'
-  }
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'implicit'
+    }
   }
 );
