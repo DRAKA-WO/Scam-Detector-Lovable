@@ -1486,15 +1486,7 @@ function Dashboard() {
   
 
   return (
-    <div 
-      className="min-h-screen bg-background" 
-      style={{ 
-        minHeight: '100vh',
-        backgroundColor: '#0a0a0a', 
-        color: '#ffffff',
-        paddingTop: '64px'
-      }}
-    >
+    <div className="min-h-screen bg-background text-foreground pt-16">
       <Header 
         alerts={alerts} 
         onDismissAlert={(alertId) => {
@@ -1514,31 +1506,23 @@ function Dashboard() {
           }
         }}
       />
-      <main 
-        className="container mx-auto px-4 py-8 max-w-7xl" 
-        style={{ 
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '32px 16px',
-          color: '#ffffff'
-        }}
-      >
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
         
         {/* Welcome Section */}
-        <div style={{ marginBottom: '40px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="mb-10">
+          <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
-              <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff', lineHeight: '1.2' }}>
+              <h1 className="font-display text-3xl md:text-4xl font-bold mb-2 text-foreground">
                 Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! 👋
               </h1>
-              <p style={{ color: '#a1a1aa', fontSize: '1rem' }}>
+              <p className="text-muted-foreground text-base">
                 Manage your scam detection activity and track your protection stats
               </p>
             </div>
             <Button
               onClick={handleLogout}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-border hover:bg-muted/50"
             >
               <LogOut className="w-4 h-4" />
               Logout
@@ -1547,20 +1531,20 @@ function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="mb-6">
+        <div className="mb-8">
           {/* Time Filter Buttons */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm text-muted-foreground">Filter by:</span>
-            <div className="flex gap-2">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
+            <div className="flex gap-2 p-1 bg-card/50 rounded-lg border border-border">
               <button
                 onClick={() => {
                   console.log('🔄 Setting filter to: today')
                   setStatsTimeFilter('today')
                 }}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   statsTimeFilter === 'today'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 Today
@@ -1570,10 +1554,10 @@ function Dashboard() {
                   console.log('🔄 Setting filter to: thisWeek')
                   setStatsTimeFilter('thisWeek')
                 }}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   statsTimeFilter === 'thisWeek'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 This Week
@@ -1583,10 +1567,10 @@ function Dashboard() {
                   console.log('🔄 Setting filter to: thisMonth')
                   setStatsTimeFilter('thisMonth')
                 }}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   statsTimeFilter === 'thisMonth'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 This Month
@@ -1595,85 +1579,83 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8" style={{ marginBottom: '32px' }}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Remaining Checks</CardTitle>
-              <Shield className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-end justify-between">
-                <div>
-                  <div className="text-2xl font-bold">{remainingChecks}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {remainingChecks > 0 ? 'Ready to scan' : 'Upgrade for more'}
-                  </p>
-                </div>
-                <a
-                  href="/pricing"
-                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium transition-all whitespace-nowrap"
-                >
-                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Get more
-                </a>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Stat Cards - Beautiful gradient-accented cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+          {/* Remaining Checks Card */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-card to-card border border-purple-500/20 p-5 group hover:border-purple-500/40 transition-all hover:shadow-lg hover:shadow-purple-500/10">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-2xl"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Remaining Checks</span>
+              <Shield className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="text-3xl font-bold text-foreground mb-1">{remainingChecks}</div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {remainingChecks > 0 ? 'Ready to scan' : 'Upgrade for more'}
+              </p>
+              <a
+                href="/pricing"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium transition-all hover:scale-105 shadow-md"
+              >
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Get more
+              </a>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+          {/* Scans This Month Card */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 via-card to-card border border-blue-500/20 p-5 group hover:border-blue-500/40 transition-all hover:shadow-lg hover:shadow-blue-500/10">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">
                 {statsTimeFilter === 'today' ? 'Scans Today' : 
                  statsTimeFilter === 'thisWeek' ? 'Scans This Week' : 
                  'Scans This Month'}
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredStats.totalScans}</div>
-              <p className="text-xs text-muted-foreground">
-                {statsTimeFilter === 'today' ? 'Today' : 
-                 statsTimeFilter === 'thisWeek' ? 'This week' : 
-                 'This month'}
-              </p>
-            </CardContent>
-          </Card>
+              </span>
+              <TrendingUp className="h-5 w-5 text-blue-400" />
+            </div>
+            <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.totalScans}</div>
+            <p className="text-xs text-muted-foreground">
+              {statsTimeFilter === 'today' ? 'Today' : 
+               statsTimeFilter === 'thisWeek' ? 'This week' : 
+               'This month'}
+            </p>
+          </div>
 
+          {/* Scams Detected Card */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Card 
-                  className="cursor-pointer hover:shadow-lg hover:border-red-500/50 hover:bg-red-500/5 transition-all"
+                <div 
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/10 via-card to-card border border-red-500/20 p-5 cursor-pointer group hover:border-red-500/40 transition-all hover:shadow-lg hover:shadow-red-500/10"
                   onClick={() => {
                     setScanHistoryFilter('scam')
-                    setShowHistory(true) // Show scan history section
-                    // Scroll to scan history section
+                    setShowHistory(true)
                     setTimeout(() => {
                       document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                     }, 100)
                   }}
                 >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Scams Detected</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{filteredStats.scamsDetected}</div>
-                    <p className="text-xs text-muted-foreground">
-                      Threats identified
-                    </p>
-                  </CardContent>
-                </Card>
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-2xl"></div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-muted-foreground">Scams Detected</span>
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.scamsDetected}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Threats identified
+                  </p>
+                </div>
               </TooltipTrigger>
               {Object.keys(filteredScamTypeBreakdown).length > 0 && (
-                <TooltipContent side="top" className="max-w-xs bg-black border border-gray-800">
+                <TooltipContent side="top" className="max-w-xs bg-popover border border-border">
                   <div className="space-y-1.5">
                     <p className="font-semibold text-sm mb-2">Scam Types Detected:</p>
                     {Object.entries(filteredScamTypeBreakdown)
                       .sort(([, a], [, b]) => b - a)
-                      .slice(0, 5) // Show only top 5 most detected scam types
+                      .slice(0, 5)
                       .map(([scamType, count]) => (
                         <div key={scamType} className="flex justify-between items-center text-xs">
                           <span className="capitalize">{scamType.replace(/_/g, ' ')}</span>
@@ -1681,7 +1663,7 @@ function Dashboard() {
                         </div>
                       ))}
                     {Object.keys(filteredScamTypeBreakdown).length > 5 && (
-                      <div className="text-xs text-muted-foreground pt-1 border-t border-gray-700">
+                      <div className="text-xs text-muted-foreground pt-1 border-t border-border">
                         +{Object.keys(filteredScamTypeBreakdown).length - 5} more type{Object.keys(filteredScamTypeBreakdown).length - 5 !== 1 ? 's' : ''}
                       </div>
                     )}
@@ -1691,61 +1673,59 @@ function Dashboard() {
             </Tooltip>
           </TooltipProvider>
 
-          <Card 
-            className="cursor-pointer hover:shadow-lg hover:border-yellow-500/50 hover:bg-yellow-500/5 transition-all"
+          {/* Suspicious Results Card */}
+          <div 
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-500/10 via-card to-card border border-yellow-500/20 p-5 cursor-pointer group hover:border-yellow-500/40 transition-all hover:shadow-lg hover:shadow-yellow-500/10"
             onClick={() => {
               setScanHistoryFilter('suspicious')
-              setShowHistory(true) // Show scan history section
-              // Scroll to scan history section
+              setShowHistory(true)
               setTimeout(() => {
                 document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }, 100)
             }}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Suspicious Results</CardTitle>
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredStats.suspiciousResults}</div>
-              <p className="text-xs text-muted-foreground">
-                Potentially risky content
-              </p>
-            </CardContent>
-          </Card>
+            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/5 rounded-full blur-2xl"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Suspicious Results</span>
+              <AlertCircle className="h-5 w-5 text-yellow-400" />
+            </div>
+            <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.suspiciousResults}</div>
+            <p className="text-xs text-muted-foreground">
+              Potentially risky content
+            </p>
+          </div>
 
-          <Card 
-            className="cursor-pointer hover:shadow-lg hover:border-green-500/50 hover:bg-green-500/5 transition-all"
+          {/* Safe Results Card */}
+          <div 
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-500/10 via-card to-card border border-green-500/20 p-5 cursor-pointer group hover:border-green-500/40 transition-all hover:shadow-lg hover:shadow-green-500/10"
             onClick={() => {
               setScanHistoryFilter('safe')
-              setShowHistory(true) // Show scan history section
-              // Scroll to scan history section
+              setShowHistory(true)
               setTimeout(() => {
                 document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }, 100)
             }}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Safe Results</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredStats.safeResults}</div>
-              <p className="text-xs text-muted-foreground">
-                Verified safe content
-              </p>
-            </CardContent>
-          </Card>
+            <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full blur-2xl"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Safe Results</span>
+              <CheckCircle className="h-5 w-5 text-green-400" />
+            </div>
+            <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.safeResults}</div>
+            <p className="text-xs text-muted-foreground">
+              Verified safe content
+            </p>
+          </div>
         </div>
 
         {/* Quick Actions & Account Info */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8" style={{ marginBottom: '32px' }}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+          <Card className="border-border bg-card/50 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-display">Quick Actions</CardTitle>
               <CardDescription>Start scanning or manage your activity</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               {/* Risk Pattern Level Metric */}
               {currentRiskLevel && (
                 <div className={`relative overflow-hidden rounded-lg border p-4 ${
@@ -1894,11 +1874,11 @@ function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="relative">
+          <Card className="border-border bg-card/50 backdrop-blur-sm">
+            <CardHeader className="relative pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Account Information</CardTitle>
+                  <CardTitle className="text-xl font-display">Account Information</CardTitle>
                   <CardDescription>Manage your account settings and subscription</CardDescription>
                 </div>
                 {editingSection === 'none' && (
@@ -2145,12 +2125,16 @@ function Dashboard() {
         </div>
 
         {/* Scan History Section */}
-        <Card id="scan-history-section" className={`mb-8 ${!showHistory ? 'hidden' : ''}`}>
-          <CardHeader>
-            <CardTitle className="mb-2">Scan History</CardTitle>
-            <CardDescription>View your scan history (last 30 days)</CardDescription>
+        <Card id="scan-history-section" className={`mb-10 border-border bg-card/50 backdrop-blur-sm ${!showHistory ? 'hidden' : ''}`}>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <CardTitle className="text-xl font-display mb-1">Scan History</CardTitle>
+                <CardDescription>View your scan history (last 30 days)</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent>
             {selectedScan ? (
               <div>
                 <Button
@@ -2180,80 +2164,83 @@ function Dashboard() {
         </Card>
 
         {/* Browser Extension Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Browser Extension</CardTitle>
+        <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-display">Browser Extension</CardTitle>
             <CardDescription>Download our extension to browse securely and scan content on the go</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Download our extension to browse securely and scan content on the go
+            </p>
             <a
               href="https://chrome.google.com/webstore"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-4 px-6 py-2.5 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105 w-full justify-center"
+              className="inline-flex items-center justify-center gap-4 w-full px-6 py-4 rounded-xl bg-gradient-to-r from-card to-muted/30 border border-border hover:border-primary/50 shadow-lg hover:shadow-primary/20 transition-all duration-300 group hover:scale-[1.02]"
             >
               <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
                 Download our extension and browse securely
               </span>
               
               {/* Browser Logos */}
-              <div className="flex items-center gap-1.5">
-                <img src={chromeLogo} alt="Chrome" className="w-6 h-6" />
-                <img src={edgeLogo} alt="Edge" className="w-6 h-6" />
-                <img src={braveLogo} alt="Brave" className="w-6 h-6" />
-                <img src={operaLogo} alt="Opera" className="w-6 h-6" />
+              <div className="flex items-center gap-2">
+                <img src={chromeLogo} alt="Chrome" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
+                <img src={edgeLogo} alt="Edge" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
+                <img src={braveLogo} alt="Brave" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
+                <img src={operaLogo} alt="Opera" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
               </div>
             </a>
           </CardContent>
         </Card>
 
         {/* Features Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Dashboard Features</CardTitle>
+        <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-display">Dashboard Features</CardTitle>
             <CardDescription>What you can do with your account</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-                <div className="p-2 rounded-lg bg-green-500/10">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
+              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-green-500/5 to-transparent border border-green-500/10 hover:border-green-500/30 transition-all group">
+                <div className="p-2.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
+                  <CheckCircle className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">Unlimited Analysis</h4>
+                  <h4 className="font-semibold mb-1 text-foreground">Unlimited Analysis</h4>
                   <p className="text-sm text-muted-foreground">
                     Get 5 free checks on signup, then upgrade for unlimited scans
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <Shield className="w-5 h-5 text-purple-500" />
+              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-purple-500/5 to-transparent border border-purple-500/10 hover:border-purple-500/30 transition-all group">
+                <div className="p-2.5 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+                  <Shield className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">Full Detailed Reports</h4>
+                  <h4 className="font-semibold mb-1 text-foreground">Full Detailed Reports</h4>
                   <p className="text-sm text-muted-foreground">
                     Access comprehensive analysis reports for every scan
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <Clock className="w-5 h-5 text-blue-500" />
+              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-blue-500/5 to-transparent border border-blue-500/10 hover:border-blue-500/30 transition-all group">
+                <div className="p-2.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                  <Clock className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">Priority Processing</h4>
+                  <h4 className="font-semibold mb-1 text-foreground">Priority Processing</h4>
                   <p className="text-sm text-muted-foreground">
                     Faster analysis times for logged-in users
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <TrendingUp className="w-5 h-5 text-orange-500" />
+              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-orange-500/5 to-transparent border border-orange-500/10 hover:border-orange-500/30 transition-all group">
+                <div className="p-2.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
+                  <TrendingUp className="w-5 h-5 text-orange-400" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">Analysis History</h4>
+                  <h4 className="font-semibold mb-1 text-foreground">Analysis History</h4>
                   <p className="text-sm text-muted-foreground">
                     Track all your scans and results
                   </p>
