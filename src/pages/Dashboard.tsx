@@ -1512,10 +1512,10 @@ function Dashboard() {
         <div className="mb-10">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
-              <h1 className="font-display text-3xl md:text-4xl font-bold mb-2 text-foreground">
+              <h1 className="text-3xl md:text-4xl font-bold mb-1 text-foreground">
                 Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! 👋
               </h1>
-              <p className="text-muted-foreground text-base">
+              <p className="text-muted-foreground">
                 Manage your scam detection activity and track your protection stats
               </p>
             </div>
@@ -1721,8 +1721,8 @@ function Dashboard() {
         {/* Quick Actions & Account Info */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
           <Card className="border-border bg-card/50 backdrop-blur-sm">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-display">Quick Actions</CardTitle>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Start scanning or manage your activity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1875,10 +1875,10 @@ function Dashboard() {
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm">
-            <CardHeader className="relative pb-4">
+            <CardHeader className="relative">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-xl font-display">Account Information</CardTitle>
+                  <CardTitle>Account Information</CardTitle>
                   <CardDescription>Manage your account settings and subscription</CardDescription>
                 </div>
                 {editingSection === 'none' && (
