@@ -2,29 +2,40 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || '';
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || '';
+// Use environment variables with fallback to default values
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || 'https://tpmynhukocnyggqkxckh.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwbXluaHVrb2NueWdncWt4Y2toIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MDk1NjUsImV4cCI6MjA4MzQ4NTU2NX0.ahgb7-LdOyie47J3VSbszUtbjsWsVm_RzU7DfQAV0SY';
 
-// Log Supabase config for debugging
-console.log('🔧 Supabase Config:', {
-  urlSet: !!SUPABASE_URL,
-  keySet: !!SUPABASE_PUBLISHABLE_KEY,
-  isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : '❓ CHECK URL'
+// Always log Supabase config (for debugging in production)
+const usingEnvVars = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+console.log('🔧 Supabase Config Check:', {
+  url: SUPABASE_URL,
+  urlSource: import.meta.env.VITE_SUPABASE_URL ? '✅ FROM ENV' : '⚠️ USING FALLBACK',
+  keySource: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? '✅ FROM ENV' : '⚠️ USING FALLBACK',
+  isCorrectProject: SUPABASE_URL?.includes('tpmynhukocnyggqkxckh') ? '✅ CORRECT' : '❓ UNKNOWN',
+  allViteEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
+  usingEnvVars: usingEnvVars ? '✅ YES' : '⚠️ NO - Using fallback values',
 });
+
+// Warn if using fallback values (but don't crash the app)
+if (!usingEnvVars) {
+  console.warn('⚠️ Supabase environment variables not found in Lovable.dev Secrets. Using fallback values.');
+  console.warn('⚠️ Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to Lovable.dev → Secrets and redeploy.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL, 
+  SUPABASE_PUBLISHABLE_KEY, 
   {
-    auth: {
-      storage: localStorage,
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: 'implicit'
-    }
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'implicit'
+  }
   }
 );
