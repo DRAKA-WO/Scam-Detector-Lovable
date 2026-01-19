@@ -1756,28 +1756,6 @@ function Dashboard() {
                 <History className="w-4 h-4 mr-2" />
                 {showHistory ? 'Hide' : 'View'} Scan History
               </Button>
-              
-              {/* Browser Extension Download */}
-              <div className="pt-3 mt-3 border-t border-border">
-                <a
-                  href="https://chrome.google.com/webstore"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-4 px-6 py-2.5 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105 w-full justify-center"
-                >
-                  <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
-                    Download our extension and browse securely
-                  </span>
-                  
-                  {/* Browser Logos */}
-                  <div className="flex items-center gap-1.5">
-                    <img src={chromeLogo} alt="Chrome" className="w-6 h-6" />
-                    <img src={edgeLogo} alt="Edge" className="w-6 h-6" />
-                    <img src={braveLogo} alt="Brave" className="w-6 h-6" />
-                    <img src={operaLogo} alt="Opera" className="w-6 h-6" />
-                  </div>
-                </a>
-              </div>
             </CardContent>
           </Card>
 
@@ -2077,6 +2055,33 @@ function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Browser Extension Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Browser Extension</CardTitle>
+            <CardDescription>Download our extension to browse securely and scan content on the go</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <a
+              href="https://chrome.google.com/webstore"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-4 px-6 py-2.5 rounded-full bg-card/80 backdrop-blur-sm border border-border hover:border-primary/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group hover:scale-105 w-full justify-center"
+            >
+              <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
+                Download our extension and browse securely
+              </span>
+              
+              {/* Browser Logos */}
+              <div className="flex items-center gap-1.5">
+                <img src={chromeLogo} alt="Chrome" className="w-6 h-6" />
+                <img src={edgeLogo} alt="Edge" className="w-6 h-6" />
+                <img src={braveLogo} alt="Brave" className="w-6 h-6" />
+                <img src={operaLogo} alt="Opera" className="w-6 h-6" />
+              </div>
+            </a>
+          </CardContent>
+        </Card>
 
         {/* Features Section */}
         <Card className="mb-8">
