@@ -455,158 +455,127 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       </div>
 
       {/* Scan Items Grid */}
-      <div className="space-y-3 max-h-[520px] overflow-y-auto pr-2 custom-scrollbar">
+      <div className="space-y-3 max-h-[520px] overflow-y-auto pr-2">
         {filteredScans.length === 0 ? (
-          <div className="text-center py-12 px-4">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
-              <Search className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-            <p className="text-muted-foreground">
-              {searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
-                ? 'No scans match your filters. Try adjusting your search criteria.'
-                : `No ${filterClassification !== 'all' ? filterClassification : ''} scans found.`}
-            </p>
+          <div className="text-center py-8 text-muted-foreground">
+            {searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
+              ? 'No scans match your filters. Try adjusting your search criteria.'
+              : `No ${filterClassification !== 'all' ? filterClassification : ''} scans found.`}
           </div>
         ) : (
-          filteredScans.map((scan, index) => (
+          filteredScans.map((scan) => (
             <div
               key={scan.id}
-              className={`group relative cursor-pointer rounded-xl border transition-all duration-300 hover:scale-[1.01] ${
+              className={`cursor-pointer rounded-xl border transition-all hover:shadow-lg p-4 ${
                 scan.classification === 'scam' 
-                  ? 'border-red-500/30 bg-gradient-to-r from-red-500/5 to-red-500/10 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10' 
+                  ? 'border-red-500/30 bg-gradient-to-r from-red-500/5 to-red-500/10 hover:border-red-500/50' 
                   : scan.classification === 'suspicious'
-                  ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-yellow-500/10 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-yellow-500/10'
-                  : 'border-green-500/30 bg-gradient-to-r from-green-500/5 to-green-500/10 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-500/10'
+                  ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-yellow-500/10 hover:border-yellow-500/50'
+                  : 'border-green-500/30 bg-gradient-to-r from-green-500/5 to-green-500/10 hover:border-green-500/50'
               }`}
               onClick={() => onScanClick && onScanClick(scan)}
-              style={{ animationDelay: `${index * 50}ms` }}
             >
-              <div className="p-4">
-                <div className="flex items-start gap-4">
-                  {/* Image, Text, or URL Preview */}
-                  <div className="flex-shrink-0 relative">
-                    {scan.scan_type === 'image' && scan.image_url ? (
-                      imageUrls[scan.id] && imageUrls[scan.id] !== null ? (
-                        <>
-                          <div className="relative overflow-hidden rounded-xl">
-                            <img
-                              src={imageUrls[scan.id]}
-                              alt="Scan preview"
-                              className="w-20 h-20 object-cover rounded-xl border border-border/50 cursor-pointer group-hover:scale-105 transition-transform duration-300"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setPreviewImage(imageUrls[scan.id])
-                              }}
-                              onError={(e) => {
-                                console.warn(`⚠️ Image failed to load for scan ${scan.id}:`, imageUrls[scan.id])
-                                e.target.style.display = 'none'
-                                const fallback = e.target.nextElementSibling
-                                if (fallback) fallback.style.display = 'flex'
-                              }}
-                            />
-                            <div className="w-20 h-20 rounded-xl bg-muted/50 flex items-center justify-center border border-border/50 hidden">
-                              <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                          </div>
-                        </>
-                      ) : imageUrls[scan.id] === null ? (
-                        <div className="w-20 h-20 rounded-xl bg-muted/30 flex items-center justify-center border border-border/50">
+              <div className="flex items-start gap-4">
+                {/* Image, Text, or URL Preview */}
+                <div className="flex-shrink-0 relative">
+                  {scan.scan_type === 'image' && scan.image_url ? (
+                    imageUrls[scan.id] && imageUrls[scan.id] !== null ? (
+                      <>
+                        <img
+                          src={imageUrls[scan.id]}
+                          alt="Scan preview"
+                          className="w-20 h-20 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setPreviewImage(imageUrls[scan.id])
+                          }}
+                          onError={(e) => {
+                            console.warn(`⚠️ Image failed to load for scan ${scan.id}:`, imageUrls[scan.id])
+                            e.target.style.display = 'none'
+                            const fallback = e.target.nextElementSibling
+                            if (fallback) fallback.style.display = 'flex'
+                          }}
+                        />
+                        <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border hidden">
                           <ImageIcon className="h-6 w-6 text-muted-foreground" />
                         </div>
-                      ) : (
-                        <div className="w-20 h-20 rounded-xl bg-muted/30 flex items-center justify-center border border-border/50">
-                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
-                        </div>
-                      )
-                    ) : scan.scan_type === 'url' ? (
-                      <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500/20 via-cyan-500/15 to-blue-500/20 flex flex-col items-center justify-center border border-blue-500/30 group-hover:border-blue-400/50 transition-colors">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mb-1">
-                          <LinkIcon className="h-5 w-5 text-blue-400" />
-                        </div>
-                        <span className="text-[10px] text-blue-300 font-semibold uppercase tracking-wider">URL</span>
-                      </div>
-                    ) : scan.scan_type === 'text' ? (
-                      <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-purple-500/20 via-pink-500/15 to-purple-500/20 flex flex-col items-center justify-center border border-purple-500/30 group-hover:border-purple-400/50 transition-colors">
-                        <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center mb-1">
-                          <FileText className="h-5 w-5 text-purple-400" />
-                        </div>
-                        <span className="text-[10px] text-purple-300 font-semibold uppercase tracking-wider">Text</span>
+                      </>
+                    ) : imageUrls[scan.id] === null ? (
+                      <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
+                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
                       </div>
                     ) : (
-                      <div className="w-20 h-20 rounded-xl bg-muted/30 flex items-center justify-center border border-border/50">
-                        {getScanTypeIcon(scan.scan_type)}
+                      <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
                       </div>
+                    )
+                  ) : scan.scan_type === 'url' ? (
+                    <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex flex-col items-center justify-center border border-blue-500/30">
+                      <LinkIcon className="h-6 w-6 text-blue-400 mb-1" />
+                      <span className="text-[10px] text-blue-300 font-medium">URL</span>
+                    </div>
+                  ) : scan.scan_type === 'text' ? (
+                    <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex flex-col items-center justify-center border border-purple-500/30">
+                      <FileText className="h-6 w-6 text-purple-400 mb-1" />
+                      <span className="text-[10px] text-purple-300 font-medium">TEXT</span>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
+                      {getScanTypeIcon(scan.scan_type)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    {getClassificationIcon(scan.classification)}
+                    <span className="font-semibold capitalize">{scan.classification}</span>
+                    <span className="text-muted-foreground text-sm">•</span>
+                    <span className="text-muted-foreground text-sm capitalize">{scan.scan_type}</span>
+                  </div>
+
+                  {/* Preview */}
+                  {scan.content_preview && (() => {
+                    const isScamTypeDescription = (scan.classification === 'safe' || scan.classification === 'suspicious') &&
+                      (scan.content_preview.toLowerCase().includes('scam') || 
+                       scan.content_preview.toLowerCase().includes('phishing') ||
+                       scan.content_preview.toLowerCase().includes('credential'));
+                    
+                    if (isScamTypeDescription) return null;
+                    
+                    return (
+                      <div className="mb-2">
+                        {scan.scan_type === 'url' ? (
+                          <a
+                            href={scan.content_preview}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-400 hover:text-blue-300 underline line-clamp-1 break-all"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {scan.content_preview}
+                          </a>
+                        ) : (
+                          <p className="text-sm text-muted-foreground line-clamp-2 break-words">
+                            {scan.content_preview}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Metadata */}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDate(scan.created_at)}
+                    </div>
+                    {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
+                      <span className="capitalize">
+                        {scan.analysis_result.scam_type.replace(/_/g, ' ')}
+                      </span>
                     )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        scan.classification === 'scam' 
-                          ? 'bg-red-500/20 text-red-400' 
-                          : scan.classification === 'suspicious'
-                          ? 'bg-yellow-500/20 text-yellow-400'
-                          : 'bg-green-500/20 text-green-400'
-                      }`}>
-                        {getClassificationIcon(scan.classification)}
-                        <span className="capitalize">{scan.classification}</span>
-                      </div>
-                      <span className="text-muted-foreground/50">•</span>
-                      <span className="text-muted-foreground text-xs capitalize bg-muted/30 px-2 py-0.5 rounded-full">{scan.scan_type}</span>
-                    </div>
-
-                    {/* Preview */}
-                    {scan.content_preview && (() => {
-                      const isScamTypeDescription = (scan.classification === 'safe' || scan.classification === 'suspicious') &&
-                        (scan.content_preview.toLowerCase().includes('scam') || 
-                         scan.content_preview.toLowerCase().includes('phishing') ||
-                         scan.content_preview.toLowerCase().includes('credential'));
-                      
-                      if (isScamTypeDescription) return null;
-                      
-                      return (
-                        <div className="mb-2">
-                          {scan.scan_type === 'url' ? (
-                            <a
-                              href={scan.content_preview}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-400 hover:text-blue-300 underline line-clamp-1 break-all transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {scan.content_preview}
-                            </a>
-                          ) : (
-                            <p className="text-sm text-muted-foreground/80 line-clamp-2 break-words">
-                              {scan.content_preview}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Metadata */}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatDate(scan.created_at)}</span>
-                      </div>
-                      {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
-                        <span className="capitalize px-2 py-0.5 rounded-full bg-red-500/10 text-red-400/80 text-[10px] font-medium">
-                          {scan.analysis_result.scam_type.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Arrow indicator */}
-                  <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
                   </div>
                 </div>
               </div>
