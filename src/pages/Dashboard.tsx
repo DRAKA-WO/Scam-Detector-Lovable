@@ -2204,13 +2204,12 @@ function Dashboard() {
         {/* Browser Extension Section */}
         <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Browser Extension</CardTitle>
-            <CardDescription>Download our extension to browse securely and scan content on the go</CardDescription>
+            <div>
+              <CardTitle>Browser Extension</CardTitle>
+              <CardDescription>Download our extension to browse securely and scan content on the go</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Download our extension to browse securely and scan content on the go
-            </p>
+          <CardContent>
             <a
               href="https://chrome.google.com/webstore"
               target="_blank"
