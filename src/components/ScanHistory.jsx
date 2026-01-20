@@ -638,7 +638,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             variant="outline"
             size="sm"
             onClick={() => downloadCSV(filteredScans)}
-            className="flex items-center gap-1.5 h-8"
+            className="flex items-center gap-1.5 h-8 hover:bg-muted hover:border-primary/50 hover:scale-[1.02] transition-all cursor-pointer"
           >
             <Download className="h-4 w-4" />
             Export CSV

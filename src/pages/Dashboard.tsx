@@ -1524,7 +1524,7 @@ function Dashboard() {
             <Button
               onClick={handleLogout}
               variant="outline"
-              className="flex items-center gap-2 border-border hover:bg-muted/50"
+              className="flex items-center gap-2 border-border hover:bg-muted hover:border-primary/50 hover:scale-[1.02] transition-all cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               Logout
@@ -2141,7 +2141,7 @@ function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="relative z-10"
+                  className="relative z-10 hover:bg-muted hover:border-primary/50 hover:scale-[1.02] transition-all cursor-pointer"
                   disabled={isRefreshingHistory}
                   onClick={async (e) => {
                     e.stopPropagation()
