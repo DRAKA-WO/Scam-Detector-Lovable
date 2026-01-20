@@ -303,8 +303,17 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       const scanDate = new Date(scan.created_at)
       const now = new Date()
       const daysAgo = parseInt(dateRange)
-      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
-      if (scanDate < cutoffDate) {
+      
+      // Set cutoff date to start of day (00:00:00) for accurate comparison
+      const cutoffDate = new Date(now)
+      cutoffDate.setDate(now.getDate() - daysAgo)
+      cutoffDate.setHours(0, 0, 0, 0)
+      
+      // Set scan date to start of day for comparison
+      const scanDateStart = new Date(scanDate)
+      scanDateStart.setHours(0, 0, 0, 0)
+      
+      if (scanDateStart < cutoffDate) {
         return false
       }
     }
