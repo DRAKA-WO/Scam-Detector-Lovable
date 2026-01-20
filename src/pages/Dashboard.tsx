@@ -1903,35 +1903,43 @@ function Dashboard() {
                 <div className="flex-shrink-0 flex flex-col items-center">
                   <div className="relative">
                     {editingSection === 'profile' && avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Avatar preview"
-                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-600/50"
-                      />
+                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar preview"
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      </div>
                     ) : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection === 'profile' && !shouldRemoveAvatar ? (
-                      <img
-                        src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
-                        alt="Avatar"
-                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-600/50"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
+                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
+                        <img
+                          src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                          alt="Avatar"
+                          className="w-full h-full rounded-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      </div>
                     ) : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' ? (
-                      <img
-                        src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
-                        alt="Avatar"
-                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-600/50"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
+                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
+                        <img
+                          src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                          alt="Avatar"
+                          className="w-full h-full rounded-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      </div>
                     ) : null}
                     {/* Avatar fallback - shown when no avatar image */}
-                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-2 ring-purple-600/50 ${((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' && !shouldRemoveAvatar) || (editingSection === 'profile' && avatarPreview) ? 'hidden' : ''}`}>
-                      <User className="w-6 h-6 text-white" />
+                    <div className={`w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600 ${((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' && !shouldRemoveAvatar) || (editingSection === 'profile' && avatarPreview) ? 'hidden' : ''}`}>
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                        <User className="w-6 h-6 text-white" />
+                      </div>
                     </div>
                     {/* X button - shown only when editing and avatar exists */}
                     {editingSection === 'profile' && ((avatarPreview) || ((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && !shouldRemoveAvatar)) && (
