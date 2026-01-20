@@ -2139,7 +2139,9 @@ function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
+                  className="relative z-10"
+                  onClick={async (e) => {
+                    e.stopPropagation()
                     if (user?.id) {
                       try {
                         const { getScanHistory } = await import('@/utils/scanHistory')
