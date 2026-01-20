@@ -197,13 +197,13 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   const getClassificationIcon = (classification) => {
     switch (classification) {
       case 'scam':
-        return <AlertTriangle className="h-5 w-5 text-red-500" />
+        return <AlertTriangle className="h-4 w-4 text-red-300" />
       case 'suspicious':
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />
+        return <AlertCircle className="h-4 w-4 text-yellow-300" />
       case 'safe':
-        return <CheckCircle className="h-5 w-5 text-green-500" />
+        return <CheckCircle className="h-4 w-4 text-green-300" />
       default:
-        return <Shield className="h-5 w-5 text-gray-500" />
+        return <Shield className="h-4 w-4 text-gray-300" />
     }
   }
 
@@ -550,9 +550,20 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    {getClassificationIcon(scan.classification)}
-                    <span className="font-semibold capitalize">{scan.classification}</span>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {/* Classification Badge */}
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                      scan.classification === 'scam' 
+                        ? 'bg-red-900/40 text-red-300 border border-red-800/50' 
+                        : scan.classification === 'suspicious'
+                        ? 'bg-yellow-900/40 text-yellow-300 border border-yellow-800/50'
+                        : scan.classification === 'safe'
+                        ? 'bg-green-900/40 text-green-300 border border-green-800/50'
+                        : 'bg-gray-900/40 text-gray-300 border border-gray-800/50'
+                    }`}>
+                      {getClassificationIcon(scan.classification)}
+                      <span className="capitalize">{scan.classification}</span>
+                    </div>
                     <span className="text-muted-foreground text-sm">•</span>
                     <span className="text-muted-foreground text-sm capitalize">{scan.scan_type}</span>
                   </div>
@@ -591,16 +602,16 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                   })()}
 
                   {/* Metadata */}
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {formatDate(scan.created_at)}
                     </div>
-                    {/* Only show scam_type for scam results */}
+                    {/* Scam Type Badge - Only show for scam results */}
                     {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
-                      <span className="capitalize">
-                        {scan.analysis_result.scam_type.replace(/_/g, ' ')}
-                      </span>
+                      <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-900/40 text-red-300 border border-red-800/50">
+                        {scan.analysis_result.scam_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </div>
                     )}
                   </div>
                 </div>
