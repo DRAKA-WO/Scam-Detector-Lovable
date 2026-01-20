@@ -210,13 +210,13 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   const getClassificationColor = (classification) => {
     switch (classification) {
       case 'scam':
-        return 'border-red-500/30 bg-red-500/10'
+        return 'border-red-500/20 bg-gradient-to-br from-red-500/10 via-card to-card'
       case 'suspicious':
-        return 'border-yellow-500/30 bg-yellow-500/10'
+        return 'border-yellow-500/20 bg-gradient-to-br from-yellow-500/10 via-card to-card'
       case 'safe':
-        return 'border-green-500/30 bg-green-500/10'
+        return 'border-green-500/20 bg-gradient-to-br from-green-500/10 via-card to-card'
       default:
-        return 'border-gray-500/30 bg-gray-500/10'
+        return 'border-gray-500/20 bg-gradient-to-br from-gray-500/10 via-card to-card'
     }
   }
 
@@ -481,7 +481,12 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
           filteredScans.map((scan) => (
           <Card
             key={scan.id}
-            className={`cursor-pointer transition-all hover:shadow-lg bg-card/50 backdrop-blur-sm border ${getClassificationColor(scan.classification)}`}
+            className={`cursor-pointer transition-all hover:shadow-lg border rounded-xl overflow-hidden relative group hover:shadow-lg ${getClassificationColor(scan.classification)} ${
+              scan.classification === 'scam' ? 'hover:border-red-500/40 hover:shadow-red-500/10' :
+              scan.classification === 'suspicious' ? 'hover:border-yellow-500/40 hover:shadow-yellow-500/10' :
+              scan.classification === 'safe' ? 'hover:border-green-500/40 hover:shadow-green-500/10' :
+              'hover:border-gray-500/40'
+            }`}
             onClick={() => onScanClick && onScanClick(scan)}
           >
             <CardContent className="p-4">
