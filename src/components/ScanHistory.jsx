@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getScanHistory, getSignedImageUrl } from '../utils/scanHistory'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Shield, CheckCircle, AlertTriangle, AlertCircle, Image as ImageIcon, Link as LinkIcon, FileText, Clock, X, Search, Calendar, Filter, Download } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, AlertCircle, Image as ImageIcon, Link as LinkIcon, FileText, Clock, X, Search, Calendar, Filter, Download, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { downloadCSV, downloadJSON } from '@/utils/exportUtils'
@@ -490,7 +490,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             onClick={() => onScanClick && onScanClick(scan)}
           >
             <CardContent className="p-4">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 relative">
                 {/* Image, Text, or URL Preview */}
                 <div className="flex-shrink-0 relative">
                   {scan.scan_type === 'image' && scan.image_url ? (
@@ -617,6 +617,11 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                       </div>
                     )}
                   </div>
+                </div>
+                
+                {/* Clickable Arrow Indicator */}
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  <ChevronRight className="h-6 w-6 text-blue-400 group-hover:text-blue-300 transition-colors" />
                 </div>
               </div>
             </CardContent>
