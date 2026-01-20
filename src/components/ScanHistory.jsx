@@ -333,30 +333,40 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   })
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Enhanced Filters */}
-      <div className="space-y-4">
+      <div className="space-y-4 mb-4 -mt-4">
         {/* Search and Date Range Row */}
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search Input */}
-          <div className="flex-1 relative group">
+          <div className="flex-1 relative">
             <Input
               type="text"
               placeholder="Search scans (content, URL, type...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-10 h-10 text-sm px-4 bg-background/50 border-border/50 focus:border-purple-500/50 focus:ring-purple-500/20 transition-all"
+              className="pr-9 h-8 text-sm px-3"
+              style={{
+                backgroundColor: 'hsl(var(--input))',
+                color: 'hsl(var(--foreground))',
+                borderColor: 'hsl(var(--input))'
+              }}
             />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-purple-400 transition-colors" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
           
           {/* Date Range Selector */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-border/50">
-            <Calendar className="h-4 w-4 text-purple-400" />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="bg-transparent text-sm text-foreground outline-none cursor-pointer"
+              className="px-3 py-1.5 h-8 rounded-md text-sm"
+              style={{
+                backgroundColor: 'hsl(var(--input))',
+                color: 'hsl(var(--foreground))',
+                borderColor: 'hsl(var(--input))'
+              }}
             >
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
@@ -368,79 +378,85 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
         {/* Classification and Scam Type Filters */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           {/* Classification Filter Buttons */}
-          <div className="flex gap-1.5 flex-wrap p-1.5 bg-background/30 backdrop-blur-sm rounded-xl border border-border/50">
-            <button
-              onClick={() => {
-                setFilterClassification('all')
-                if (onFilterChange) onFilterChange('all')
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                filterClassification === 'all'
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => {
-                setFilterClassification('safe')
-                if (onFilterChange) onFilterChange('safe')
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
-                filterClassification === 'safe'
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/40 shadow-lg shadow-green-500/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
-            >
-              <CheckCircle className="h-3.5 w-3.5" />
-              Safe
-            </button>
-            <button
-              onClick={() => {
-                setFilterClassification('suspicious')
-                if (onFilterChange) onFilterChange('suspicious')
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
-                filterClassification === 'suspicious'
-                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 shadow-lg shadow-yellow-500/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
-            >
-              <AlertCircle className="h-3.5 w-3.5" />
-              Suspicious
-            </button>
-            <button
-              onClick={() => {
-                setFilterClassification('scam')
-                if (onFilterChange) onFilterChange('scam')
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
-                filterClassification === 'scam'
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/40 shadow-lg shadow-red-500/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-              }`}
-            >
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Scam
-            </button>
+          <div className="flex gap-2 flex-wrap p-1 bg-card/50 rounded-lg border border-border">
+        <button
+          onClick={() => {
+            setFilterClassification('all')
+            if (onFilterChange) onFilterChange('all')
+          }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            filterClassification === 'all'
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => {
+            setFilterClassification('safe')
+            if (onFilterChange) onFilterChange('safe')
+          }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+            filterClassification === 'safe'
+              ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-lg shadow-green-500/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+          }`}
+        >
+          <CheckCircle className="h-4 w-4" />
+          Safe
+        </button>
+        <button
+          onClick={() => {
+            setFilterClassification('suspicious')
+            if (onFilterChange) onFilterChange('suspicious')
+          }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+            filterClassification === 'suspicious'
+              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-lg shadow-yellow-500/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+          }`}
+        >
+          <AlertCircle className="h-4 w-4" />
+          Suspicious
+        </button>
+        <button
+          onClick={() => {
+            setFilterClassification('scam')
+            if (onFilterChange) onFilterChange('scam')
+          }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+            filterClassification === 'scam'
+              ? 'bg-red-500/20 text-red-400 border border-red-500/50 shadow-lg shadow-red-500/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4" />
+          Scam
+        </button>
           </div>
 
           {/* Scam Type Filter (only show when 'Scam' classification is selected) */}
           {uniqueScamTypes.length > 0 && filterClassification === 'scam' && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
-              <Filter className="h-4 w-4 text-red-400" />
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
               <select
                 value={scamTypeFilter}
                 onChange={(e) => {
                   const selectedScamType = e.target.value
                   setScamTypeFilter(selectedScamType)
+                  // Automatically switch to 'scam' classification when a specific scam type is selected
                   if (selectedScamType !== 'all' && filterClassification !== 'scam') {
                     setFilterClassification('scam')
                     if (onFilterChange) onFilterChange('scam')
                   }
                 }}
-                className="bg-transparent text-sm text-foreground outline-none cursor-pointer min-w-[150px]"
+                className="px-3 py-1.5 h-8 rounded-md text-sm min-w-[180px]"
+                style={{
+                  backgroundColor: 'hsl(var(--input))',
+                  color: 'hsl(var(--foreground))',
+                  borderColor: 'hsl(var(--input))'
+                }}
               >
                 <option value="all">All Scam Types</option>
                 {uniqueScamTypes.map((type) => (
@@ -454,31 +470,26 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
         </div>
       </div>
 
-      {/* Scan Items Grid */}
-      <div className="space-y-3 max-h-[520px] overflow-y-auto pr-2">
+      <div className="grid gap-4 max-h-[520px] overflow-y-auto pr-2 dark-scrollbar">
         {filteredScans.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            {searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
+{searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
               ? 'No scans match your filters. Try adjusting your search criteria.'
               : `No ${filterClassification !== 'all' ? filterClassification : ''} scans found.`}
           </div>
         ) : (
           filteredScans.map((scan) => (
-            <div
-              key={scan.id}
-              className={`cursor-pointer rounded-xl border transition-all hover:shadow-lg p-4 ${
-                scan.classification === 'scam' 
-                  ? 'border-red-500/30 bg-gradient-to-r from-red-500/5 to-red-500/10 hover:border-red-500/50' 
-                  : scan.classification === 'suspicious'
-                  ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-yellow-500/10 hover:border-yellow-500/50'
-                  : 'border-green-500/30 bg-gradient-to-r from-green-500/5 to-green-500/10 hover:border-green-500/50'
-              }`}
-              onClick={() => onScanClick && onScanClick(scan)}
-            >
+          <Card
+            key={scan.id}
+            className={`cursor-pointer transition-all hover:shadow-lg ${getClassificationColor(scan.classification)}`}
+            onClick={() => onScanClick && onScanClick(scan)}
+          >
+            <CardContent className="p-4">
               <div className="flex items-start gap-4">
                 {/* Image, Text, or URL Preview */}
                 <div className="flex-shrink-0 relative">
                   {scan.scan_type === 'image' && scan.image_url ? (
+                    // Check if we have a URL and it's not null (null means it failed to load)
                     imageUrls[scan.id] && imageUrls[scan.id] !== null ? (
                       <>
                         <img
@@ -490,21 +501,27 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                             setPreviewImage(imageUrls[scan.id])
                           }}
                           onError={(e) => {
+                            // Fallback if signed URL fails to load
                             console.warn(`⚠️ Image failed to load for scan ${scan.id}:`, imageUrls[scan.id])
                             e.target.style.display = 'none'
                             const fallback = e.target.nextElementSibling
-                            if (fallback) fallback.style.display = 'flex'
+                            if (fallback) {
+                              fallback.style.display = 'flex'
+                            }
                           }}
                         />
+                        {/* Fallback icon (hidden by default, shown on image error) */}
                         <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border hidden">
                           <ImageIcon className="h-6 w-6 text-muted-foreground" />
                         </div>
                       </>
                     ) : imageUrls[scan.id] === null ? (
+                      // Explicitly failed to generate signed URL - show fallback immediately
                       <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
                         <ImageIcon className="h-6 w-6 text-muted-foreground" />
                       </div>
                     ) : (
+                      // Still loading - show spinner
                       <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
                       </div>
@@ -537,12 +554,15 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
 
                   {/* Preview */}
                   {scan.content_preview && (() => {
+                    // Don't show content preview if it looks like a scam type description for safe/suspicious results
                     const isScamTypeDescription = (scan.classification === 'safe' || scan.classification === 'suspicious') &&
                       (scan.content_preview.toLowerCase().includes('scam') || 
                        scan.content_preview.toLowerCase().includes('phishing') ||
                        scan.content_preview.toLowerCase().includes('credential'));
                     
-                    if (isScamTypeDescription) return null;
+                    if (isScamTypeDescription) {
+                      return null; // Don't show scam type info for safe/suspicious results
+                    }
                     
                     return (
                       <div className="mb-2">
@@ -571,6 +591,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                       <Clock className="h-3 w-3" />
                       {formatDate(scan.created_at)}
                     </div>
+                    {/* Only show scam_type for scam results */}
                     {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
                       <span className="capitalize">
                         {scan.analysis_result.scam_type.replace(/_/g, ' ')}
@@ -579,22 +600,20 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                   </div>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
           ))
         )}
       </div>
 
       {/* Export Button - Bottom Right */}
       {filteredScans.length > 0 && (
-        <div className="flex justify-between items-center mt-6 pt-4 border-t border-border/30">
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredScans.length} of {scans.length} scans
-          </p>
+        <div className="flex justify-end mt-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => downloadCSV(filteredScans)}
-            className="flex items-center gap-2 h-9 px-4 bg-background/50 border-border/50 hover:bg-purple-500/10 hover:border-purple-500/30 hover:text-purple-400 transition-all"
+            className="flex items-center gap-1.5 h-8"
           >
             <Download className="h-4 w-4" />
             Export CSV
