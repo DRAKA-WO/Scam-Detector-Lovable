@@ -2234,8 +2234,10 @@ function Dashboard() {
         {/* Features Section */}
         <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Dashboard Features</CardTitle>
-            <CardDescription>What you can do with your account</CardDescription>
+            <div>
+              <CardTitle>Dashboard Features</CardTitle>
+              <CardDescription>What you can do with your account</CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
