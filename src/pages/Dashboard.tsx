@@ -427,10 +427,9 @@ function Dashboard() {
         endDate = getEndOfDay(now)
         break
       case 'thisWeek':
-        // Start of week (Sunday 00:00:00) in local timezone
-        const dayOfWeek = now.getDay()
+        // Last 7 days (to match scan history "Last 7 days" filter)
         startDate = new Date(now)
-        startDate.setDate(now.getDate() - dayOfWeek)
+        startDate.setDate(now.getDate() - 7)
         startDate = getStartOfDay(startDate)
         // End of today
         endDate = getEndOfDay(now)
