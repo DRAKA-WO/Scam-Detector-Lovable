@@ -1651,7 +1651,7 @@ function Dashboard() {
                 </div>
               </TooltipTrigger>
               {Object.keys(filteredScamTypeBreakdown).length > 0 && (
-                <TooltipContent side="top" className="max-w-xs bg-popover border border-border">
+                <TooltipContent side="top" className="max-w-xs bg-black border border-gray-800">
                   <div className="space-y-1.5">
                     <p className="font-semibold text-sm mb-2">Scam Types Detected:</p>
                     {Object.entries(filteredScamTypeBreakdown)
