@@ -564,8 +564,11 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                       {getClassificationIcon(scan.classification)}
                       <span className="capitalize">{scan.classification}</span>
                     </div>
-                    <span className="text-muted-foreground text-sm">•</span>
-                    <span className="text-muted-foreground text-sm capitalize">{scan.scan_type}</span>
+                    {/* Scan Type Badge */}
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-900/40 text-gray-300 border border-gray-800/50">
+                      {getScanTypeIcon(scan.scan_type)}
+                      <span className="capitalize">{scan.scan_type}</span>
+                    </div>
                   </div>
 
                   {/* Preview */}
