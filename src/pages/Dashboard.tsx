@@ -98,6 +98,7 @@ function Dashboard() {
   const [scanHistory, setScanHistory] = useState<any[]>([])
   const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
   const [isRefreshingHistory, setIsRefreshingHistory] = useState(false)
+  const [scanHistoryKey, setScanHistoryKey] = useState(0) // Key to force re-render
   
   // Use alerts from context (for global notifications)
   let alertsContext
@@ -2153,6 +2154,7 @@ function Dashboard() {
                         const history = await getScanHistory(user.id)
                         console.log('📥 Refreshed scan history:', history.length, 'scans')
                         setScanHistory([...history]) // Force re-render with new array reference
+                        setScanHistoryKey(prev => prev + 1) // Force component re-render
                         await refreshStats()
                         console.log('✅ Refresh complete')
                       } catch (error) {
@@ -2187,6 +2189,7 @@ function Dashboard() {
               </div>
             ) : (
               <ScanHistory
+                key={scanHistoryKey}
                 userId={user?.id}
                 onScanClick={(scan) => setSelectedScan(scan)}
                 onRefresh={refreshStats}

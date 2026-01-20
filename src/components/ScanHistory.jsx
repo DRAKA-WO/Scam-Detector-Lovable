@@ -102,7 +102,8 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   }, [initialFilter])
 
   useEffect(() => {
-    if (externalScans) {
+    if (externalScans && externalScans.length >= 0) {
+      // Always update when externalScans changes (even if empty array)
       setScans(externalScans)
       setLoading(false)
     } else if (userId) {
