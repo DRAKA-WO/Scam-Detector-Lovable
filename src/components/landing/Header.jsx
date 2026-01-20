@@ -391,36 +391,52 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                       })()}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-96 p-0 bg-gray-900 border-gray-700">
-                    <div className="p-4 border-b border-gray-700">
-                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                        <Bell className="h-5 w-5" />
+                  <PopoverContent align="end" className="w-96 p-0 bg-gradient-to-br from-gray-900 via-gray-900 to-gray-950 border border-gray-800 shadow-2xl">
+                    <div className="relative overflow-hidden p-4 border-b border-gray-800 bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl"></div>
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2 relative z-10">
+                        <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                          <Bell className="h-4 w-4 text-purple-400" />
+                        </div>
                         Smart Notifications & Alerts
                       </h3>
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className="max-h-96 overflow-y-auto dark-scrollbar">
                       {alerts && alerts.length > 0 ? (
-                        <div className="p-2 space-y-2">
+                        <div className="p-3 space-y-2">
                           {alerts.map((alert) => (
                             <Card
                               key={alert.id || alert.type}
-                              className={`border-l-4 ${
-                                alert.severity === 'error' ? 'border-l-red-500 bg-red-500/5' :
-                                alert.severity === 'warning' ? 'border-l-yellow-500 bg-yellow-500/5' :
-                                'border-l-blue-500 bg-blue-500/5'
-                              } border-gray-700`}
+                              className={`relative overflow-hidden rounded-lg border transition-all ${
+                                alert.severity === 'error' 
+                                  ? 'bg-gradient-to-br from-red-500/10 via-card/50 to-card/50 border-red-500/30 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10' :
+                                  alert.severity === 'warning' 
+                                  ? 'bg-gradient-to-br from-yellow-500/10 via-card/50 to-card/50 border-yellow-500/30 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-yellow-500/10' :
+                                  'bg-gradient-to-br from-blue-500/10 via-card/50 to-card/50 border-blue-500/30 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10'
+                              }`}
                             >
-                              <CardContent className="pt-3 pb-3 px-3">
-                                <div className="flex items-start gap-2">
-                                  <AlertTriangle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
-                                    alert.severity === 'error' ? 'text-red-500' :
-                                    alert.severity === 'warning' ? 'text-yellow-500' :
-                                    'text-blue-500'
-                                  }`} />
-                                  <p className={`text-sm flex-1 ${
-                                    alert.severity === 'error' ? 'text-red-400' :
-                                    alert.severity === 'warning' ? 'text-yellow-400' :
-                                    'text-blue-400'
+                              <div className={`absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl opacity-30 ${
+                                alert.severity === 'error' ? 'bg-red-500' :
+                                alert.severity === 'warning' ? 'bg-yellow-500' :
+                                'bg-blue-500'
+                              }`}></div>
+                              <CardContent className="pt-3 pb-3 px-3 relative">
+                                <div className="flex items-start gap-3">
+                                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                                    alert.severity === 'error' ? 'bg-red-500/20' :
+                                    alert.severity === 'warning' ? 'bg-yellow-500/20' :
+                                    'bg-blue-500/20'
+                                  }`}>
+                                    <AlertTriangle className={`h-4 w-4 ${
+                                      alert.severity === 'error' ? 'text-red-400' :
+                                      alert.severity === 'warning' ? 'text-yellow-400' :
+                                      'text-blue-400'
+                                    }`} />
+                                  </div>
+                                  <p className={`text-sm flex-1 leading-relaxed ${
+                                    alert.severity === 'error' ? 'text-red-300' :
+                                    alert.severity === 'warning' ? 'text-yellow-300' :
+                                    'text-blue-300'
                                   }`}>
                                     {alert.message}
                                   </p>
@@ -429,9 +445,9 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => onDismissAlert(alert.id)}
-                                      className="h-5 w-5 p-0 flex-shrink-0 hover:bg-gray-800"
+                                      className="h-6 w-6 p-0 flex-shrink-0 hover:bg-gray-800/50 rounded-md transition-colors"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5 text-gray-400 hover:text-white" />
                                     </Button>
                                   )}
                                 </div>
@@ -440,12 +456,19 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                           ))}
                         </div>
                       ) : (
-                        <div className="p-4">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0 text-gray-400" />
-                            <p className="text-sm text-gray-400 flex-1">
-                              No alerts at this time. Alerts will appear here when unusual patterns, new scam types, or risk changes are detected.
-                            </p>
+                        <div className="p-6">
+                          <div className="flex flex-col items-center gap-3 text-center">
+                            <div className="p-3 rounded-full bg-gradient-to-br from-purple-500/10 to-pink-500/10">
+                              <Bell className="h-6 w-6 text-purple-400/50" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-300 mb-1">
+                                No alerts at this time
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Alerts will appear here when unusual patterns, new scam types, or risk changes are detected.
+                              </p>
+                            </div>
                           </div>
                         </div>
                       )}
