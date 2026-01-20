@@ -2134,6 +2134,28 @@ function Dashboard() {
                 <CardTitle>Scan History</CardTitle>
                 <CardDescription>View your scan history (last 30 days)</CardDescription>
               </div>
+              {/* Refresh button - only show when viewing list, not single result */}
+              {!selectedScan && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (user?.id) {
+                      try {
+                        const { getScanHistory } = await import('@/utils/scanHistory')
+                        const history = await getScanHistory(user.id)
+                        setScanHistory(history)
+                        await refreshStats()
+                      } catch (error) {
+                        console.error('Error refreshing scan history:', error)
+                      }
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
