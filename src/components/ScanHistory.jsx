@@ -490,7 +490,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             onClick={() => onScanClick && onScanClick(scan)}
           >
             <CardContent className="p-4">
-              <div className="flex items-start gap-4 relative">
+              <div className="flex items-center gap-4 relative">
                 {/* Image, Text, or URL Preview */}
                 <div className="flex-shrink-0 relative">
                   {scan.scan_type === 'image' && scan.image_url ? (
@@ -621,7 +621,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                 
                 {/* Clickable Arrow Indicator */}
                 <div className="flex-shrink-0 flex items-center justify-center">
-                  <ChevronRight className="h-6 w-6 text-blue-400 group-hover:text-blue-300 transition-colors" />
+                  <ChevronRight className="h-6 w-6 text-white/70 group-hover:text-white transition-colors" />
                 </div>
               </div>
             </CardContent>
