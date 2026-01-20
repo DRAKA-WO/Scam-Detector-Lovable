@@ -334,8 +334,6 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
 
   return (
     <div>
-      {/* Enhanced Filters */}
-      <div className="space-y-4 mb-4 -mt-4">
         {/* Search and Date Range Row */}
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search Input */}
