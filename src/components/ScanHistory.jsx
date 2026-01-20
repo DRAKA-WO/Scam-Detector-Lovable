@@ -481,7 +481,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
           filteredScans.map((scan) => (
           <Card
             key={scan.id}
-            className={`cursor-pointer transition-all hover:shadow-lg ${getClassificationColor(scan.classification)}`}
+            className={`cursor-pointer transition-all hover:shadow-lg bg-card/50 backdrop-blur-sm border ${getClassificationColor(scan.classification)}`}
             onClick={() => onScanClick && onScanClick(scan)}
           >
             <CardContent className="p-4">
