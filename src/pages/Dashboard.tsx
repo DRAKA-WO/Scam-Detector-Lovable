@@ -595,9 +595,9 @@ function Dashboard() {
         endDate = getEndOfDay(now)
         break
       case 'thisWeek':
-        const dayOfWeek = now.getDay()
+        // Last 7 days (to match filteredStats and scan history "Last 7 days" filter)
         startDate = new Date(now)
-        startDate.setDate(now.getDate() - dayOfWeek)
+        startDate.setDate(now.getDate() - 7)
         startDate = getStartOfDay(startDate)
         endDate = getEndOfDay(now)
         break
@@ -641,8 +641,9 @@ function Dashboard() {
     // Calculate breakdown from filtered scans
     const breakdown: Record<string, number> = {}
     filtered.forEach(scan => {
-      if (scan.classification === 'scam' && scan.analysis_result?.scam_type) {
-        const scamType = scan.analysis_result.scam_type
+      if (scan.classification === 'scam') {
+        // Count all scam scans, even if they don't have a scam_type
+        const scamType = scan.analysis_result?.scam_type || 'Unknown Scam Type'
         breakdown[scamType] = (breakdown[scamType] || 0) + 1
       }
     })
