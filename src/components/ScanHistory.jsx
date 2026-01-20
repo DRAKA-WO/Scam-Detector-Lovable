@@ -91,7 +91,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   const [filterClassification, setFilterClassification] = useState(initialFilter) // 'all', 'safe', 'suspicious', 'scam'
   const [previewImage, setPreviewImage] = useState(null) // For image preview modal
   const [searchQuery, setSearchQuery] = useState('') // Search query
-  const [dateRange, setDateRange] = useState('30') // '7', '30', 'all' (for last 7 days, last 30 days, all)
+  const [dateRange, setDateRange] = useState('30') // '0' (today), '7' (last 7 days), '30' (last 30 days)
   const [scamTypeFilter, setScamTypeFilter] = useState('all') // Filter by scam type
 
   // Update filter when initialFilter prop changes (from parent clicks)
@@ -299,11 +299,27 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
     }
 
     // Date range filter
-    if (dateRange !== 'all') {
-      const scanDate = new Date(scan.created_at)
-      const now = new Date()
-      const daysAgo = parseInt(dateRange)
+    const scanDate = new Date(scan.created_at)
+    const now = new Date()
+    const daysAgo = parseInt(dateRange)
+    
+    if (daysAgo === 0) {
+      // Today filter - compare local date strings
+      const scanLocalYear = scanDate.getFullYear()
+      const scanLocalMonth = scanDate.getMonth()
+      const scanLocalDate = scanDate.getDate()
+      const scanLocalDateStr = `${scanLocalYear}-${String(scanLocalMonth + 1).padStart(2, '0')}-${String(scanLocalDate).padStart(2, '0')}`
       
+      const todayLocalYear = now.getFullYear()
+      const todayLocalMonth = now.getMonth()
+      const todayLocalDate = now.getDate()
+      const todayLocalDateStr = `${todayLocalYear}-${String(todayLocalMonth + 1).padStart(2, '0')}-${String(todayLocalDate).padStart(2, '0')}`
+      
+      if (scanLocalDateStr !== todayLocalDateStr) {
+        return false
+      }
+    } else {
+      // Last N days filter
       // Set cutoff date to start of day (00:00:00) for accurate comparison
       const cutoffDate = new Date(now)
       cutoffDate.setDate(now.getDate() - daysAgo)
@@ -378,9 +394,9 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                 borderColor: 'hsl(var(--input))'
               }}
             >
+              <option value="0">Today</option>
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
-              <option value="all">All time</option>
             </select>
           </div>
         </div>
@@ -483,7 +499,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       <div className="grid gap-4 max-h-[520px] overflow-y-auto pr-2 dark-scrollbar">
         {filteredScans.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            {searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
+                    {searchQuery || dateRange !== '30' || filterClassification !== 'all' || scamTypeFilter !== 'all'
               ? 'No scans match your filters. Try adjusting your search criteria.'
               : `No ${filterClassification !== 'all' ? filterClassification : ''} scans found.`}
           </div>
