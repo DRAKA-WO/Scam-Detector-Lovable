@@ -1722,8 +1722,10 @@ function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
           <Card className="border-border bg-card/50 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Start scanning or manage your activity</CardDescription>
+              <div>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>Start scanning or manage your activity</CardDescription>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Risk Pattern Level Metric */}
