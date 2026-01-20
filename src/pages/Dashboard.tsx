@@ -97,6 +97,7 @@ function Dashboard() {
   const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
   const [scanHistory, setScanHistory] = useState<any[]>([])
   const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
+  const [isRefreshingHistory, setIsRefreshingHistory] = useState(false)
   
   // Use alerts from context (for global notifications)
   let alertsContext
@@ -2140,21 +2141,29 @@ function Dashboard() {
                   variant="outline"
                   size="sm"
                   className="relative z-10"
+                  disabled={isRefreshingHistory}
                   onClick={async (e) => {
                     e.stopPropagation()
+                    e.preventDefault()
                     if (user?.id) {
+                      setIsRefreshingHistory(true)
                       try {
+                        console.log('🔄 Manual refresh triggered')
                         const { getScanHistory } = await import('@/utils/scanHistory')
                         const history = await getScanHistory(user.id)
-                        setScanHistory(history)
+                        console.log('📥 Refreshed scan history:', history.length, 'scans')
+                        setScanHistory([...history]) // Force re-render with new array reference
                         await refreshStats()
+                        console.log('✅ Refresh complete')
                       } catch (error) {
-                        console.error('Error refreshing scan history:', error)
+                        console.error('❌ Error refreshing scan history:', error)
+                      } finally {
+                        setIsRefreshingHistory(false)
                       }
                     }
                   }}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingHistory ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
               )}
