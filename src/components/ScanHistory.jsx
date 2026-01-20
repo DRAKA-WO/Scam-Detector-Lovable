@@ -471,7 +471,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       <div className="grid gap-4 max-h-[520px] overflow-y-auto pr-2 dark-scrollbar">
         {filteredScans.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-{searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
+            {searchQuery || dateRange !== '30' || scamTypeFilter !== 'all'
               ? 'No scans match your filters. Try adjusting your search criteria.'
               : `No ${filterClassification !== 'all' ? filterClassification : ''} scans found.`}
           </div>
