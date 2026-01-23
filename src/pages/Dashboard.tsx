@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import chromeLogo from "@/assets/chrome-logo.svg"
 import edgeLogo from "@/assets/edge-logo.svg"
 import braveLogo from "@/assets/brave-logo.svg"
@@ -18,6 +18,7 @@ import ResultCard from '@/components/ResultCard'
 import { getRemainingUserChecks } from '@/utils/checkLimits'
 import { syncSessionToExtension, clearExtensionSession } from '@/utils/extensionSync'
 import { supabase } from '@/integrations/supabase/client'
+import { normalizeScamType } from '@/utils/insightsCalculator'
 import { useAlerts } from '@/contexts/AlertsContext'
 
 function Dashboard() {
@@ -94,11 +95,69 @@ function Dashboard() {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedScan, setSelectedScan] = useState(null)
   const [scanHistoryFilter, setScanHistoryFilter] = useState('all') // 'all', 'safe', 'suspicious', 'scam'
+  const [scanHistoryDateRange, setScanHistoryDateRange] = useState<string | null>(null) // Date range to apply when navigating from stat cards
   const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
   const [scanHistory, setScanHistory] = useState<any[]>([])
-  const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>('thisMonth')
+  // Initialize filter to 'thisMonth' to prevent flash (will be adjusted by useEffect if needed)
+  const [statsTimeFilter, setStatsTimeFilter] = useState<'today' | 'thisWeek' | 'thisMonth'>(() => {
+    // Try to get from localStorage first
+    try {
+      const saved = localStorage.getItem('scam_checker_stats_time_filter')
+      if (saved && (saved === 'today' || saved === 'thisWeek' || saved === 'thisMonth')) {
+        return saved as 'today' | 'thisWeek' | 'thisMonth'
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+    // Default to 'thisMonth' since that's usually what gets selected
+    return 'thisMonth'
+  })
+  const hasSetInitialFilter = useRef(false) // Track if we've set the initial filter based on scan counts
+  const [isScanHistoryLoaded, setIsScanHistoryLoaded] = useState(false) // Track if scan history has been loaded
+  const hasSetInitialScanHistoryDateRange = useRef(false) // Track if we've set the initial scan history date range
   const [isRefreshingHistory, setIsRefreshingHistory] = useState(false)
   const [scanHistoryKey, setScanHistoryKey] = useState(0) // Key to force re-render
+  
+  // Cache for stats to reduce Supabase requests
+  const statsCache = useRef<{ data: any; timestamp: number } | null>(null)
+  const STATS_CACHE_DURATION = 30000 // 30 seconds cache
+  const scanHistoryCache = useRef<{ data: any[]; timestamp: number } | null>(null)
+  const SCAN_HISTORY_CACHE_DURATION = 30000 // 30 seconds cache
+  const scanHistoryScrollPosition = useRef<number>(0) // Store scroll position of scan history container when viewing a scan
+  const pageScrollPosition = useRef<number>(0) // Store page scroll position when viewing a scan
+  const isRestoringScroll = useRef<boolean>(false) // Flag to prevent multiple restorations
+  
+  // Prevent browser's automatic scroll restoration
+  useEffect(() => {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual'
+    }
+  }, [])
+  
+  // Restore page scroll position when returning to scan history (keep page position unchanged)
+  useEffect(() => {
+    if (!selectedScan && isRestoringScroll.current && pageScrollPosition.current > 0) {
+      // Restore page scroll to where it was when the scan was clicked
+      const savedPagePosition = pageScrollPosition.current
+      console.log('📍 Restoring page scroll position:', savedPagePosition)
+      
+      // Restore page scroll immediately and maintain it
+      window.scrollTo({
+        top: savedPagePosition,
+        left: 0,
+        behavior: 'auto'
+      })
+      
+      // Try a few more times to ensure it sticks
+      setTimeout(() => {
+        window.scrollTo(0, savedPagePosition)
+      }, 50)
+      setTimeout(() => {
+        window.scrollTo(0, savedPagePosition)
+        isRestoringScroll.current = false
+      }, 150)
+    }
+  }, [selectedScan])
   
   // Use alerts from context (for global notifications)
   let alertsContext
@@ -122,7 +181,35 @@ function Dashboard() {
   // Use context values if available, otherwise use local state
   const alerts = alertsContext?.alerts || localAlerts
   const currentRiskLevel = alertsContext?.currentRiskLevel || localCurrentRiskLevel
-  const [isTipExpanded, setIsTipExpanded] = useState(true) // Tip expanded by default
+  // Load risk pattern tip expanded state from localStorage (default: true)
+  // Risk patterns tip: Always expanded on first visit, then respects user preference
+  const [isTipExpanded, setIsTipExpanded] = useState(() => {
+    try {
+      const saved = localStorage.getItem('scam_checker_risk_pattern_tip_expanded')
+      // If no saved preference exists, default to expanded (true)
+      // Only use saved value if user has explicitly interacted with it
+      if (saved === null) {
+        return true // First time - always expanded
+      }
+      return JSON.parse(saved)
+    } catch {
+      return true // On error, default to expanded
+    }
+  })
+  // First scan tip: Always expanded on first visit, then respects user preference
+  const [isFirstScanTipExpanded, setIsFirstScanTipExpanded] = useState(() => {
+    try {
+      const saved = localStorage.getItem('scam_checker_first_scan_tip_expanded')
+      // If no saved preference exists, default to expanded (true)
+      // Only use saved value if user has explicitly interacted with it
+      if (saved === null) {
+        return true // First time - always expanded
+      }
+      return JSON.parse(saved)
+    } catch {
+      return true // On error, default to expanded
+    }
+  })
 
   // Helper functions for dismissed alerts persistence
   const getDismissedAlerts = (userId: string): Record<string, boolean> => {
@@ -158,12 +245,36 @@ function Dashboard() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [shouldRemoveAvatar, setShouldRemoveAvatar] = useState(false)
+  const [avatarImageError, setAvatarImageError] = useState(false)
   const [accountError, setAccountError] = useState('')
   const [accountSuccess, setAccountSuccess] = useState('')
   const [accountLoading, setAccountLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-sync existing session to extension on Dashboard load
+  // Get avatar URL (prioritize Gmail picture, then custom avatar, then preview)
+  const avatarUrl = useMemo(() => {
+    if (editingSection === 'profile' && avatarPreview) {
+      return avatarPreview
+    }
+    if (editingSection === 'profile' && shouldRemoveAvatar) {
+      return null
+    }
+    // Gmail/Google OAuth provides picture, custom uploads use avatar_url
+    return user?.user_metadata?.picture || user?.user_metadata?.avatar_url || null
+  }, [editingSection, avatarPreview, shouldRemoveAvatar, user?.user_metadata?.picture, user?.user_metadata?.avatar_url])
+
+  // Reset avatar error when URL changes
+  useEffect(() => {
+    setAvatarImageError(false)
+  }, [avatarUrl])
+
+  // Get user's initial for fallback (same logic as Header component)
+  const userInitial = useMemo(() => {
+    const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
+    return userName.charAt(0).toUpperCase()
+  }, [user?.user_metadata?.full_name, user?.user_metadata?.name, user?.email])
+
+  // Auto-sync existing session to extension on Dashboard load and retry failed scans
   useEffect(() => {
     const syncExistingSession = async () => {
       try {
@@ -171,8 +282,6 @@ function Dashboard() {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (session && session.user && !error) {
-          console.log('🔍 Dashboard: Syncing session to extension...');
-          
           // Fetch plan first, then sync with plan
           let userPlan = 'FREE';
           try {
@@ -184,14 +293,28 @@ function Dashboard() {
             
             if (!planError && planData?.plan) {
               userPlan = planData.plan;
-              console.log('📊 Dashboard: Fetched plan for sync:', userPlan);
             }
           } catch (planErr) {
             console.warn('⚠️ Dashboard: Error fetching plan for sync:', planErr);
           }
           
           await syncSessionToExtension(session, session.user.id, null, userPlan);
-          console.log('✅ Dashboard: Session synced to extension with plan:', userPlan);
+          
+          // Retry any failed scans from localStorage
+          try {
+            const { retryFailedScans } = await import('@/utils/scanHistory');
+            const retriedCount = await retryFailedScans(session.user.id);
+            if (retriedCount > 0) {
+              console.log(`✅ Successfully retried ${retriedCount} failed scans`);
+              // Refresh scan history to show retried scans
+              const { getScanHistory } = await import('@/utils/scanHistory');
+              const history = await getScanHistory(session.user.id);
+              setScanHistory(history);
+              setIsScanHistoryLoaded(true);
+            }
+          } catch (retryError) {
+            console.error('Error retrying failed scans:', retryError);
+          }
         }
       } catch (error) {
         console.error('Dashboard: Error syncing session to extension:', error);
@@ -207,7 +330,6 @@ function Dashboard() {
     
     const handleChecksUpdate = () => {
       const checks = getRemainingUserChecks(user.id);
-      console.log('🔄 Dashboard: Checks updated in real-time', checks);
       setRemainingChecks(checks);
     };
     
@@ -286,6 +408,7 @@ function Dashboard() {
       }
       
       // Update current risk level (local state for backward compatibility)
+      // The useEffect hook will handle auto-expanding when this value changes
       setLocalCurrentRiskLevel(riskLevel)
       
       // Alert for unusual spike in scams (relaxed condition: >1 scam and >30% increase)
@@ -386,6 +509,26 @@ function Dashboard() {
     }
   }, [user?.id, localCurrentRiskLevel])
 
+  // Track previous risk level to detect changes
+  const prevRiskLevelRef = useRef<string | null>(null)
+  
+  // Auto-expand risk pattern section when risk level changes
+  useEffect(() => {
+    // Only expand if risk level actually changed (not on initial load)
+    if (localCurrentRiskLevel !== null && prevRiskLevelRef.current !== null && prevRiskLevelRef.current !== localCurrentRiskLevel) {
+      // Risk level changed - auto-expand the section
+      setIsTipExpanded(true)
+      // Also update localStorage to reflect the auto-expansion
+      try {
+        localStorage.setItem('scam_checker_risk_pattern_tip_expanded', JSON.stringify(true))
+      } catch (error) {
+        console.warn('Failed to save risk pattern tip state:', error)
+      }
+    }
+    // Update ref for next comparison
+    prevRiskLevelRef.current = localCurrentRiskLevel
+  }, [localCurrentRiskLevel]) // Only trigger when risk level actually changes
+
   // Regenerate alerts whenever scan history changes
   useEffect(() => {
     generateAlerts(scanHistory)
@@ -447,16 +590,6 @@ function Dashboard() {
         endDate = getEndOfDay(now)
     }
 
-    console.log('🔍 Filtering stats:', {
-      filter: statsTimeFilter,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      startTime: startDate.getTime(),
-      endTime: endDate.getTime(),
-      totalScans: scanHistory.length,
-      now: now.toISOString()
-    })
-
     const filtered = scanHistory.filter(scan => {
       if (!scan.created_at) return false
       
@@ -465,74 +598,25 @@ function Dashboard() {
       
       // Check if date is valid
       if (isNaN(scanDate.getTime())) {
-        console.warn('⚠️ Invalid date for scan:', scan.id, scan.created_at)
         return false
       }
       
-      // Convert scan date to local date components for comparison
-      // This ensures we're comparing "today" in the user's local timezone
-      const scanLocalYear = scanDate.getFullYear()
-      const scanLocalMonth = scanDate.getMonth()
-      const scanLocalDate = scanDate.getDate()
-      
-      // Get local date components for start/end boundaries
-      const startLocalYear = startDate.getFullYear()
-      const startLocalMonth = startDate.getMonth()
-      const startLocalDate = startDate.getDate()
-      const startLocalHours = startDate.getHours()
-      const startLocalMinutes = startDate.getMinutes()
-      const startLocalSeconds = startDate.getSeconds()
-      
-      const endLocalYear = endDate.getFullYear()
-      const endLocalMonth = endDate.getMonth()
-      const endLocalDate = endDate.getDate()
-      const endLocalHours = endDate.getHours()
-      const endLocalMinutes = endDate.getMinutes()
-      const endLocalSeconds = endDate.getSeconds()
-      
-      // Compare using timestamps (this handles timezone correctly)
-      // getTime() returns UTC milliseconds since epoch, so comparison is timezone-agnostic
+      // Compare using timestamps (most reliable and timezone-agnostic)
       const scanTime = scanDate.getTime()
       const startTime = startDate.getTime()
       const endTime = endDate.getTime()
       
-      // Double-check: also compare local date strings to ensure we're filtering correctly
-      const scanLocalDateStr = `${scanLocalYear}-${String(scanLocalMonth + 1).padStart(2, '0')}-${String(scanLocalDate).padStart(2, '0')}`
-      const startLocalDateStr = `${startLocalYear}-${String(startLocalMonth + 1).padStart(2, '0')}-${String(startLocalDate).padStart(2, '0')}`
-      const endLocalDateStr = `${endLocalYear}-${String(endLocalMonth + 1).padStart(2, '0')}-${String(endLocalDate).padStart(2, '0')}`
-      
-      // Use timestamp comparison (most reliable)
-      const isInRange = scanTime >= startTime && scanTime <= endTime
-      
-      // For "today" filter, use local date string comparison to avoid timezone edge cases
-      let finalInRange = isInRange
+      // For "today" filter, also check if scan is very recent (within last 5 minutes)
+      // This ensures newly added scans are always included even if there's a small timezone mismatch
       if (statsTimeFilter === 'today') {
-        // For today, the scan's local date must match today's local date exactly
-        // This ensures we only get scans from today, not yesterday or tomorrow
-        finalInRange = scanLocalDateStr === startLocalDateStr
-      } else {
-        // For week/month filters, use timestamp comparison
-        finalInRange = isInRange
+        const now = Date.now()
+        const fiveMinutesAgo = now - (5 * 60 * 1000)
+        // Include if: (1) within time range OR (2) very recent (within last 5 minutes)
+        return (scanTime >= startTime && scanTime <= endTime) || (scanTime >= fiveMinutesAgo && scanTime <= now)
       }
       
-      // Log all scans for debugging (limited to avoid spam)
-      if (scanHistory.length <= 25) {
-        console.log(`🔍 Scan ${scanHistory.indexOf(scan) + 1}/${scanHistory.length}:`, {
-          scanId: scan.id?.substring(0, 8),
-          scanDateISO: scanDate.toISOString(),
-          scanLocalDate: scanLocalDateStr,
-          startLocalDate: startLocalDateStr,
-          endLocalDate: endLocalDateStr,
-          scanTime,
-          startTime,
-          endTime,
-          isInRange: isInRange ? '✅' : '❌',
-          finalInRange: finalInRange ? '✅' : '❌',
-          filter: statsTimeFilter
-        })
-      }
-      
-      return finalInRange
+      // For week/month filters, use timestamp comparison
+      return scanTime >= startTime && scanTime <= endTime
     })
 
     const result = {
@@ -549,18 +633,6 @@ function Dashboard() {
       acc[dateKey] = (acc[dateKey] || 0) + 1
       return acc
     }, {} as Record<string, number>)
-
-    console.log('📊 Filtered stats result:', {
-      filter: statsTimeFilter,
-      ...result,
-      filteredCount: filtered.length,
-      totalScansInHistory: scanHistory.length,
-      dateDistribution,
-      dateRange: {
-        start: startDate.toISOString(),
-        end: endDate.toISOString()
-      }
-    })
 
     return result
   }, [scanHistory, statsTimeFilter])
@@ -643,7 +715,9 @@ function Dashboard() {
     filtered.forEach(scan => {
       if (scan.classification === 'scam') {
         // Count all scam scans, even if they don't have a scam_type
-        const scamType = scan.analysis_result?.scam_type || 'Unknown Scam Type'
+        // Normalize scam types to group similar ones together
+        const originalScamType = scan.analysis_result?.scam_type || 'Unknown Scam Type'
+        const scamType = normalizeScamType(originalScamType)
         breakdown[scamType] = (breakdown[scamType] || 0) + 1
       }
     })
@@ -651,72 +725,114 @@ function Dashboard() {
     return breakdown
   }, [scanHistory, statsTimeFilter])
 
-  // Real-time subscription to scan_history table for automatic updates
-  useEffect(() => {
-    if (!user?.id) return
-
-    console.log('📡 Dashboard: Setting up real-time subscription to scan_history for user:', user.id)
-    
-    // Subscribe to changes in scan_history table
-    const channel = supabase
-      .channel(`scan_history_changes_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'scan_history',
-          filter: `user_id=eq.${user.id}`
-        },
-        async (payload) => {
-          console.log('🔄 Dashboard: Scan history changed:', payload.eventType, payload.new || payload.old)
-          // Refresh scan history when any change occurs
-          try {
-            const { getScanHistory } = await import('@/utils/scanHistory')
-            const history = await getScanHistory(user.id)
-            setScanHistory(history)
-            console.log('✅ Dashboard: Scan history refreshed via real-time subscription, new length:', history.length)
-          } catch (error) {
-            console.error('❌ Dashboard: Error refreshing scan history:', error)
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Dashboard: Subscription status:', status)
-      })
-
-    return () => {
-      console.log('📡 Dashboard: Unsubscribing from scan_history changes')
-      supabase.removeChannel(channel)
-    }
-  }, [user?.id])
-
-  // Function to refresh stats from database
-  const refreshStats = async () => {
+  // Function to refresh stats from database with caching
+  // Defined here before useEffects that use it to avoid "before initialization" error
+  const refreshStats = useCallback(async (retryCount = 0, forceRefresh = false) => {
     if (!user?.id) return
     
     try {
+      const now = Date.now()
+      
+      // Check cache for stats (unless forced refresh)
+      if (!forceRefresh && statsCache.current) {
+        const cacheAge = now - statsCache.current.timestamp
+        if (cacheAge < STATS_CACHE_DURATION) {
+          // Use cached stats
+          setStats(statsCache.current.data)
+          // Still refresh scan history if cache is stale
+          if (!scanHistoryCache.current || (now - scanHistoryCache.current.timestamp) >= SCAN_HISTORY_CACHE_DURATION) {
+            // Only refresh scan history, not stats
+            const { getScanHistory } = await import('@/utils/scanHistory')
+            const history = await getScanHistory(user.id)
+            scanHistoryCache.current = { data: history, timestamp: now }
+            // Merge with existing state
+            setScanHistory(prev => {
+              if (!prev || prev.length === 0) return history
+              const existingMap = new Map(prev.map(scan => [scan.id, scan]))
+              history.forEach(scan => existingMap.set(scan.id, scan))
+              return Array.from(existingMap.values()).sort((a, b) => 
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              )
+            })
+          }
+          return // Use cached data, skip database fetch
+        }
+      }
+      
+      // Cache expired or force refresh - fetch from database
       const { getUserPermanentStats, getScanHistory } = await import('@/utils/scanHistory')
-      const userStats = await getUserPermanentStats(user.id)
-      console.log('🔄 Dashboard: Refreshed permanent stats', userStats)
+      
+      // Batch both requests together (they can run in parallel)
+      const [userStats, history] = await Promise.all([
+        getUserPermanentStats(user.id),
+        (async () => {
+          // Check cache for scan history first
+          if (!forceRefresh && scanHistoryCache.current) {
+            const cacheAge = now - scanHistoryCache.current.timestamp
+            if (cacheAge < SCAN_HISTORY_CACHE_DURATION) {
+              return scanHistoryCache.current.data
+            }
+          }
+          // Add small delay on retry to allow database to commit
+          if (retryCount > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500 * retryCount))
+          }
+          return await getScanHistory(user.id)
+        })()
+      ])
+      
+      // Update cache and state
+      statsCache.current = { data: userStats, timestamp: now }
       setStats(userStats)
       
-      // Calculate scam type breakdown and monthly scans
-      try {
-        const history = await getScanHistory(user.id)
-        setScanHistory(history)
+      if (history) {
+        scanHistoryCache.current = { data: history, timestamp: now }
         
-        // Calculate monthly scans (last 30 days)
-        setMonthlyScans(history.length)
+        // Mark scan history as loaded
+        setIsScanHistoryLoaded(true)
         
-        // Calculate scam type breakdown if there are scams detected
+        // Merge with existing scanHistory to preserve any scans added optimistically
+        // This prevents overwriting scans that were just added but might not be in DB yet
+        let mergedHistory: any[] = []
+        setScanHistory(prev => {
+          if (!prev || prev.length === 0) {
+            mergedHistory = history
+            setMonthlyScans(history.length)
+            return history
+          }
+          
+          // Create a map of existing scans by ID for quick lookup
+          const existingMap = new Map(prev.map(scan => [scan.id, scan]))
+          
+          // Add all scans from database (database is source of truth for existing scans)
+          history.forEach(scan => {
+            existingMap.set(scan.id, scan)
+          })
+          
+          // Convert back to array and sort by created_at (most recent first)
+          mergedHistory = Array.from(existingMap.values()).sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime()
+            const dateB = new Date(b.created_at).getTime()
+            return dateB - dateA
+          })
+          
+          setMonthlyScans(mergedHistory.length)
+          return mergedHistory
+        })
+        
+        // Calculate scam type breakdown using merged history (includes optimistic updates)
         if (userStats.scamsDetected > 0) {
           const breakdown: Record<string, number> = {}
           
-          history.forEach(scan => {
+          // Use mergedHistory if available, otherwise use fetched history
+          const scansToProcess = mergedHistory.length > 0 ? mergedHistory : history
+          
+          scansToProcess.forEach(scan => {
             if (scan.classification === 'scam') {
               // Count all scams, even if they don't have a scam_type
-              const scamType = scan.analysis_result?.scam_type || 'Unknown Scam Type'
+              // Normalize scam types to group similar ones together
+              const originalScamType = scan.analysis_result?.scam_type || 'Unknown Scam Type'
+              const scamType = normalizeScamType(originalScamType)
               breakdown[scamType] = (breakdown[scamType] || 0) + 1
             }
           })
@@ -727,10 +843,6 @@ function Dashboard() {
         }
 
         // Alerts will be generated automatically via useEffect when scanHistory changes
-      } catch (error) {
-        console.error('Error calculating scam type breakdown:', error)
-        setMonthlyScans(0)
-        setScanHistory([])
       }
       
       // Also refresh plan with retry logic
@@ -767,8 +879,327 @@ function Dashboard() {
       await refreshPlanWithRetry()
     } catch (error) {
       console.error('❌ Dashboard: Error refreshing stats:', error)
+      // Don't clear state on error, keep existing data
     }
-  }
+  }, [user?.id])
+
+  // Real-time subscriptions to scan_history and user_stats tables for automatic updates
+  // This reduces the need for polling - only fetches when data actually changes
+  useEffect(() => {
+    if (!user?.id) return
+    
+    // Subscribe to changes in scan_history table
+    const scanHistoryChannel = supabase
+      .channel(`scan_history_changes_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'scan_history',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          // Real-time change detected - invalidate cache and refresh
+          statsCache.current = null
+          scanHistoryCache.current = null
+          
+          // Refresh stats (will fetch from database since cache is cleared)
+          try {
+            await refreshStats(0, true) // forceRefresh = true
+          } catch (error) {
+            console.error('❌ Dashboard: Error refreshing after real-time change:', error)
+          }
+        }
+      )
+      .subscribe()
+
+    // Subscribe to changes in user_stats table
+    const userStatsChannel = supabase
+      .channel(`user_stats_changes_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE', // Only listen to updates (stats are updated, not inserted/deleted)
+          schema: 'public',
+          table: 'user_stats',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          // Stats updated - invalidate cache and refresh
+          statsCache.current = null
+          
+          // Refresh stats (will fetch from database since cache is cleared)
+          try {
+            await refreshStats(0, true) // forceRefresh = true
+          } catch (error) {
+            console.error('❌ Dashboard: Error refreshing after stats update:', error)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(scanHistoryChannel)
+      supabase.removeChannel(userStatsChannel)
+    }
+  }, [user?.id, refreshStats]) // refreshStats is stable (useCallback), safe to include
+
+  // Auto-refresh stats when scanHistory changes (fallback if real-time doesn't trigger)
+  // filteredStats useMemo will automatically recalculate when scanHistory changes
+
+  // Set default filter based on scan counts: default to "today", only use "this month" if it has more scans
+  // Only runs if user has NO saved preference (first time or cleared localStorage)
+  useEffect(() => {
+    if (scanHistory.length === 0 || !user?.id || hasSetInitialFilter.current) {
+      return // Don't set filter if no scans, no user, or already set
+    }
+    
+    // Check if user has a saved preference - if yes, don't override with calculated default
+    const savedFilter = localStorage.getItem('scam_checker_stats_time_filter')
+    if (savedFilter && (savedFilter === 'today' || savedFilter === 'thisWeek' || savedFilter === 'thisMonth')) {
+      // User has a saved preference - respect it and don't calculate default
+      hasSetInitialFilter.current = true
+      return
+    }
+    
+    // No saved preference - calculate default based on scan counts
+
+    const now = new Date()
+    
+    // Helper to get start/end of day
+    const getStartOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
+    const getEndOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(23, 59, 59, 999)
+      return d
+    }
+
+    // Calculate "today" count
+    const todayStart = getStartOfDay(now)
+    const todayEnd = getEndOfDay(now)
+    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    
+    const todayCount = scanHistory.filter(scan => {
+      if (!scan.created_at) return false
+      const scanDate = new Date(scan.created_at)
+      if (isNaN(scanDate.getTime())) return false
+      const scanLocalDateStr = `${scanDate.getFullYear()}-${String(scanDate.getMonth() + 1).padStart(2, '0')}-${String(scanDate.getDate()).padStart(2, '0')}`
+      return scanLocalDateStr === todayDateStr
+    }).length
+
+    // Calculate "this month" count
+    const monthStart = getStartOfDay(new Date(now.getFullYear(), now.getMonth(), 1))
+    const monthEnd = getEndOfDay(now)
+    const monthStartTime = monthStart.getTime()
+    const monthEndTime = monthEnd.getTime()
+    
+    const monthCount = scanHistory.filter(scan => {
+      if (!scan.created_at) return false
+      const scanDate = new Date(scan.created_at)
+      if (isNaN(scanDate.getTime())) return false
+      const scanTime = scanDate.getTime()
+      return scanTime >= monthStartTime && scanTime <= monthEndTime
+    }).length
+
+    // Set filter: use "this month" only if it has more scans than "today"
+    const newFilter = monthCount > todayCount ? 'thisMonth' : 'today'
+    setStatsTimeFilter(newFilter)
+    
+    // Save calculated default to localStorage (only if no user preference exists)
+    // This ensures the calculated default persists, but user clicks will override it
+    try {
+      localStorage.setItem('scam_checker_stats_time_filter', newFilter)
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+    
+    hasSetInitialFilter.current = true
+  }, [scanHistory, user?.id])
+
+  // Set default scan history date range based on scan counts: default to "today", only use "last 30 days" if it has more scans
+  useEffect(() => {
+    if (scanHistory.length === 0 || !user?.id || hasSetInitialScanHistoryDateRange.current) {
+      return // Don't set date range if no scans, no user, or already set
+    }
+
+    // Don't override if scanHistoryDateRange was explicitly set (e.g., from stat card navigation)
+    // Check this before calculating to avoid unnecessary work
+    if (scanHistoryDateRange !== null) {
+      hasSetInitialScanHistoryDateRange.current = true
+      return
+    }
+
+    const now = new Date()
+    
+    // Helper to get start/end of day
+    const getStartOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
+    const getEndOfDay = (date: Date) => {
+      const d = new Date(date)
+      d.setHours(23, 59, 59, 999)
+      return d
+    }
+
+    // Calculate "today" count (dateRange '0')
+    const todayStart = getStartOfDay(now)
+    const todayEnd = getEndOfDay(now)
+    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    
+    const todayCount = scanHistory.filter(scan => {
+      if (!scan.created_at) return false
+      const scanDate = new Date(scan.created_at)
+      if (isNaN(scanDate.getTime())) return false
+      const scanLocalDateStr = `${scanDate.getFullYear()}-${String(scanDate.getMonth() + 1).padStart(2, '0')}-${String(scanDate.getDate()).padStart(2, '0')}`
+      return scanLocalDateStr === todayDateStr
+    }).length
+
+    // Calculate "last 30 days" count (dateRange '30')
+    const thirtyDaysAgo = new Date(now)
+    thirtyDaysAgo.setDate(now.getDate() - 30)
+    const thirtyDaysAgoStart = getStartOfDay(thirtyDaysAgo)
+    const todayEndTime = getEndOfDay(now).getTime()
+    const thirtyDaysAgoStartTime = thirtyDaysAgoStart.getTime()
+    
+    const last30DaysCount = scanHistory.filter(scan => {
+      if (!scan.created_at) return false
+      const scanDate = new Date(scan.created_at)
+      if (isNaN(scanDate.getTime())) return false
+      const scanTime = scanDate.getTime()
+      return scanTime >= thirtyDaysAgoStartTime && scanTime <= todayEndTime
+    }).length
+
+    // Set date range: use "last 30 days" only if it has more scans than "today"
+    if (last30DaysCount > todayCount) {
+      setScanHistoryDateRange('30')
+    } else {
+      // Default to "today"
+      setScanHistoryDateRange('0')
+    }
+    
+    hasSetInitialScanHistoryDateRange.current = true
+  }, [scanHistory, user?.id, scanHistoryDateRange]) // Include scanHistoryDateRange to read current value, but ref prevents re-running logic
+
+  // Polling fallback: Refresh stats every 30 seconds in case real-time subscription doesn't work
+  // Increased from 10s to 30s to reduce Supabase requests (~67% reduction)
+  useEffect(() => {
+    if (!user?.id) return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        // Use cached data if available (won't fetch if cache is valid)
+        await refreshStats(0, false) // Don't force refresh, use cache
+      } catch (error) {
+        console.error('❌ Dashboard: Error in polling refresh:', error)
+      }
+    }, 30000) // 30 seconds (optimized for cost - reduced from 10s)
+
+    return () => {
+      clearInterval(pollInterval)
+    }
+  }, [user?.id, refreshStats])
+
+  // Listen for scan saved events to refresh stats immediately
+  useEffect(() => {
+    const handleScanSaved = async (event: Event) => {
+      const customEvent = event as CustomEvent
+      const savedScan = customEvent.detail
+      
+      // Immediately add the new scan to scanHistory state if we have it
+      if (savedScan && savedScan.id) {
+        // Invalidate cache since we have new data
+        statsCache.current = null
+        scanHistoryCache.current = null
+        
+        // Ensure the scan has a proper created_at timestamp (use current time if missing)
+        const scanWithTimestamp = {
+          ...savedScan,
+          created_at: savedScan.created_at || new Date().toISOString()
+        }
+        
+        setScanHistory(prev => {
+          // Check if scan already exists (avoid duplicates)
+          const exists = prev.some(s => s.id === scanWithTimestamp.id)
+          if (exists) return prev
+          // Add new scan at the beginning (most recent first)
+          const updated = [scanWithTimestamp, ...prev]
+          // Also update monthly scans count
+          setMonthlyScans(updated.length)
+          return updated
+        })
+        
+        // Force immediate UI update by triggering a re-render
+        setScanHistoryKey(prev => prev + 1)
+      }
+      
+      // Also check sessionStorage for any missed scans
+      if (typeof window !== 'undefined') {
+        try {
+          const lastSavedScan = sessionStorage.getItem('lastSavedScan')
+          if (lastSavedScan) {
+            const scan = JSON.parse(lastSavedScan)
+            if (scan && scan.id) {
+              setScanHistory(prev => {
+                const exists = prev.some(s => s.id === scan.id)
+                if (exists) return prev
+                const updated = [scan, ...prev]
+                setMonthlyScans(updated.length)
+                return updated
+              })
+              sessionStorage.removeItem('lastSavedScan')
+            }
+          }
+        } catch (e) {
+          // Ignore sessionStorage errors
+        }
+      }
+      
+      try {
+        // Force refresh stats from database after a delay to catch database replication
+        // Use forceRefresh=true to bypass cache since we just saved a new scan
+        setTimeout(async () => {
+          await refreshStats(0, true) // forceRefresh = true
+        }, 1500)
+      } catch (error) {
+        console.error('❌ Dashboard: Error refreshing stats after scan save:', error)
+      }
+    }
+
+    window.addEventListener('scanSaved', handleScanSaved as EventListener)
+    
+    // Also check for saved scans on mount (in case event was missed)
+    if (typeof window !== 'undefined') {
+      try {
+        const lastSavedScan = sessionStorage.getItem('lastSavedScan')
+        if (lastSavedScan) {
+          const scan = JSON.parse(lastSavedScan)
+          if (scan && scan.id) {
+            setScanHistory(prev => {
+              const exists = prev.some(s => s.id === scan.id)
+              if (exists) return prev
+              const updated = [scan, ...prev]
+              setMonthlyScans(updated.length)
+              return updated
+            })
+            sessionStorage.removeItem('lastSavedScan')
+          }
+        }
+      } catch (e) {
+        // Ignore sessionStorage errors
+      }
+    }
+    
+    return () => {
+      window.removeEventListener('scanSaved', handleScanSaved as EventListener)
+    }
+  }, [refreshStats])
 
   useEffect(() => {
     const currentEffectId = ++effectIdRef.current
@@ -785,25 +1216,23 @@ function Dashboard() {
         return false
       }
       
-      console.log('📊 Dashboard: Updating user data', session.user.email)
       setUser(session.user)
       
       // Get user's remaining checks
       const checks = getRemainingUserChecks(session.user.id)
-      console.log('📊 Dashboard: User checks', checks)
       setRemainingChecks(checks)
       
       // Get user stats from permanent stats table (cumulative, never decrease)
       try {
         const { getUserPermanentStats, getScanHistory } = await import('@/utils/scanHistory')
         const userStats = await getUserPermanentStats(session.user.id)
-        console.log('📊 Dashboard: User permanent stats', userStats)
         setStats(userStats)
         
         // Calculate scam type breakdown and monthly scans
         try {
           const history = await getScanHistory(session.user.id)
           setScanHistory(history)
+          setIsScanHistoryLoaded(true)
           
           // Calculate monthly scans (last 30 days)
           setMonthlyScans(history.length)
@@ -814,7 +1243,9 @@ function Dashboard() {
             
             history.forEach(scan => {
               if (scan.classification === 'scam' && scan.analysis_result?.scam_type) {
-                const scamType = scan.analysis_result.scam_type
+                // Normalize scam types to group similar ones together
+                const originalScamType = scan.analysis_result.scam_type
+                const scamType = normalizeScamType(originalScamType)
                 breakdown[scamType] = (breakdown[scamType] || 0) + 1
               }
             })
@@ -827,6 +1258,7 @@ function Dashboard() {
           console.error('Error calculating scam type breakdown:', error)
           setMonthlyScans(0)
           setScanHistory([])
+          setIsScanHistoryLoaded(true) // Mark as loaded even if empty
         }
       } catch (error) {
         console.error('❌ Dashboard: Error fetching stats:', error)
@@ -897,7 +1329,6 @@ function Dashboard() {
     // Check session immediately and synchronously
     const checkSessionImmediately = async () => {
       try {
-        console.log('📊 Dashboard: Checking session immediately...')
         const { supabase } = await import('@/integrations/supabase/client')
         const { data: { session }, error } = await supabase.auth.getSession()
         
@@ -907,7 +1338,6 @@ function Dashboard() {
         }
         
         if (session?.user) {
-          console.log('📊 Dashboard: Session found immediately')
           return updateUserData(session)
         }
         
@@ -921,7 +1351,6 @@ function Dashboard() {
     // Set up auth listener
     const setupAuthListener = async () => {
       try {
-        console.log('📊 Dashboard: Setting up auth listener...')
         const { supabase } = await import('@/integrations/supabase/client')
         
         // Check session immediately first
@@ -937,11 +1366,9 @@ function Dashboard() {
           if (currentEffectId !== effectIdRef.current) {
             return
           }
-          console.log('📊 Dashboard: Auth state changed', _event, session ? 'Session received' : 'No session')
           
           if (!session) {
             if (_event === 'SIGNED_OUT') {
-              console.log('📊 Dashboard: User signed out, redirecting')
               navigate('/')
             } else if (loading) {
               // If we're loading and have no session, redirect
@@ -965,7 +1392,6 @@ function Dashboard() {
             }
             const hasSessionNow = await checkSessionImmediately()
             if (!hasSessionNow && currentEffectId === effectIdRef.current) {
-              console.log('📊 Dashboard: No session found after delay, redirecting')
               navigate('/')
             }
           }, 1000)
@@ -1003,6 +1429,9 @@ function Dashboard() {
       
       // Clear user state immediately
       setUser(null)
+      // Reset initial filter flags so they can be recalculated on next login
+      hasSetInitialFilter.current = false
+      hasSetInitialScanHistoryDateRange.current = false
       
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut()
@@ -1068,6 +1497,7 @@ function Dashboard() {
     setAvatarFile(null)
     setAvatarPreview(user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null)
     setShouldRemoveAvatar(false)
+    setAvatarImageError(false)
     setAccountError('')
     setAccountSuccess('')
     setEditingSection('profile')
@@ -1540,8 +1970,12 @@ function Dashboard() {
             <div className="flex gap-2 p-1 bg-card/50 rounded-lg border border-border">
               <button
                 onClick={() => {
-                  console.log('🔄 Setting filter to: today')
                   setStatsTimeFilter('today')
+                  try {
+                    localStorage.setItem('scam_checker_stats_time_filter', 'today')
+                  } catch (error) {
+                    // Ignore localStorage errors
+                  }
                 }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   statsTimeFilter === 'today'
@@ -1553,8 +1987,12 @@ function Dashboard() {
               </button>
               <button
                 onClick={() => {
-                  console.log('🔄 Setting filter to: thisWeek')
                   setStatsTimeFilter('thisWeek')
+                  try {
+                    localStorage.setItem('scam_checker_stats_time_filter', 'thisWeek')
+                  } catch (error) {
+                    // Ignore localStorage errors
+                  }
                 }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   statsTimeFilter === 'thisWeek'
@@ -1566,8 +2004,12 @@ function Dashboard() {
               </button>
               <button
                 onClick={() => {
-                  console.log('🔄 Setting filter to: thisMonth')
                   setStatsTimeFilter('thisMonth')
+                  try {
+                    localStorage.setItem('scam_checker_stats_time_filter', 'thisMonth')
+                  } catch (error) {
+                    // Ignore localStorage errors
+                  }
                 }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   statsTimeFilter === 'thisMonth'
@@ -1634,6 +2076,10 @@ function Dashboard() {
                   className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/10 via-card to-card border border-red-500/20 p-5 cursor-pointer group hover:border-red-500/40 transition-all hover:shadow-lg hover:shadow-red-500/10"
                   onClick={() => {
                     setScanHistoryFilter('scam')
+                    // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
+                    const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
+                    const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
+                    setScanHistoryDateRange(mappedDateRange)
                     setShowHistory(true)
                     setTimeout(() => {
                       document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1680,6 +2126,10 @@ function Dashboard() {
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-500/10 via-card to-card border border-yellow-500/20 p-5 cursor-pointer group hover:border-yellow-500/40 transition-all hover:shadow-lg hover:shadow-yellow-500/10"
             onClick={() => {
               setScanHistoryFilter('suspicious')
+              // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
+              const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
+              const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
+              setScanHistoryDateRange(mappedDateRange)
               setShowHistory(true)
               setTimeout(() => {
                 document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1702,6 +2152,10 @@ function Dashboard() {
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-500/10 via-card to-card border border-green-500/20 p-5 cursor-pointer group hover:border-green-500/40 transition-all hover:shadow-lg hover:shadow-green-500/10"
             onClick={() => {
               setScanHistoryFilter('safe')
+              // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
+              const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
+              const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
+              setScanHistoryDateRange(mappedDateRange)
               setShowHistory(true)
               setTimeout(() => {
                 document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1730,6 +2184,59 @@ function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* First Scan Encouragement Card - Show when user has 0 scans (only after scan history is loaded) */}
+              {isScanHistoryLoaded && (!scanHistory || scanHistory.length === 0) && (
+                <div className="relative overflow-hidden rounded-lg border p-4 bg-gradient-to-br from-purple-500/10 via-card to-card border-purple-500/20 shadow-lg shadow-purple-500/10">
+                  {/* Decorative background pattern */}
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-2xl"></div>
+                  
+                  <div className="relative space-y-3">
+                    {/* First Scan Header - Clickable to toggle tip */}
+                    <button
+                      onClick={() => {
+                        const newValue = !isFirstScanTipExpanded
+                        setIsFirstScanTipExpanded(newValue)
+                        // Persist to localStorage
+                        try {
+                          localStorage.setItem('scam_checker_first_scan_tip_expanded', JSON.stringify(newValue))
+                        } catch (error) {
+                          console.warn('Failed to save first scan tip state:', error)
+                        }
+                      }}
+                      className="flex items-center justify-between w-full gap-2.5 hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex items-center gap-2.5 flex-1">
+                        <div className="p-1.5 rounded-lg bg-purple-500/20">
+                          <Sparkles className="w-4 h-4 text-purple-300" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <h4 className="text-sm font-semibold text-purple-400">
+                            Ready to Get Started?
+                          </h4>
+                        </div>
+                      </div>
+                      {isFirstScanTipExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-purple-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-purple-400" />
+                      )}
+                    </button>
+                    
+                    {/* First Scan Tip - Collapsible */}
+                    {isFirstScanTipExpanded && (
+                      <div className="flex items-start gap-2.5 pt-2 border-t animate-in slide-in-from-top-2 duration-200 border-purple-500/20">
+                        <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs bg-purple-500/20 text-purple-300">
+                          💡
+                        </div>
+                        <p className="text-xs leading-relaxed text-purple-300/90">
+                          Welcome to ScamGuard! Start protecting yourself by scanning your first link, image, or text. Click "Start New Scan" below to begin your security journey!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {/* Risk Pattern Level Metric */}
               {currentRiskLevel && (
                 <div className={`relative overflow-hidden rounded-lg border p-4 ${
@@ -1751,7 +2258,16 @@ function Dashboard() {
                   <div className="relative space-y-3">
                     {/* Risk Level Header - Clickable to toggle tip */}
                     <button
-                      onClick={() => setIsTipExpanded(!isTipExpanded)}
+                      onClick={() => {
+                        const newValue = !isTipExpanded
+                        setIsTipExpanded(newValue)
+                        // Persist to localStorage
+                        try {
+                          localStorage.setItem('scam_checker_risk_pattern_tip_expanded', JSON.stringify(newValue))
+                        } catch (error) {
+                          console.warn('Failed to save risk pattern tip state:', error)
+                        }
+                      }}
                       className="flex items-center justify-between w-full gap-2.5 hover:opacity-80 transition-opacity"
                     >
                       <div className="flex items-center gap-2.5 flex-1">
@@ -1892,7 +2408,7 @@ function Dashboard() {
                     className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     title="Edit Account"
                   >
-                    <Settings className="h-5 w-5" />
+                    <Settings className="h-5 w-5 transition-transform hover:rotate-90 hover:scale-110" />
                   </button>
                 )}
               </div>
@@ -1902,47 +2418,28 @@ function Dashboard() {
               <div className={`flex items-start gap-4 ${editingSection === 'none' ? 'pb-6 border-b border-border' : 'pb-4'}`}>
                 <div className="flex-shrink-0 flex flex-col items-center">
                   <div className="relative">
-                    {editingSection === 'profile' && avatarPreview ? (
+                    {avatarUrl && !avatarImageError ? (
+                      /* Avatar image - Gmail picture or custom upload */
                       <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
                         <img
-                          src={avatarPreview}
-                          alt="Avatar preview"
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      </div>
-                    ) : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection === 'profile' && !shouldRemoveAvatar ? (
-                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
-                        <img
-                          src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                          src={avatarUrl}
                           alt="Avatar"
                           className="w-full h-full rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
+                          onError={() => {
+                            setAvatarImageError(true)
                           }}
                         />
                       </div>
-                    ) : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' ? (
+                    ) : (
+                      /* No avatar or image failed - show initial only */
                       <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
-                        <img
-                          src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
-                          alt="Avatar"
-                          className="w-full h-full rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-lg">
+                          <span>{userInitial}</span>
+                        </div>
                       </div>
-                    ) : null}
-                    {/* Avatar fallback - shown when no avatar image */}
-                    <div className={`w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600 ${((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && editingSection !== 'profile' && !shouldRemoveAvatar) || (editingSection === 'profile' && avatarPreview) ? 'hidden' : ''}`}>
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                        <User className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
+                    )}
                     {/* X button - shown only when editing and avatar exists */}
-                    {editingSection === 'profile' && ((avatarPreview) || ((user?.user_metadata?.avatar_url || user?.user_metadata?.picture) && !shouldRemoveAvatar)) && (
+                    {editingSection === 'profile' && avatarUrl && (
                       <button
                         type="button"
                         onClick={handleRemoveAvatar}
@@ -2157,14 +2654,11 @@ function Dashboard() {
                     if (user?.id) {
                       setIsRefreshingHistory(true)
                       try {
-                        console.log('🔄 Manual refresh triggered')
                         const { getScanHistory } = await import('@/utils/scanHistory')
                         const history = await getScanHistory(user.id)
-                        console.log('📥 Refreshed scan history:', history.length, 'scans')
                         setScanHistory([...history]) // Force re-render with new array reference
                         setScanHistoryKey(prev => prev + 1) // Force component re-render
-                        await refreshStats()
-                        console.log('✅ Refresh complete')
+                        await refreshStats(0, true) // Force refresh after manual refresh
                       } catch (error) {
                         console.error('❌ Error refreshing scan history:', error)
                       } finally {
@@ -2184,14 +2678,20 @@ function Dashboard() {
               <div>
                 <Button
                   variant="outline"
-                  onClick={() => setSelectedScan(null)}
+                  onClick={() => {
+                    isRestoringScroll.current = true
+                    setSelectedScan(null)
+                  }}
                   className="mb-4"
                 >
                   ← Back to History
                 </Button>
                 <ResultCard
                   result={selectedScan.analysis_result}
-                  onNewAnalysis={() => setSelectedScan(null)}
+                  onNewAnalysis={() => {
+                    isRestoringScroll.current = true
+                    setSelectedScan(null)
+                  }}
                   onReportScam={() => {}}
                 />
               </div>
@@ -2199,11 +2699,25 @@ function Dashboard() {
               <ScanHistory
                 key={scanHistoryKey}
                 userId={user?.id}
-                onScanClick={(scan) => setSelectedScan(scan)}
-                onRefresh={refreshStats}
+                onScanClick={(scan, scrollPosition) => {
+                  // Save scroll position of scan history container AND page scroll before showing scan result
+                  if (scrollPosition !== undefined) {
+                    scanHistoryScrollPosition.current = scrollPosition
+                    pageScrollPosition.current = window.scrollY || window.pageYOffset || 0
+                    isRestoringScroll.current = true
+                    console.log('💾 Saved scan history scroll:', scrollPosition, 'page scroll:', pageScrollPosition.current)
+                  }
+                  setSelectedScan(scan)
+                }}
+                onRefresh={() => refreshStats(0, true)} // Force refresh on manual refresh
                 initialFilter={scanHistoryFilter}
                 onFilterChange={setScanHistoryFilter}
                 scans={scanHistory}
+                initialDateRange={scanHistoryDateRange || undefined}
+                savedScrollPosition={isRestoringScroll.current ? scanHistoryScrollPosition.current : undefined}
+                onScrollRestored={() => {
+                  isRestoringScroll.current = false
+                }}
               />
             )}
           </CardContent>

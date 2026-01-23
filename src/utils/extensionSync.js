@@ -15,22 +15,46 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
     // Get checks from Supabase (or localStorage fallback) if not provided
     let checksCount = checks;
     if (checksCount === null && userId) {
-      try {
-        // First, try to sync from Supabase users table
-        const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
-        checksCount = await syncUserChecksFromSupabase(userId);
-      } catch (e) {
-        // Fallback to localStorage silently
+      // FIX: Check if there's a pending check update (check was just used)
+      // If so, don't sync stale data - let the extension's value take precedence
+      const { pendingCheckUpdates } = await import('./checkLimits.js');
+      const pendingUpdate = pendingCheckUpdates?.get?.(userId);
+      
+      if (pendingUpdate) {
+        const timeSinceUpdate = Date.now() - (pendingUpdate.timestamp || 0);
+        // If update was less than 15 seconds ago, use the pending value (more recent)
+        if (timeSinceUpdate < 15000) {
+          checksCount = pendingUpdate.to; // Use the decremented value
+          if (import.meta.env.DEV) {
+            console.log(`📤 Using pending check value: ${checksCount} (${Math.round(timeSinceUpdate/1000)}s since update)`);
+          }
+        }
+      }
+      
+      // If no pending update or it's old, try localStorage first
+      if (checksCount === null) {
         try {
           const checksKey = `scam_checker_user_checks_${userId}`;
           const storedChecks = localStorage.getItem(checksKey);
           if (storedChecks !== null) {
             checksCount = parseInt(storedChecks, 10);
-          } else if (import.meta.env.DEV) {
-            console.warn(`⚠️ No checks found for user ${userId}`);
+            // Use localStorage value - it's the most up-to-date after a check is used
+            // Only sync from Supabase if localStorage doesn't have a value
+          } else {
+            // No localStorage value, fetch from Supabase
+            const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
+            checksCount = await syncUserChecksFromSupabase(userId);
           }
-        } catch (fallbackError) {
-          console.warn('Could not get checks from localStorage:', fallbackError);
+        } catch (e) {
+          // Fallback: try Supabase if localStorage access failed
+          try {
+            const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
+            checksCount = await syncUserChecksFromSupabase(userId);
+          } catch (supabaseError) {
+            if (import.meta.env.DEV) {
+              console.warn(`⚠️ No checks found for user ${userId}`);
+            }
+          }
         }
       }
     }
@@ -51,7 +75,6 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
         
         if (!error && data?.plan) {
           userPlan = data.plan;
-          console.log('📤 ExtensionSync: Fetched plan from Supabase:', userPlan);
         } else {
           // Default to FREE if no plan found or on error
           userPlan = 'FREE';
@@ -143,7 +166,7 @@ export function initializeExtensionSync() {
   let syncTimeout = null;
   let periodicSyncInterval = null;
   let lastSyncTime = 0;
-  const SYNC_THROTTLE_MS = 10000; // Sync at most once every 10 seconds
+  const SYNC_THROTTLE_MS = 60000; // Sync at most once every 60 seconds (optimized to reduce Supabase requests)
   
   // Listen for checksUpdated events and sync to extension (throttled)
   const handleChecksUpdate = async () => {
@@ -214,7 +237,8 @@ export function initializeExtensionSync() {
   // Add event listener for when web updates checks
   window.addEventListener('checksUpdated', handleChecksUpdate);
   
-  // Periodic sync FROM Supabase every 3 seconds to pick up changes made by extension or admin
+  // Periodic sync FROM Supabase every 60 seconds to pick up changes made by extension or admin
+  // Increased from 30s to 60s to reduce Supabase requests (~50% reduction)
   periodicSyncInterval = setInterval(async () => {
     await performSyncFromSupabase();
   }, SYNC_THROTTLE_MS);
@@ -227,7 +251,7 @@ export function initializeExtensionSync() {
   
   // Only log initialization once
   if (import.meta.env.DEV) {
-    console.log('🔄 Extension sync listener initialized (throttled to 10s)');
+    console.log('🔄 Extension sync listener initialized (throttled to 60s)');
   }
   
   // Store cleanup function globally

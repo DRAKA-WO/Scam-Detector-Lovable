@@ -18,7 +18,9 @@ import {
   useFreeCheck, 
   isUserLoggedIn,
   getRemainingUserChecks,
-  useUserCheck
+  useUserCheck,
+  refundFreeCheck,
+  refundUserCheck
 } from '../../utils/checkLimits'
 import { saveScanToHistory, uploadScanImage } from '../../utils/scanHistory'
 // Supabase import removed - will be loaded dynamically to avoid build errors
@@ -63,12 +65,21 @@ function DetectorSection() {
             
             // Initialize/sync checks - will check database to determine if new or existing user
             // Database is the source of truth - no need for localStorage flags
-            console.log('🔄 Syncing user checks on mount...');
-            await initializeUserChecks(session.user.id, false);
-            
-            const checks = getRemainingUserChecks(session.user.id)
-            console.log('📊 User checks:', checks)
-            setRemainingChecks(checks)
+            // Don't sync if there's a pending update (check was just used)
+            const key = `scam_checker_user_checks_${session.user.id}`
+            const hasLocalValue = localStorage.getItem(key)
+            if (hasLocalValue) {
+              // Use local value first, then sync in background
+              const checks = getRemainingUserChecks(session.user.id)
+              setRemainingChecks(checks)
+              // Sync in background without blocking
+              initializeUserChecks(session.user.id, false).catch(() => {})
+            } else {
+              // No local value, sync immediately
+              await initializeUserChecks(session.user.id, false)
+              const checks = getRemainingUserChecks(session.user.id)
+              setRemainingChecks(checks)
+            }
           }
         } catch (error) {
           console.error('Error getting user session:', error)
@@ -106,11 +117,21 @@ function DetectorSection() {
             
             // Initialize/sync checks - will check database to determine if new or existing user
             // Database is the source of truth - no need for localStorage flags
-            console.log('🔄 Syncing user checks on auth change...');
-            await initializeUserChecks(session.user.id, false);
-            
-            const checks = getRemainingUserChecks(session.user.id)
-            setRemainingChecks(checks)
+            // Don't sync if there's a pending update (check was just used)
+            const key = `scam_checker_user_checks_${session.user.id}`
+            const hasLocalValue = localStorage.getItem(key)
+            if (hasLocalValue) {
+              // Use local value first, then sync in background
+              const checks = getRemainingUserChecks(session.user.id)
+              setRemainingChecks(checks)
+              // Sync in background without blocking
+              initializeUserChecks(session.user.id, false).catch(() => {})
+            } else {
+              // No local value, sync immediately
+              await initializeUserChecks(session.user.id, false)
+              const checks = getRemainingUserChecks(session.user.id)
+              setRemainingChecks(checks)
+            }
             
             // NOTE: Pending scan handling is now in App.tsx OAuthCallback
             // This ensures it runs even when redirecting to dashboard
@@ -390,14 +411,42 @@ function DetectorSection() {
               )
               console.log('✅ Scan saved to history')
             } catch (error) {
-              console.error('Error saving scan to history:', error)
-              // Don't block the user if history save fails
+              console.error('❌ Error saving scan to history:', error)
+              // Show user-friendly error notification
+              if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+                console.warn('⚠️ Network error - scan will be retried automatically')
+              } else {
+                console.error('❌ Failed to save scan - it may not appear in history:', error.message)
+              }
+              // Don't block the user if history save fails - retry logic will handle it
             }
           })()
         }
       }
     } catch (err) {
-      setError(getUserFriendlyError(err.message, 'image'))
+      // IMPORTANT: Refund the check since API call failed
+      let refunded = false
+      if (isLoggedIn && userId) {
+        refunded = await refundUserCheck(userId)
+        if (refunded) {
+          setRemainingChecks(getRemainingUserChecks(userId))
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      } else {
+        refunded = refundFreeCheck()
+        if (refunded) {
+          setRemainingChecks(getRemainingFreeChecks())
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      }
+      
+      // Add refund message to error if check was refunded
+      let errorMessage = getUserFriendlyError(err.message, 'image')
+      if (refunded) {
+        errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      }
+      
+      setError(errorMessage)
       setLoading(false)
     }
   }
@@ -493,14 +542,42 @@ function DetectorSection() {
               )
               console.log('✅ Scan saved to history')
             } catch (error) {
-              console.error('Error saving scan to history:', error)
-              // Don't block the user if history save fails
+              console.error('❌ Error saving scan to history:', error)
+              // Show user-friendly error notification
+              if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+                console.warn('⚠️ Network error - scan will be retried automatically')
+              } else {
+                console.error('❌ Failed to save scan - it may not appear in history:', error.message)
+              }
+              // Don't block the user if history save fails - retry logic will handle it
             }
           })()
         }
       }
     } catch (err) {
-      setError(getUserFriendlyError(err.message, 'url'))
+      // IMPORTANT: Refund the check since API call failed
+      let refunded = false
+      if (isLoggedIn && userId) {
+        refunded = await refundUserCheck(userId)
+        if (refunded) {
+          setRemainingChecks(getRemainingUserChecks(userId))
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      } else {
+        refunded = refundFreeCheck()
+        if (refunded) {
+          setRemainingChecks(getRemainingFreeChecks())
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      }
+      
+      // Add refund message to error if check was refunded
+      let errorMessage = getUserFriendlyError(err.message, 'url')
+      if (refunded) {
+        errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      }
+      
+      setError(errorMessage)
       setLoading(false)
     }
   }
@@ -558,8 +635,11 @@ function DetectorSection() {
       const isLastFreeCheck = !isLoggedIn && checksAfter === 0
       
       if (isLastFreeCheck) {
-        // Create preview for storage
-        const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
+        // Save preview text (first 1000 chars) - full text stored in analysis_result
+        const PREVIEW_LENGTH = 1000 // Reasonable preview size to prevent timeout
+        const contentPreview = textContent.length > PREVIEW_LENGTH 
+          ? textContent.substring(0, PREVIEW_LENGTH) + '...' 
+          : textContent
         
         // Store this scan for after signup (await since it's async now)
         await storePendingScan('text', null, null, contentPreview, data.classification, data)
@@ -582,28 +662,102 @@ function DetectorSection() {
           // Don't await - save in background so it doesn't block showing the result
           (async () => {
             try {
-              // Create preview (first 200 chars of text)
-              const contentPreview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent
+              // Save preview text (first 1000 chars) - full text stored in analysis_result
+              // This prevents timeout issues with large text inserts
+              const PREVIEW_LENGTH = 1000 // Reasonable preview size to prevent timeout
+              const contentPreview = textContent.length > PREVIEW_LENGTH 
+                ? textContent.substring(0, PREVIEW_LENGTH) + '...' 
+                : textContent
               
               // Save scan to history (stats auto-incremented in Supabase)
-              await saveScanToHistory(
-                userId,
-                'text',
-                null, // No image for text scans
-                contentPreview,
-                data.classification,
-                data
-              )
-              console.log('✅ Scan saved to history')
+              try {
+                const savedScan = await saveScanToHistory(
+                  userId,
+                  'text',
+                  null, // No image for text scans
+                  contentPreview,
+                  data.classification,
+                  data
+                )
+                
+                if (savedScan && savedScan.id) {
+                  // Ensure the scan has all required fields for the UI
+                  const scanForUI = {
+                    ...savedScan,
+                    created_at: savedScan.created_at || new Date().toISOString(),
+                    classification: savedScan.classification || data.classification,
+                    scan_type: savedScan.scan_type || 'text',
+                    content_preview: savedScan.content_preview || contentPreview,
+                    analysis_result: savedScan.analysis_result || data
+                  }
+                  
+                  // Trigger stats refresh immediately with complete scan data
+                  window.dispatchEvent(new CustomEvent('scanSaved', { detail: scanForUI }))
+                  
+                  // Also store in sessionStorage as backup in case event is missed
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('lastSavedScan', JSON.stringify(scanForUI))
+                  }
+                } else {
+                  // Still trigger refresh to try to get the scan from database
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('scanSaved', { detail: null }))
+                  }, 1000)
+                }
+              } catch (saveError) {
+                console.error('❌ Error saving scan to history:', saveError)
+                // Still trigger refresh to try to get the scan from database
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('scanSaved', { detail: null }))
+                }, 2000)
+              }
             } catch (error) {
-              console.error('Error saving scan to history:', error)
-              // Don't block the user if history save fails
+              console.error('❌ Error saving scan to history:', error)
+              console.error('❌ Full error object:', JSON.stringify(error, null, 2))
+              
+              // Show user-friendly error notification
+              if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+                console.warn('⚠️ Network error - scan will be retried automatically')
+              } else if (error.message?.includes('constraint') || error.message?.includes('check_content_preview_length')) {
+                console.error('❌ Database constraint error - migration may not have been run!')
+                alert('⚠️ Error saving scan: Database constraint violation. Please run the migration to fix this.')
+              } else if (error.code === '23514' || error.code === 'PGRST116') {
+                console.error('❌ Database constraint violation:', error.message)
+                alert('⚠️ Error saving scan: Content too long. Please contact support.')
+              } else {
+                console.error('❌ Failed to save scan - it may not appear in history:', error.message)
+                // Show error to user so they know something went wrong
+                console.warn('⚠️ Scan may not appear in history. Error:', error.message)
+              }
+              // Don't block the user if history save fails - retry logic will handle it
             }
           })()
         }
       }
     } catch (err) {
-      setError(getUserFriendlyError(err.message, 'text'))
+      // IMPORTANT: Refund the check since API call failed
+      let refunded = false
+      if (isLoggedIn && userId) {
+        refunded = await refundUserCheck(userId)
+        if (refunded) {
+          setRemainingChecks(getRemainingUserChecks(userId))
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      } else {
+        refunded = refundFreeCheck()
+        if (refunded) {
+          setRemainingChecks(getRemainingFreeChecks())
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      }
+      
+      // Add refund message to error if check was refunded
+      let errorMessage = getUserFriendlyError(err.message, 'text')
+      if (refunded) {
+        errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      }
+      
+      setError(errorMessage)
       setLoading(false)
     }
   }
@@ -703,20 +857,22 @@ function DetectorSection() {
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-2xl mx-auto">
-          {/* Section Header */}
-          <div 
-            ref={headerRef}
-            className={`text-center mb-10 transition-all duration-700 ${
-              headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-            }`}
-          >
-            <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
-              <span className="gradient-text">Analyze</span> Any Content
-            </h2>
-            <p className="text-muted-foreground text-lg">
-              Paste, upload, or enter suspicious content to get instant AI analysis
-            </p>
-          </div>
+          {/* Section Header - Hide when analyzing */}
+          {!loading && (
+            <div 
+              ref={headerRef}
+              className={`text-center mb-10 transition-all duration-700 ${
+                headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+              }`}
+            >
+              <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
+                <span className="gradient-text">Analyze</span> Any Content
+              </h2>
+              <p className="text-muted-foreground text-lg">
+                Paste, upload, or enter suspicious content to get instant AI analysis
+              </p>
+            </div>
+          )}
 
           {!result && !loading && (
             <div 
@@ -756,7 +912,7 @@ function DetectorSection() {
 
           {error && (
             <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 backdrop-blur-xl animate-fade-in">
-              <p className="text-destructive">{error}</p>
+              <p className="text-destructive whitespace-pre-line">{error}</p>
             </div>
           )}
 

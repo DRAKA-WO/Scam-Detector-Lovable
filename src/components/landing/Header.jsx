@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown, Sparkles, PlayCircle, HelpCircle, MessageCircle, Zap, User, Settings, Gift, Mail, LogOut, Bell, AlertTriangle, X } from "lucide-react"
+import { ChevronDown, Sparkles, PlayCircle, HelpCircle, MessageCircle, Zap, User, Settings, Gift, Mail, LogOut, Bell, AlertTriangle, X, Download } from "lucide-react"
 import { supabase } from '@/integrations/supabase/client'
 import { clearExtensionSession } from '@/utils/extensionSync'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -433,13 +433,31 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                                       'text-blue-400'
                                     }`} />
                                   </div>
-                                  <p className={`text-sm flex-1 leading-relaxed ${
-                                    alert.severity === 'error' ? 'text-red-300' :
-                                    alert.severity === 'warning' ? 'text-yellow-300' :
-                                    'text-blue-300'
-                                  }`}>
-                                    {alert.message}
-                                  </p>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm leading-relaxed ${
+                                      alert.severity === 'error' ? 'text-red-300' :
+                                      alert.severity === 'warning' ? 'text-yellow-300' :
+                                      'text-blue-300'
+                                    }`}>
+                                      {alert.message}
+                                    </p>
+                                    {alert.actionButton && (
+                                      <Button
+                                        onClick={alert.actionButton.onClick}
+                                        className={`mt-3 text-xs h-8 px-3 font-medium transition-all ${
+                                          alert.severity === 'error' 
+                                            ? 'bg-red-500 hover:bg-red-600 text-white' :
+                                            alert.severity === 'warning'
+                                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                        }`}
+                                        size="sm"
+                                      >
+                                        <Download className="h-3 w-3 mr-1.5" />
+                                        {alert.actionButton.label}
+                                      </Button>
+                                    )}
+                                  </div>
                                   {onDismissAlert && alert.id && !alert.isRiskAlert && (
                                     <Button
                                       variant="ghost"

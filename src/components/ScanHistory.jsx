@@ -1,15 +1,59 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getScanHistory, getSignedImageUrl } from '../utils/scanHistory'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Shield, CheckCircle, AlertTriangle, AlertCircle, Image as ImageIcon, Link as LinkIcon, FileText, Clock, X, Search, Calendar, Filter, Download, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { downloadCSV, downloadJSON } from '@/utils/exportUtils'
+import { normalizeScamType } from '../utils/insightsCalculator'
 
 // Cache key for storing signed URLs in localStorage
 const SIGNED_URL_CACHE_KEY = 'scam_checker_signed_urls_cache'
 // Signed URLs expire after 50 minutes (slightly less than 1 hour expiry from Supabase)
 const URL_CACHE_EXPIRY_MS = 50 * 60 * 1000
+
+// Helper function to blur part of URL for security (never blur extension)
+const blurUrlPart = (url) => {
+  if (!url || url.length < 10) return url
+  
+  // Extract extension (everything after the last dot, including the dot)
+  let extension = ''
+  let urlWithoutExtension = url
+  const lastDotIndex = url.lastIndexOf('.')
+  const lastSlashIndex = Math.max(url.lastIndexOf('/'), url.lastIndexOf('?'))
+  
+  // Only consider it an extension if the dot comes after the last slash (not in path/query)
+  if (lastDotIndex > lastSlashIndex && lastDotIndex > 0) {
+    extension = url.substring(lastDotIndex)
+    urlWithoutExtension = url.substring(0, lastDotIndex)
+  }
+  
+  // Keep more characters visible at start, blur only the middle part, keep extension visible
+  // Show at least 10 characters or 30% of the URL before blurring (extended blur by 10%)
+  const startVisible = Math.max(10, Math.floor(urlWithoutExtension.length * 0.3))
+  const middleStart = Math.min(startVisible, urlWithoutExtension.length - 3) // Leave at least 3 chars before extension
+  const middleEnd = urlWithoutExtension.length
+  
+  if (middleEnd <= middleStart) {
+    // URL too short, blur middle but keep extension
+    return (
+      <>
+        {urlWithoutExtension.substring(0, 1)}
+        <span style={{ filter: 'blur(3px)' }}>{urlWithoutExtension.substring(1)}</span>
+        {extension}
+      </>
+    )
+  }
+  
+  return (
+    <>
+      {urlWithoutExtension.substring(0, middleStart)}
+      <span style={{ filter: 'blur(3px)' }}>{urlWithoutExtension.substring(middleStart)}</span>
+      {extension}
+    </>
+  )
+}
 
 // Helper to load cached URLs from localStorage
 function loadCachedUrls() {
@@ -84,15 +128,19 @@ function saveCachedUrls(urlMap) {
   }
 }
 
-function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', onFilterChange, scans: externalScans }) {
+function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', onFilterChange, scans: externalScans, initialDateRange, savedScrollPosition, onScrollRestored }) {
+  // Initialize with externalScans if provided to prevent empty flash
   const [scans, setScans] = useState(externalScans || [])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(externalScans && externalScans.length > 0 ? false : true)
   const [imageUrls, setImageUrls] = useState(() => loadCachedUrls()) // Load from cache on mount
   const [filterClassification, setFilterClassification] = useState(initialFilter) // 'all', 'safe', 'suspicious', 'scam'
   const [previewImage, setPreviewImage] = useState(null) // For image preview modal
+  const [previewText, setPreviewText] = useState(null) // For text preview modal: {content: string, scanId: string} | null
   const [searchQuery, setSearchQuery] = useState('') // Search query
-  const [dateRange, setDateRange] = useState('30') // '0' (today), '7' (last 7 days), '30' (last 30 days)
+  const [dateRange, setDateRange] = useState(initialDateRange || '30') // '0' (today), '7' (last 7 days), '30' (last 30 days)
   const [scamTypeFilter, setScamTypeFilter] = useState('all') // Filter by scam type
+  const scrollContainerRef = useRef(null) // Ref for the scrollable container
+  const isRestoringScroll = useRef(false) // Flag to prevent scroll reset during restoration
 
   // Update filter when initialFilter prop changes (from parent clicks)
   useEffect(() => {
@@ -101,11 +149,85 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
     }
   }, [initialFilter])
 
+  // Track the last applied initialDateRange to prevent resetting on refresh
+  const lastAppliedInitialDateRange = useRef(null)
+  
+  // Restore scroll position when component mounts or when savedScrollPosition prop changes
+  useEffect(() => {
+    if (savedScrollPosition !== undefined && savedScrollPosition > 0) {
+      isRestoringScroll.current = true
+      // Wait for the component to fully render and the scroll container to be available
+      const restoreScroll = () => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = savedScrollPosition
+          } else {
+          console.warn('⚠️ Scroll container ref not available yet')
+        }
+      }
+      
+      // Use requestAnimationFrame to ensure DOM is ready, then try multiple times
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          restoreScroll()
+          // Try again after delays to catch any competing scrolls
+          const timeout1 = setTimeout(restoreScroll, 50)
+          const timeout2 = setTimeout(() => {
+            restoreScroll()
+            // Final restoration attempt
+            setTimeout(() => {
+              restoreScroll()
+              isRestoringScroll.current = false
+              if (onScrollRestored) {
+                onScrollRestored()
+              }
+            }, 200)
+          }, 150)
+          
+          return () => {
+            clearTimeout(timeout1)
+            clearTimeout(timeout2)
+          }
+        })
+      })
+    }
+  }, [savedScrollPosition, onScrollRestored])
+  
+  // Prevent scroll reset when scans update during restoration
+  useEffect(() => {
+    if (isRestoringScroll.current && scrollContainerRef.current && savedScrollPosition !== undefined && savedScrollPosition > 0) {
+      // If we're restoring scroll, maintain the position even if scans update
+      const currentScroll = scrollContainerRef.current.scrollTop
+      if (Math.abs(currentScroll - savedScrollPosition) > 10) {
+        // Only restore if scroll has drifted significantly
+        scrollContainerRef.current.scrollTop = savedScrollPosition
+      }
+    }
+  }, [scans, savedScrollPosition])
+
+  // Update dateRange when initialDateRange prop changes (from stat card clicks)
+  // Only apply if it's a new value that's different from what we last applied
+  useEffect(() => {
+    if (initialDateRange !== undefined && initialDateRange !== null) {
+      // Only apply if it's a new value (different from what we last applied)
+      // This prevents resetting when component re-renders with the same prop value
+      if (initialDateRange !== lastAppliedInitialDateRange.current) {
+        setDateRange(initialDateRange)
+        lastAppliedInitialDateRange.current = initialDateRange
+      }
+    } else {
+      // If initialDateRange becomes null/undefined, reset the ref so it can be applied again
+      lastAppliedInitialDateRange.current = null
+    }
+  }, [initialDateRange])
+
   useEffect(() => {
     if (externalScans && externalScans.length >= 0) {
       // Always update when externalScans changes (even if empty array)
       setScans(externalScans)
-      setLoading(false)
+      // Only set loading to false if we have scans, or if it's explicitly an empty array (not undefined)
+      if (externalScans.length > 0 || (externalScans.length === 0 && externalScans !== undefined)) {
+        setLoading(false)
+      }
     } else if (userId) {
       loadHistory()
     } else {
@@ -284,11 +406,11 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
     )
   }
 
-  // Get unique scam types for filter dropdown
+  // Get unique scam types for filter dropdown (normalized to group similar types)
   const uniqueScamTypes = [...new Set(
     scans
       .filter(scan => scan.classification === 'scam' && scan.analysis_result?.scam_type)
-      .map(scan => scan.analysis_result.scam_type)
+      .map(scan => normalizeScamType(scan.analysis_result.scam_type))
   )].sort()
 
   // Filter scans based on selected classification, date range, search, and scam type
@@ -334,9 +456,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       }
     }
 
-    // Scam type filter (only applies to scam classification)
+    // Scam type filter (only applies to scam classification) - use normalized types
     if (scamTypeFilter !== 'all' && scan.classification === 'scam') {
-      if (scan.analysis_result?.scam_type !== scamTypeFilter) {
+      const normalizedScanType = normalizeScamType(scan.analysis_result?.scam_type)
+      if (normalizedScanType !== scamTypeFilter) {
         return false
       }
     }
@@ -348,7 +471,8 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       const matchesUrl = scan.scan_type === 'url' && scan.content_preview?.toLowerCase().includes(query)
       const matchesClassification = scan.classification?.toLowerCase().includes(query)
       const matchesScanType = scan.scan_type?.toLowerCase().includes(query)
-      const matchesScamType = scan.analysis_result?.scam_type?.toLowerCase().includes(query)
+      const normalizedScamType = normalizeScamType(scan.analysis_result?.scam_type)
+      const matchesScamType = normalizedScamType?.toLowerCase().includes(query)
       
       if (!matchesContent && !matchesUrl && !matchesClassification && !matchesScanType && !matchesScamType) {
         return false
@@ -477,11 +601,16 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                     if (onFilterChange) onFilterChange('scam')
                   }
                 }}
-                className="px-3 py-1.5 h-8 rounded-md text-sm min-w-[180px]"
+                size={uniqueScamTypes.length + 1 > 8 ? 8 : 1}
+                className={`px-3 py-1.5 rounded-md text-sm min-w-[180px] ${uniqueScamTypes.length + 1 > 8 ? 'overflow-y-auto' : ''}`}
                 style={{
                   backgroundColor: 'hsl(var(--input))',
                   color: 'hsl(var(--foreground))',
-                  borderColor: 'hsl(var(--input))'
+                  borderColor: 'hsl(var(--input))',
+                  ...(uniqueScamTypes.length + 1 > 8 && {
+                    maxHeight: '200px',
+                    height: 'auto'
+                  })
                 }}
               >
                 <option value="all">All Scam Types</option>
@@ -496,7 +625,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
         </div>
       </div>
 
-      <div className="grid gap-4 max-h-[520px] overflow-y-auto pr-2 dark-scrollbar">
+      <div 
+        ref={scrollContainerRef}
+        className="grid gap-4 max-h-[520px] overflow-y-auto pr-2 dark-scrollbar"
+      >
         {filteredScans.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
                     {searchQuery || dateRange !== '30' || filterClassification !== 'all' || scamTypeFilter !== 'all'
@@ -513,7 +645,11 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
               scan.classification === 'safe' ? 'hover:border-green-500/40 hover:shadow-green-500/10' :
               'hover:border-gray-500/40'
             }`}
-            onClick={() => onScanClick && onScanClick(scan)}
+            onClick={() => {
+              // Save scroll position before navigating to scan result
+              const scrollPos = scrollContainerRef.current ? scrollContainerRef.current.scrollTop : 0
+              onScanClick && onScanClick(scan, scrollPos)
+            }}
           >
             <CardContent className="p-4">
               <div className="flex items-center gap-4 relative">
@@ -523,24 +659,28 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                     // Check if we have a URL and it's not null (null means it failed to load)
                     imageUrls[scan.id] && imageUrls[scan.id] !== null ? (
                       <>
-                        <img
-                          src={imageUrls[scan.id]}
-                          alt="Scan preview"
-                          className="w-20 h-20 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                        <div
+                          className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:from-purple-500/40 hover:to-pink-500/40 hover:border-purple-500/60 hover:scale-105 transition-all cursor-pointer overflow-hidden"
                           onClick={(e) => {
                             e.stopPropagation()
                             setPreviewImage(imageUrls[scan.id])
                           }}
-                          onError={(e) => {
-                            // Fallback if signed URL fails to load
-                            console.warn(`⚠️ Image failed to load for scan ${scan.id}:`, imageUrls[scan.id])
-                            e.target.style.display = 'none'
-                            const fallback = e.target.nextElementSibling
-                            if (fallback) {
-                              fallback.style.display = 'flex'
-                            }
-                          }}
-                        />
+                        >
+                          <img
+                            src={imageUrls[scan.id]}
+                            alt="Scan preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback if signed URL fails to load
+                              console.warn(`⚠️ Image failed to load for scan ${scan.id}:`, imageUrls[scan.id])
+                              e.target.style.display = 'none'
+                              const fallback = e.target.parentElement.nextElementSibling
+                              if (fallback) {
+                                fallback.style.display = 'flex'
+                              }
+                            }}
+                          />
+                        </div>
                         {/* Fallback icon (hidden by default, shown on image error) */}
                         <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border hidden">
                           <ImageIcon className="h-6 w-6 text-muted-foreground" />
@@ -563,10 +703,21 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                       <span className="text-[10px] text-blue-300 font-medium">URL</span>
                     </div>
                   ) : scan.scan_type === 'text' ? (
-                    <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex flex-col items-center justify-center border border-purple-500/30">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (scan.content_preview) {
+                          setPreviewText({
+                            content: scan.content_preview,
+                            scanId: scan.id
+                          })
+                        }
+                      }}
+                      className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex flex-col items-center justify-center border border-purple-500/30 hover:from-purple-500/40 hover:to-pink-500/40 hover:border-purple-500/60 hover:scale-105 transition-all cursor-pointer"
+                    >
                       <FileText className="h-6 w-6 text-purple-400 mb-1" />
                       <span className="text-[10px] text-purple-300 font-medium">TEXT</span>
-                    </div>
+                    </button>
                   ) : (
                     <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
                       {getScanTypeIcon(scan.scan_type)}
@@ -609,18 +760,32 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                       return null; // Don't show scam type info for safe/suspicious results
                     }
                     
+                    // For text scans, don't show content in the card (only in modal)
+                    if (scan.scan_type === 'text') {
+                      return null;
+                    }
+                    
                     return (
                       <div className="mb-2">
                         {scan.scan_type === 'url' ? (
-                          <a
-                            href={scan.content_preview}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-400 hover:text-blue-300 underline line-clamp-1 break-all"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {scan.content_preview}
-                          </a>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p 
+                                  className="text-sm text-muted-foreground line-clamp-1 break-all select-none cursor-default"
+                                  style={{ 
+                                    userSelect: 'none'
+                                  }}
+                                  onClick={(e) => e.preventDefault()}
+                                >
+                                  {blurUrlPart(scan.content_preview)}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">URL partially hidden for security</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
                           <p className="text-sm text-muted-foreground line-clamp-2 break-words">
                             {scan.content_preview}
@@ -641,6 +806,19 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                       <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-900/40 text-red-300 border border-red-800/50">
                         {scan.analysis_result.scam_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </div>
+                    )}
+                  </div>
+
+                  {/* Instructional Text */}
+                  <div className="mt-2 text-xs text-muted-foreground/80 italic">
+                    {scan.classification === 'safe' && (
+                      <span>Click to see verification steps</span>
+                    )}
+                    {scan.classification === 'suspicious' && (
+                      <span>Click to see suspicious indicators plus verification steps</span>
+                    )}
+                    {scan.classification === 'scam' && (
+                      <span>Click to see scam indicators and what to do</span>
                     )}
                   </div>
                 </div>
@@ -671,19 +849,85 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
         </div>
       )}
 
+      {/* Text Preview Modal */}
+      {previewText && (
+        <div 
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setPreviewText(null)}
+        >
+          <div 
+            className="relative bg-card rounded-lg border-2 border-purple-500/50 shadow-2xl flex flex-col cursor-default"
+            style={{
+              maxWidth: '500px',
+              maxHeight: '400px',
+              width: '85%'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-purple-400" />
+                <h3 className="text-lg font-semibold">Text Preview</h3>
+              </div>
+              <button
+                onClick={() => setPreviewText(null)}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div 
+              className="p-6 overflow-y-scroll flex-1 text-preview-scroll"
+              style={{
+                maxHeight: '350px',
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(168, 85, 247, 0.6) rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <p className="text-sm text-foreground break-words whitespace-pre-wrap leading-relaxed">
+                {previewText.content}
+              </p>
+            </div>
+            <style>{`
+              .text-preview-scroll::-webkit-scrollbar {
+                width: 10px;
+              }
+              .text-preview-scroll::-webkit-scrollbar-track {
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 5px;
+              }
+              .text-preview-scroll::-webkit-scrollbar-thumb {
+                background: rgba(168, 85, 247, 0.6);
+                border-radius: 5px;
+              }
+              .text-preview-scroll::-webkit-scrollbar-thumb:hover {
+                background: rgba(168, 85, 247, 0.8);
+              }
+            `}</style>
+          </div>
+        </div>
+      )}
+
       {/* Image Preview Modal */}
       {previewImage && (
         <div 
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setPreviewImage(null)}
         >
           <div 
-            className="relative max-w-4xl max-h-[90vh] bg-card rounded-lg overflow-hidden"
+            className="relative bg-card rounded-lg overflow-hidden border-2 border-purple-500/50 shadow-2xl cursor-default"
+            style={{
+              maxWidth: '600px',
+              maxHeight: '600px',
+              width: 'auto',
+              height: 'auto'
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 z-10 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg transition-colors"
+              className="absolute top-2 right-2 z-10 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg transition-colors"
               title="Close"
             >
               <X className="w-5 h-5" />
@@ -691,7 +935,12 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             <img
               src={previewImage}
               alt="Full size preview"
-              className="w-full h-full max-h-[90vh] object-contain"
+              className="w-auto h-auto object-contain rounded"
+              style={{
+                maxWidth: '600px',
+                maxHeight: '600px',
+                display: 'block'
+              }}
             />
           </div>
         </div>

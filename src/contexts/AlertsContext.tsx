@@ -9,6 +9,10 @@ interface Alert {
   severity: 'info' | 'warning' | 'error'
   scamType?: string
   isRiskAlert?: boolean
+  actionButton?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 interface AlertsContextType {
@@ -70,8 +74,34 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
 
   // Function to generate smart alerts based on scan history
   const generateAlerts = useCallback(async (history: any[]) => {
-    if (!userId || !history || history.length === 0) {
+    if (!userId) {
       setAlerts([])
+      setCurrentRiskLevel(null)
+      return
+    }
+
+    // Show welcome alert for new users with 0 scans
+    if (!history || history.length === 0) {
+      const dismissedAlerts = getDismissedAlerts(userId)
+      const welcomeAlertId = 'welcome-new-user'
+      
+      if (!dismissedAlerts[welcomeAlertId]) {
+        setAlerts([{
+          id: welcomeAlertId,
+          type: 'welcome',
+          message: '👋 Welcome to ScamGuard! Download our browser extension for automatic protection while browsing. Stay safe from scams with real-time detection!',
+          severity: 'info',
+          actionButton: {
+            label: 'Download Extension',
+            onClick: () => {
+              // Open extension download page or Chrome Web Store
+              window.open('https://chrome.google.com/webstore', '_blank')
+            }
+          }
+        }])
+      } else {
+        setAlerts([])
+      }
       setCurrentRiskLevel(null)
       return
     }

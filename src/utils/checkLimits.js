@@ -141,14 +141,34 @@ export async function syncUserChecksFromSupabase(userId, retryCount = 0, maxRetr
     }
     
     if (data && typeof data.checks === 'number') {
-      // Update localStorage with Supabase value
       const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
-      localStorage.setItem(key, data.checks.toString())
+      const currentLocalStorage = getRemainingUserChecks(userId)
+      const supabaseChecks = data.checks
       
-      // Dispatch event to update UI
-      window.dispatchEvent(new Event('checksUpdated'))
+      // Check if there's a pending update for this user
+      const pendingUpdate = pendingCheckUpdates.get(userId)
+      if (pendingUpdate) {
+        // There's a pending update - don't overwrite localStorage
+        // The pending update will complete soon and sync will happen then
+        return currentLocalStorage
+      }
       
-      return data.checks
+      // FIX: Don't overwrite localStorage if it's exactly 1 less than Supabase
+      // This prevents race condition where check was just used (localStorage = 2)
+      // but Supabase hasn't updated yet (Supabase = 3), causing sync to overwrite correct value
+      if (supabaseChecks === currentLocalStorage + 1) {
+        // Race condition: check was just used, Supabase not updated yet
+        // Keep localStorage value (more recent)
+        return currentLocalStorage
+      } else {
+        // Normal case: update localStorage with Supabase value
+        // This handles: Supabase = localStorage (synced), Supabase < localStorage (admin decrement),
+        // or Supabase > localStorage + 1 (checks added externally)
+        localStorage.setItem(key, supabaseChecks.toString())
+        // Dispatch event to update UI
+        window.dispatchEvent(new Event('checksUpdated'))
+        return supabaseChecks
+      }
     }
     
     return getRemainingUserChecks(userId)
@@ -202,8 +222,22 @@ export async function initializeUserChecks(userId, forceInit = false) {
     if (existingUser) {
       // User EXISTS in database - sync their existing check count
       const dbChecks = typeof existingUser.checks === 'number' ? existingUser.checks : 0
+      const currentLocal = getRemainingUserChecks(userId)
+      
+      // Check if there's a pending update - don't overwrite if check was just used
+      const pendingUpdate = pendingCheckUpdates.get(userId)
+      if (pendingUpdate) {
+        // There's a pending update - keep local value
+        return
+      }
+      
+      // Don't overwrite if local is 1 less than DB (check was just used)
+      if (dbChecks === currentLocal + 1) {
+        // Race condition: check was just used, DB not updated yet
+        return
+      }
+      
       localStorage.setItem(key, dbChecks.toString())
-      console.log(`✅ Existing user found - synced ${dbChecks} checks from database for user ${userId}`)
       
       // Dispatch event to update UI
       window.dispatchEvent(new Event('checksUpdated'))
@@ -250,6 +284,9 @@ export async function initializeUserChecks(userId, forceInit = false) {
  * @param {string} userId - User ID from Supabase
  * @returns {Promise<boolean>} True if check was used successfully, false if no checks remaining
  */
+// Track pending check updates to prevent race conditions
+export const pendingCheckUpdates = new Map()
+
 export async function useUserCheck(userId) {
   if (typeof window === 'undefined' || !userId) return false
   
@@ -262,7 +299,13 @@ export async function useUserCheck(userId) {
     // Update localStorage immediately (for instant UI update)
     localStorage.setItem(key, newCount.toString())
     
-    // FIX: Don't await Supabase update - sync in background to prevent blocking
+    // Mark that we have a pending update for this user
+    pendingCheckUpdates.set(userId, { from: remaining, to: newCount, timestamp: Date.now() })
+    
+    // Dispatch event immediately to update UI
+    window.dispatchEvent(new Event('checksUpdated'))
+    
+    // FIX: Update Supabase and clear pending flag when done
     // Update Supabase in background (fire and forget) so it doesn't block the UI
     ;(async () => {
       try {
@@ -274,11 +317,23 @@ export async function useUserCheck(userId) {
         
         if (error) {
           console.error('Error updating checks in Supabase:', error)
+          // On error, keep pending flag longer to prevent overwrite
+          setTimeout(() => {
+            pendingCheckUpdates.delete(userId)
+          }, 5000) // Clear after 5 seconds
         } else {
           console.log(`✅ Decremented checks in Supabase: ${remaining} → ${newCount}`)
+          // Clear pending flag after a short delay to ensure database has committed
+          setTimeout(() => {
+            pendingCheckUpdates.delete(userId)
+          }, 1000) // Clear after 1 second
         }
       } catch (error) {
         console.error('Exception updating checks in Supabase:', error)
+        // On error, keep pending flag longer
+        setTimeout(() => {
+          pendingCheckUpdates.delete(userId)
+        }, 5000)
       }
     })()
     
@@ -309,6 +364,62 @@ export function useFreeCheck() {
   }
   
   return false
+}
+
+/**
+ * Refund a free check (increment counter) for anonymous users
+ * @returns {boolean} True if check was refunded successfully
+ */
+export function refundFreeCheck() {
+  if (typeof window === 'undefined') return false
+  
+  const remaining = getRemainingFreeChecks()
+  localStorage.setItem(FREE_CHECKS_KEY, (remaining + 1).toString())
+  
+  // Dispatch event to update UI
+  window.dispatchEvent(new Event('checksUpdated'))
+  
+  return true
+}
+
+/**
+ * Refund a check for logged-in users
+ * @param {string} userId - User ID from Supabase
+ * @returns {Promise<boolean>} True if check was refunded successfully
+ */
+export async function refundUserCheck(userId) {
+  if (typeof window === 'undefined' || !userId) return false
+  
+  const key = `${USER_CHECKS_KEY_PREFIX}${userId}`
+  const remaining = getRemainingUserChecks(userId)
+  const newCount = remaining + 1
+  
+  // Update localStorage immediately (for instant UI update)
+  localStorage.setItem(key, newCount.toString())
+  
+  // Dispatch event immediately to update UI
+  window.dispatchEvent(new Event('checksUpdated'))
+  
+  // Update Supabase in background (fire and forget) so it doesn't block the UI
+  ;(async () => {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client')
+      const { error } = await supabase
+        .from('users')
+        .update({ checks: newCount })
+        .eq('id', userId)
+      
+      if (error) {
+        console.error('Error refunding check in Supabase:', error)
+      } else {
+        console.log(`✅ Refunded check in Supabase: ${remaining} → ${newCount}`)
+      }
+    } catch (error) {
+      console.error('Exception refunding check in Supabase:', error)
+    }
+  })()
+  
+  return true
 }
 
 /**

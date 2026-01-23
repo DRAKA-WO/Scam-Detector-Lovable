@@ -1,17 +1,19 @@
 import { supabase } from '@/integrations/supabase/client'
 
 /**
- * Save a scan to history
+ * Save a scan to history with retry logic
  * @param {string} userId - User ID
  * @param {string} scanType - 'image', 'url', or 'text'
  * @param {string|null} imageUrl - Supabase Storage URL for image (if applicable)
  * @param {string|null} contentPreview - Preview text for URL/text scans
  * @param {string} classification - 'safe', 'suspicious', or 'scam'
  * @param {Object} analysisResult - Full analysis result object
+ * @param {number} retryCount - Current retry attempt (internal use)
+ * @param {number} maxRetries - Maximum number of retries
  * @returns {Promise<Object>} Saved scan record
  */
-export async function saveScanToHistory(userId, scanType, imageUrl, contentPreview, classification, analysisResult) {
-  console.log('📝 saveScanToHistory called with:', { userId, scanType, imageUrl, contentPreview, classification });
+export async function saveScanToHistory(userId, scanType, imageUrl, contentPreview, classification, analysisResult, retryCount = 0, maxRetries = 3) {
+    // Removed verbose logging
   
   if (!userId) {
     console.warn('❌ Cannot save scan history: user not logged in')
@@ -19,16 +21,23 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
   }
 
   try {
+    // Safety check: Truncate content_preview to 2000 chars to prevent timeout issues
+    // Database constraint also enforces this, but we truncate here to avoid errors
+    const MAX_PREVIEW_LENGTH = 2000
+    const truncatedPreview = contentPreview && contentPreview.length > MAX_PREVIEW_LENGTH
+      ? contentPreview.substring(0, MAX_PREVIEW_LENGTH)
+      : contentPreview
+    
     const insertData = {
       user_id: userId,
       scan_type: scanType,
       image_url: imageUrl || null,
-      content_preview: contentPreview || null,
+      content_preview: truncatedPreview || null,
       classification: classification,
       analysis_result: analysisResult
     };
     
-    console.log('📤 Inserting scan to history:', insertData);
+    // Removed verbose logging
     
     const { data, error } = await supabase
       .from('scan_history')
@@ -39,20 +48,164 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
     if (error) {
       console.error('❌ Error saving scan to history:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      // Check if this is a retryable error
+      const isRetryableError = 
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('NetworkError') ||
+        error.message?.includes('ERR_CONNECTION') ||
+        error.message?.includes('timeout') ||
+        error.message?.includes('ECONNRESET') ||
+        error.code === 'PGRST301' || // PostgREST connection error
+        error.code === 'PGRST302';   // PostgREST timeout
+      
+      // Retry on network/connection errors
+      if (isRetryableError && retryCount < maxRetries) {
+        const delay = 500 * Math.pow(2, retryCount); // Exponential backoff: 500ms, 1s, 2s
+        console.log(`🔄 Retrying save scan to history in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return await saveScanToHistory(userId, scanType, imageUrl, contentPreview, classification, analysisResult, retryCount + 1, maxRetries);
+      }
+      
+      // Store failed save in localStorage for later retry (only for retryable errors)
+      if (isRetryableError && typeof window !== 'undefined') {
+        try {
+          const failedScansKey = `scam_checker_failed_scans_${userId}`;
+          const failedScans = JSON.parse(localStorage.getItem(failedScansKey) || '[]');
+          failedScans.push({
+            ...insertData,
+            timestamp: Date.now(),
+            retryCount: 0
+          });
+          // Keep only last 10 failed scans
+          if (failedScans.length > 10) {
+            failedScans.shift();
+          }
+          localStorage.setItem(failedScansKey, JSON.stringify(failedScans));
+          console.warn('⚠️ Stored failed scan in localStorage for later retry');
+        } catch (storageError) {
+          console.error('Error storing failed scan:', storageError);
+        }
+      }
+      
       throw error; // Throw instead of returning null
     }
 
-    console.log('✅ Successfully saved scan to history:', data);
+    // Removed verbose logging
     
-    // Increment permanent stats (cumulative, never decrease)
-    await incrementUserStats(userId, classification);
+    // Increment permanent stats (cumulative, never decrease) with retry
+    try {
+      await incrementUserStats(userId, classification);
+    } catch (statsError) {
+      console.error('❌ Error incrementing stats (non-critical):', statsError);
+      // Don't throw - stats can be recalculated, but scan history is more important
+    }
     
     // The trigger will automatically clean up old scans (keep only 10)
     return data
   } catch (error) {
     console.error('❌ Exception saving scan to history:', error);
     console.error('Exception details:', error.message, error.stack);
+    
+    // Final retry attempt for unhandled errors
+    if (retryCount < maxRetries && error.message && !error.message.includes('duplicate') && !error.message.includes('constraint')) {
+      const delay = 500 * Math.pow(2, retryCount);
+      console.log(`🔄 Final retry attempt in ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return await saveScanToHistory(userId, scanType, imageUrl, contentPreview, classification, analysisResult, retryCount + 1, maxRetries);
+    }
+    
     throw error; // Re-throw to let caller handle
+  }
+}
+
+/**
+ * Retry failed scans stored in localStorage
+ * @param {string} userId - User ID
+ * @returns {Promise<number>} Number of successfully retried scans
+ */
+export async function retryFailedScans(userId) {
+  if (!userId || typeof window === 'undefined') return 0
+  
+  try {
+    const failedScansKey = `scam_checker_failed_scans_${userId}`;
+    const failedScans = JSON.parse(localStorage.getItem(failedScansKey) || '[]');
+    
+    if (failedScans.length === 0) return 0
+    
+    console.log(`🔄 Retrying ${failedScans.length} failed scans...`);
+    
+    const successfulRetries = [];
+    const stillFailed = [];
+    
+    for (const scan of failedScans) {
+      try {
+        // Only retry scans that are less than 24 hours old
+        const scanAge = Date.now() - scan.timestamp;
+        if (scanAge > 24 * 60 * 60 * 1000) {
+          console.log('⏭️ Skipping old failed scan (older than 24 hours)');
+          continue;
+        }
+        
+        // Safety check: Truncate content_preview to 2000 chars
+        const MAX_PREVIEW_LENGTH = 2000
+        const truncatedPreview = scan.content_preview && scan.content_preview.length > MAX_PREVIEW_LENGTH
+          ? scan.content_preview.substring(0, MAX_PREVIEW_LENGTH)
+          : scan.content_preview
+        
+        const { data, error } = await supabase
+          .from('scan_history')
+          .insert({
+            user_id: scan.user_id,
+            scan_type: scan.scan_type,
+            image_url: scan.image_url,
+            content_preview: truncatedPreview,
+            classification: scan.classification,
+            analysis_result: scan.analysis_result
+          })
+          .select()
+          .single()
+        
+        if (error) {
+          // Check if it's a duplicate (already saved)
+          if (error.code === '23505' || error.message?.includes('duplicate')) {
+            console.log('✅ Scan already exists in database, removing from failed list');
+            successfulRetries.push(scan);
+          } else {
+            // Still failing, keep for next retry
+            stillFailed.push(scan);
+          }
+        } else {
+          // Successfully saved
+          successfulRetries.push(scan);
+        }
+      } catch (error) {
+        console.error('Error retrying failed scan:', error);
+        stillFailed.push(scan);
+      }
+    }
+    
+    // Update localStorage with remaining failed scans
+    if (stillFailed.length > 0) {
+      localStorage.setItem(failedScansKey, JSON.stringify(stillFailed));
+    } else {
+      localStorage.removeItem(failedScansKey);
+    }
+    
+    // Increment stats for successfully retried scans
+    for (const scan of successfulRetries) {
+      try {
+        await incrementUserStats(userId, scan.classification);
+      } catch (error) {
+        console.error('Error incrementing stats for retried scan:', error);
+      }
+    }
+    
+    console.log(`✅ Successfully retried ${successfulRetries.length} scans, ${stillFailed.length} still failed`);
+    return successfulRetries.length
+  } catch (error) {
+    console.error('Error retrying failed scans:', error);
+    return 0
   }
 }
 
@@ -192,8 +345,6 @@ export async function getUserStatsFromDatabase(userId) {
   }
 
   try {
-    console.log('📊 Fetching user stats from database for user:', userId);
-    
     // Fetch ALL scans for the user (not just latest 3)
     const { data, error } = await supabase
       .from('scan_history')
@@ -248,8 +399,6 @@ export async function getUserPermanentStats(userId) {
   }
 
   try {
-    console.log('📊 Fetching permanent stats for user:', userId);
-    
     // Try to get existing stats - use maybeSingle() to avoid errors when no rows exist
     const { data, error } = await supabase
       .from('user_stats')
@@ -269,7 +418,6 @@ export async function getUserPermanentStats(userId) {
 
     // If no stats exist, create initial record
     if (!data) {
-      console.log('📝 Creating initial stats record for user:', userId);
       const { data: newStats, error: insertError } = await supabase
         .from('user_stats')
         .insert({ user_id: userId })
@@ -335,7 +483,6 @@ export async function incrementUserStats(userId, classification) {
 
     // If no record exists or there was an error, create initial record
     if (error || !stats) {
-      console.log('📝 Creating initial stats record during increment');
       const { data: newStats, error: insertError } = await supabase
         .from('user_stats')
         .insert({ user_id: userId })

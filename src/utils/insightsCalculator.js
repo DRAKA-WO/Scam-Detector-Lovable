@@ -4,6 +4,48 @@
  */
 
 /**
+ * Normalize similar scam types to group them together
+ * @param {string} scamType - The original scam type
+ * @returns {string} Normalized scam type
+ */
+export function normalizeScamType(scamType) {
+  if (!scamType) return scamType
+  
+  const lowerType = scamType.toLowerCase()
+  
+  // Bank-related scams - group together
+  if (lowerType.includes('bank') && (lowerType.includes('impersonat') || lowerType.includes('credential') || lowerType.includes('theft'))) {
+    return 'Phishing Scam - Bank Impersonation'
+  }
+  
+  // Phishing scams with similar patterns
+  if (lowerType.includes('phishing') && lowerType.includes('account')) {
+    return 'Phishing Scam - Account Verification'
+  }
+  
+  // Tech support scams
+  if (lowerType.includes('tech support') || lowerType.includes('tech_support')) {
+    if (lowerType.includes('apple')) {
+      return 'Tech Support Scam - Apple Impersonation'
+    }
+    return 'Tech Support Scam'
+  }
+  
+  // Credential harvesting variations
+  if (lowerType.includes('credential') && lowerType.includes('harvest')) {
+    return 'Credential Harvesting Phishing Scam'
+  }
+  
+  // Fake feature scams
+  if (lowerType.includes('fake feature') || lowerType.includes('fake_feature')) {
+    return 'Fake Feature Scam - Malware Distribution'
+  }
+  
+  // Return original if no normalization needed
+  return scamType
+}
+
+/**
  * Calculate daily trends from scan history (last 30 days)
  * @param {Array} scanHistory - Array of scan records
  * @returns {Array} Array of daily trend objects with date and counts by classification
