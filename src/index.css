@@ -198,6 +198,24 @@ body {
   .dark-scrollbar::-webkit-scrollbar-corner {
     background: transparent;
   }
+
+  @keyframes subtle-pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.03);
+    }
+  }
+
+  .subtle-pulse {
+    animation: subtle-pulse 2s ease-in-out infinite;
+  }
+
+  .subtle-pulse:hover {
+    animation-play-state: paused;
+    transform: scale(1.08) !important;
+  }
 }
 
 @layer utilities {

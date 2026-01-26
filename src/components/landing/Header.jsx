@@ -38,7 +38,8 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
   const [userName, setUserName] = useState('')
   const [userAvatar, setUserAvatar] = useState('')
   const [avatarError, setAvatarError] = useState(false)
-  const [userPlan, setUserPlan] = useState('FREE')
+  const [userPlan, setUserPlan] = useState(null) // Start with null to prevent flash
+  const [planLoaded, setPlanLoaded] = useState(false) // Track if plan has been loaded
 
   // Shared logout function
   const handleLogout = async () => {
@@ -138,13 +139,16 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                 .maybeSingle()
               
               if (!error && data?.plan) {
-                setUserPlan(data.plan)
+                const planUpper = (data.plan || '').toString().toUpperCase().trim()
+                setUserPlan(planUpper)
               } else {
                 setUserPlan('FREE')
               }
             } catch (planError) {
               console.error('Error fetching plan:', planError)
               setUserPlan('FREE')
+            } finally {
+              setPlanLoaded(true)
             }
           }
         } catch (error) {
@@ -154,6 +158,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
         const checks = getRemainingFreeChecks()
         setRemainingChecks(checks)
         setUserPlan('FREE')
+        setPlanLoaded(true)
       }
     }
     
@@ -196,10 +201,13 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                     .maybeSingle()
                   
                   if (!error && data?.plan) {
-                    setUserPlan(data.plan)
+                    const planUpper = (data.plan || '').toString().toUpperCase().trim()
+                    setUserPlan(planUpper)
+                    setPlanLoaded(true)
                     return // Success, exit retry loop
                   } else {
                     setUserPlan('FREE')
+                    setPlanLoaded(true)
                     return // Not found, use default
                   }
                 } catch (planError) {
@@ -207,6 +215,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   if (retryCount >= maxRetries) {
                     console.warn('⚠️ Error fetching plan after retries:', planError)
                     setUserPlan('FREE')
+                    setPlanLoaded(true)
                   } else {
                     // Exponential backoff: wait 200ms, 400ms, 800ms
                     await new Promise(resolve => setTimeout(resolve, 200 * Math.pow(2, retryCount - 1)))
@@ -272,9 +281,9 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
           </a>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-baseline gap-8">
             <DropdownMenu>
-              <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium flex items-center gap-1 outline-none">
+              <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium flex items-center gap-1 outline-none">
                 Resources
                 <ChevronDown className="h-4 w-4" />
               </DropdownMenuTrigger>
@@ -327,14 +336,15 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-            <a href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+            <a href="/pricing" className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium">
               Pricing
             </a>
-            <a href="/blog" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
-              Blog
-            </a>
-            <a href="/business" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+            <a href="/business" className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium">
               For Business
+            </a>
+            <a href="/#detector" className="gradient-text font-semibold transition-all text-sm font-medium relative group subtle-pulse">
+              Scan Now!
+              <span className="absolute inset-0 bg-primary/10 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity -z-10"></span>
             </a>
           </nav>
 
@@ -366,7 +376,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                 {window.location.pathname !== '/dashboard' && (
                   <a
                     href="/dashboard"
-                    className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                    className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium"
                   >
                     Dashboard
                   </a>
@@ -531,17 +541,21 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                           <div className="text-gray-400 text-xs truncate">{userEmail}</div>
                         </div>
                       </div>
-                      <div className={`inline-block px-2 py-0.5 text-xs rounded-md font-medium ${
-                        userPlan.toUpperCase() === 'PRO'
-                          ? 'bg-yellow-500/20 text-yellow-300'
-                          : userPlan.toUpperCase() === 'PREMIUM'
-                          ? 'bg-purple-500/20 text-purple-300'
-                          : userPlan.toUpperCase() === 'ENTERPRISE'
-                          ? 'bg-blue-500/20 text-blue-300'
-                          : 'bg-purple-500/20 text-purple-300'
-                      }`}>
-                        {userPlan.toUpperCase()} PLAN
-                      </div>
+                      {planLoaded && userPlan && (
+                        <div className={`inline-block px-2 py-0.5 text-xs rounded-md font-medium ${
+                          userPlan.toUpperCase() === 'FREE'
+                            ? 'bg-slate-500/20 text-slate-300'
+                            : userPlan.toUpperCase() === 'PRO'
+                            ? 'bg-yellow-500/20 text-yellow-300'
+                            : userPlan.toUpperCase() === 'PREMIUM'
+                            ? 'bg-purple-500/20 text-purple-300'
+                            : userPlan.toUpperCase() === 'ULTRA'
+                            ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-slate-500/20 text-slate-300'
+                        }`}>
+                          {userPlan.toUpperCase()} PLAN
+                        </div>
+                      )}
                     </div>
 
                     {/* Menu Items */}
@@ -667,20 +681,21 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   <div className="text-muted-foreground text-xs mt-0.5">Get help from our support team</div>
                 </div>
               </a>
-              <a href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+              <a href="/pricing" className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium">
                 Pricing
               </a>
-              <a href="/blog" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
-                Blog
-              </a>
-              <a href="/business" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+              <a href="/business" className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium">
                 For Business
+              </a>
+              <a href="/#detector" className="gradient-text font-semibold transition-all text-sm font-medium relative group subtle-pulse">
+                Scan Now!
+                <span className="absolute inset-0 bg-primary/10 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity -z-10"></span>
               </a>
               {isLoggedIn ? (
                 <>
                   <a
                     href="/dashboard"
-                    className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                    className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium"
                   >
                     Dashboard
                   </a>

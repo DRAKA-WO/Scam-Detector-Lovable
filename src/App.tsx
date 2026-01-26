@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Business from "./pages/Business";
 import ExtensionAuth from "./pages/ExtensionAuth";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -476,6 +477,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/business" element={<Business />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/extension-auth" element={<ExtensionAuth />} />
             <Route path="/auth/callback" element={<OAuthCallback />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

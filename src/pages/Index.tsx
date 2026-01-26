@@ -9,7 +9,6 @@ import FeaturesSection from '../components/landing/FeaturesSection'
 import HowItWorksSection from '../components/landing/HowItWorksSection'
 import FAQSection from '../components/landing/FAQSection'
 import Footer from '../components/landing/Footer'
-import ScrollToAnalyze from '../components/landing/ScrollToAnalyze'
 
 const Index = () => {
   const location = useLocation()
@@ -88,7 +87,6 @@ const Index = () => {
         <FAQSection />
       </main>
       <Footer />
-      <ScrollToAnalyze />
       </div>
   )
 }

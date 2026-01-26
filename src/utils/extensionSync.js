@@ -31,26 +31,34 @@ export async function syncSessionToExtension(session, userId, checks = null, pla
         }
       }
       
-      // If no pending update or it's old, try localStorage first
+      // If no pending update or it's old, fetch from Supabase FIRST (source of truth)
       if (checksCount === null) {
         try {
-          const checksKey = `scam_checker_user_checks_${userId}`;
-          const storedChecks = localStorage.getItem(checksKey);
-          if (storedChecks !== null) {
-            checksCount = parseInt(storedChecks, 10);
-            // Use localStorage value - it's the most up-to-date after a check is used
-            // Only sync from Supabase if localStorage doesn't have a value
-          } else {
-            // No localStorage value, fetch from Supabase
-            const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
-            checksCount = await syncUserChecksFromSupabase(userId);
+      // CRITICAL: Always fetch from Supabase first - it's the source of truth
+      // Don't use localStorage - it might be stale (e.g., extension updated Supabase)
+      const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
+      checksCount = await syncUserChecksFromSupabase(userId);
+          
+          // If Supabase fetch failed, fallback to localStorage
+          if (checksCount === null || checksCount === 0) {
+            const checksKey = `scam_checker_user_checks_${userId}`;
+            const storedChecks = localStorage.getItem(checksKey);
+            if (storedChecks !== null) {
+              checksCount = parseInt(storedChecks, 10);
+              if (import.meta.env.DEV) {
+                console.log(`⚠️ Using localStorage fallback for checks: ${checksCount}`);
+              }
+            }
           }
         } catch (e) {
-          // Fallback: try Supabase if localStorage access failed
+          // Fallback: try localStorage if Supabase fetch failed
           try {
-            const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
-            checksCount = await syncUserChecksFromSupabase(userId);
-          } catch (supabaseError) {
+            const checksKey = `scam_checker_user_checks_${userId}`;
+            const storedChecks = localStorage.getItem(checksKey);
+            if (storedChecks !== null) {
+              checksCount = parseInt(storedChecks, 10);
+            }
+          } catch (localStorageError) {
             if (import.meta.env.DEV) {
               console.warn(`⚠️ No checks found for user ${userId}`);
             }

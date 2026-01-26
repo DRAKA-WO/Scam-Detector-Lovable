@@ -4,7 +4,86 @@
  */
 
 /**
+ * Scam type category definitions
+ * Each category has keywords that, if found in the scam type, will group it into that category
+ * Categories are checked in order - first match wins
+ * This is extensible - just add new categories with their keywords
+ * 
+ * To add a new category in the future:
+ * 1. Add a new object to this array with:
+ *    - name: The normalized category name
+ *    - keywords: Array of keyword strings to match (case-insensitive)
+ *    - requireAll (optional): Array of keywords that ALL must be present
+ *    - specialCases (optional): Array of more specific cases that override general matching
+ */
+const SCAM_TYPE_CATEGORIES = [
+  {
+    name: 'Delivery Scam',
+    keywords: [
+      'delivery notification',
+      'delivery phishing',
+      'delivery scam',
+      'delivery smishing',
+      'package delivery',
+      'shipping notification',
+      'parcel delivery',
+      'delivery'
+    ]
+  },
+  {
+    name: 'Advance Fee Scam',
+    keywords: [
+      'advance fee',
+      'advance-fee',
+      'advance_fee',
+      'advancefee',
+      'advance fee fraud',
+      'advance fee lottery',
+      'advance fee prize',
+      'lottery/prize scam with advance fee',
+      'lottery prize scam with advance fee'
+    ]
+  },
+  {
+    name: 'Phishing Scam - Bank Impersonation',
+    keywords: ['bank impersonat', 'bank credential', 'bank theft', 'bank phishing'],
+    // Only match if both bank and one of the other keywords are present
+    requireAll: ['bank']
+  },
+  {
+    name: 'Phishing Scam - Account Verification',
+    keywords: ['phishing', 'account'],
+    requireAll: ['phishing', 'account']
+  },
+  {
+    name: 'Tech Support Scam',
+    keywords: ['tech support', 'tech_support', 'technical support'],
+    // Special handling for Apple (checked first, more specific)
+    specialCases: [
+      {
+        keywords: ['tech support', 'apple'],
+        name: 'Tech Support Scam - Apple Impersonation'
+      },
+      {
+        keywords: ['tech_support', 'apple'],
+        name: 'Tech Support Scam - Apple Impersonation'
+      }
+    ]
+  },
+  {
+    name: 'Credential Harvesting Phishing Scam',
+    keywords: ['credential', 'harvest'],
+    requireAll: ['credential', 'harvest']
+  },
+  {
+    name: 'Fake Feature Scam - Malware Distribution',
+    keywords: ['fake feature', 'fake_feature']
+  }
+]
+
+/**
  * Normalize similar scam types to group them together
+ * Uses a generic keyword-based system that can be extended for future scam types
  * @param {string} scamType - The original scam type
  * @returns {string} Normalized scam type
  */
@@ -13,32 +92,46 @@ export function normalizeScamType(scamType) {
   
   const lowerType = scamType.toLowerCase()
   
-  // Bank-related scams - group together
-  if (lowerType.includes('bank') && (lowerType.includes('impersonat') || lowerType.includes('credential') || lowerType.includes('theft'))) {
-    return 'Phishing Scam - Bank Impersonation'
-  }
-  
-  // Phishing scams with similar patterns
-  if (lowerType.includes('phishing') && lowerType.includes('account')) {
-    return 'Phishing Scam - Account Verification'
-  }
-  
-  // Tech support scams
-  if (lowerType.includes('tech support') || lowerType.includes('tech_support')) {
-    if (lowerType.includes('apple')) {
-      return 'Tech Support Scam - Apple Impersonation'
+  // Check each category in order (first match wins)
+  for (const category of SCAM_TYPE_CATEGORIES) {
+    // First, check special cases for this category (more specific matches)
+    if (category.specialCases) {
+      for (const specialCase of category.specialCases) {
+        const matchesAll = specialCase.keywords.every(keyword => 
+          lowerType.includes(keyword.toLowerCase())
+        )
+        if (matchesAll) {
+          return specialCase.name
+        }
+      }
     }
-    return 'Tech Support Scam'
-  }
-  
-  // Credential harvesting variations
-  if (lowerType.includes('credential') && lowerType.includes('harvest')) {
-    return 'Credential Harvesting Phishing Scam'
-  }
-  
-  // Fake feature scams
-  if (lowerType.includes('fake feature') || lowerType.includes('fake_feature')) {
-    return 'Fake Feature Scam - Malware Distribution'
+    
+    // Then check regular category matching
+    // Check if requireAll is specified (all keywords must be present)
+    if (category.requireAll && category.requireAll.length > 0) {
+      const matchesAll = category.requireAll.every(keyword => 
+        lowerType.includes(keyword.toLowerCase())
+      )
+      if (matchesAll) {
+        // Also check if any of the other keywords match
+        const matchesAnyKeyword = category.keywords.some(keyword => 
+          lowerType.includes(keyword.toLowerCase())
+        )
+        if (matchesAnyKeyword) {
+          return category.name
+        }
+      }
+    } else {
+      // Check if any keyword matches (longer keywords first for better matching)
+      // Sort keywords by length (longest first) to match more specific terms first
+      const sortedKeywords = [...category.keywords].sort((a, b) => b.length - a.length)
+      const matchesAny = sortedKeywords.some(keyword => 
+        lowerType.includes(keyword.toLowerCase())
+      )
+      if (matchesAny) {
+        return category.name
+      }
+    }
   }
   
   // Return original if no normalization needed

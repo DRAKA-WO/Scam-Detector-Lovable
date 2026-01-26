@@ -65,7 +65,8 @@ function Dashboard() {
     suspiciousResults: 0
   })
   const [monthlyScans, setMonthlyScans] = useState(0)
-  const [userPlan, setUserPlan] = useState('FREE')
+  const [userPlan, setUserPlan] = useState<string | null>(null) // Start with null to prevent flash
+  const [planLoaded, setPlanLoaded] = useState(false) // Track if plan has been loaded
   // Initialize loading state - check if we already have a session
   // IMPORTANT: Use the same logic as user state to ensure consistency
   const [loading, setLoading] = useState(() => {
@@ -857,14 +858,18 @@ function Dashboard() {
               .maybeSingle()
             
             if (!error && data?.plan) {
-              setUserPlan(data.plan)
+              const planUpper = (data.plan || '').toString().toUpperCase().trim()
+              setUserPlan(planUpper)
+              setPlanLoaded(true)
               // Sync plan to extension
               const { data: { session } } = await supabase.auth.getSession()
               if (session) {
-                await syncSessionToExtension(session, user.id, null, data.plan)
+                await syncSessionToExtension(session, user.id, null, planUpper)
               }
               return // Success
             }
+            setUserPlan('FREE')
+            setPlanLoaded(true)
             return // Not found or no error
           } catch (planError: any) {
             if (attempt < maxRetries - 1) {
@@ -1201,6 +1206,52 @@ function Dashboard() {
     }
   }, [refreshStats])
 
+  // 🎯 Handle showing latest scan after signup (when user completes signup from blocked result)
+  useEffect(() => {
+    if (!user?.id || !isScanHistoryLoaded || scanHistory.length === 0) {
+      return // Wait for user, scan history to load, and have at least one scan
+    }
+
+    // Check for the flag set by OAuthCallback after signup
+    const showLatestScanFlag = localStorage.getItem('show_latest_scan_after_signup')
+    if (showLatestScanFlag === 'true') {
+      console.log('🎯 [Dashboard] Flag detected - showing latest scan after signup')
+      
+      // Get the most recent scan (first in the array since they're sorted by created_at desc)
+      const latestScan = scanHistory[0]
+      
+      if (latestScan && latestScan.analysis_result) {
+        console.log('✅ [Dashboard] Found latest scan, displaying result:', {
+          scanId: latestScan.id,
+          classification: latestScan.classification,
+          scanType: latestScan.scan_type
+        })
+        
+        // Set the selected scan to show the result
+        setSelectedScan(latestScan)
+        
+        // Show the scan history section so the result is visible
+        setShowHistory(true)
+        
+        // Scroll to the scan history section after a short delay to ensure it's rendered
+        setTimeout(() => {
+          const scanHistorySection = document.getElementById('scan-history-section')
+          if (scanHistorySection) {
+            scanHistorySection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 300)
+        
+        // Clear the flag so it doesn't trigger again
+        localStorage.removeItem('show_latest_scan_after_signup')
+        console.log('✅ [Dashboard] Cleared show_latest_scan_after_signup flag')
+      } else {
+        console.warn('⚠️ [Dashboard] Flag set but no latest scan found or missing analysis_result')
+        // Clear the flag anyway to prevent infinite loops
+        localStorage.removeItem('show_latest_scan_after_signup')
+      }
+    }
+  }, [user?.id, isScanHistoryLoaded, scanHistory]) // Run when user, scan history loaded, or scan history changes
+
   useEffect(() => {
     const currentEffectId = ++effectIdRef.current
     let subscription: { unsubscribe?: () => void } | null = null
@@ -1283,14 +1334,17 @@ function Dashboard() {
               .maybeSingle()
             
             if (!error && data?.plan) {
-              console.log('📊 Dashboard: User plan', data.plan)
-              setUserPlan(data.plan)
+              const planUpper = (data.plan || '').toString().toUpperCase().trim()
+              console.log('📊 Dashboard: User plan', planUpper)
+              setUserPlan(planUpper)
+              setPlanLoaded(true)
               // Sync plan to extension
-              await syncSessionToExtension(session, session.user.id, null, data.plan)
+              await syncSessionToExtension(session, session.user.id, null, planUpper)
               return // Success
             } else {
               // Default to FREE if no plan found
               setUserPlan('FREE')
+              setPlanLoaded(true)
               return
             }
           } catch (error: any) {
@@ -1302,6 +1356,7 @@ function Dashboard() {
             } else {
               console.warn('⚠️ Dashboard: Error fetching plan after retries:', error)
               setUserPlan('FREE')
+              setPlanLoaded(true)
             }
           }
         }
@@ -2591,29 +2646,41 @@ function Dashboard() {
                     </h4>
                     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border">
                       <div className="flex items-center gap-3">
-                        <div className={`px-3 py-1.5 rounded-md border ${
-                          userPlan.toUpperCase() === 'PRO' 
-                            ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/40'
-                            : userPlan.toUpperCase() === 'PREMIUM'
-                            ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/40'
-                            : userPlan.toUpperCase() === 'ENTERPRISE'
-                            ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-500/40'
-                            : 'bg-gradient-to-r from-purple-500/15 to-pink-500/15 border-purple-500/30'
-                        }`}>
-                          <span className={`text-sm font-bold ${
-                            userPlan.toUpperCase() === 'PRO'
-                              ? 'text-yellow-200'
-                              : userPlan.toUpperCase() === 'PREMIUM'
-                              ? 'text-purple-300'
-                              : userPlan.toUpperCase() === 'ENTERPRISE'
-                              ? 'text-blue-300'
-                              : 'text-purple-300'
-                          }`}>
-                            {userPlan.toUpperCase()} PLAN
-                          </span>
-                        </div>
-                        {userPlan.toUpperCase() === 'FREE' && (
+                        {planLoaded && userPlan ? (
+                          <>
+                            <div className={`px-3 py-1.5 rounded-md border ${
+                              userPlan.toUpperCase() === 'FREE'
+                                ? 'bg-gradient-to-r from-slate-500/20 to-slate-600/20 border-slate-500/40'
+                                : userPlan.toUpperCase() === 'PRO' 
+                                ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/40'
+                                : userPlan.toUpperCase() === 'PREMIUM'
+                                ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/40'
+                                : userPlan.toUpperCase() === 'ULTRA'
+                                ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-500/40'
+                                : 'bg-gradient-to-r from-slate-500/15 to-slate-600/15 border-slate-500/30'
+                            }`}>
+                              <span className={`text-sm font-bold ${
+                                userPlan.toUpperCase() === 'FREE'
+                                  ? 'text-slate-300'
+                                  : userPlan.toUpperCase() === 'PRO'
+                                  ? 'text-yellow-200'
+                                  : userPlan.toUpperCase() === 'PREMIUM'
+                                  ? 'text-purple-300'
+                                  : userPlan.toUpperCase() === 'ULTRA'
+                                  ? 'text-blue-300'
+                                  : 'text-slate-300'
+                              }`}>
+                                {userPlan.toUpperCase()} PLAN
+                              </span>
+                            </div>
+                        {planLoaded && userPlan && userPlan.toUpperCase() === 'FREE' && (
                           <span className="text-xs text-muted-foreground">Free tier with limited features</span>
+                        )}
+                          </>
+                        ) : (
+                          <div className="px-3 py-1.5 rounded-md border bg-muted/50 animate-pulse">
+                            <span className="text-sm font-bold text-muted-foreground">Loading...</span>
+                          </div>
                         )}
                       </div>
                       <a
@@ -2623,7 +2690,7 @@ function Dashboard() {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        {userPlan.toUpperCase() === 'FREE' ? 'Upgrade' : 'Change Plan'}
+                        {planLoaded && userPlan ? (userPlan.toUpperCase() === 'FREE' ? 'Upgrade' : 'Change Plan') : 'Loading...'}
                       </a>
                     </div>
                   </div>

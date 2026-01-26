@@ -139,8 +139,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   const [searchQuery, setSearchQuery] = useState('') // Search query
   const [dateRange, setDateRange] = useState(initialDateRange || '30') // '0' (today), '7' (last 7 days), '30' (last 30 days)
   const [scamTypeFilter, setScamTypeFilter] = useState('all') // Filter by scam type
+  const [isScamTypeDropdownOpen, setIsScamTypeDropdownOpen] = useState(false) // State for custom dropdown
   const scrollContainerRef = useRef(null) // Ref for the scrollable container
   const isRestoringScroll = useRef(false) // Flag to prevent scroll reset during restoration
+  const scamTypeDropdownRef = useRef(null) // Ref for the custom dropdown container
 
   // Update filter when initialFilter prop changes (from parent clicks)
   useEffect(() => {
@@ -220,6 +222,23 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
     }
   }, [initialDateRange])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (scamTypeDropdownRef.current && !scamTypeDropdownRef.current.contains(event.target)) {
+        setIsScamTypeDropdownOpen(false)
+      }
+    }
+
+    if (isScamTypeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isScamTypeDropdownOpen])
+
   useEffect(() => {
     if (externalScans && externalScans.length >= 0) {
       // Always update when externalScans changes (even if empty array)
@@ -236,63 +255,73 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
     }
   }, [userId, externalScans])
 
-  // Generate signed URLs for images - only if not already cached or expired
+  // Generate signed URLs for images - regenerate expired URLs
   useEffect(() => {
     const generateSignedUrls = async () => {
-      // Start with cached URLs from localStorage
-      const urlMap = { ...loadCachedUrls() }
+      // Load cached URLs and check expiry
+      const cachedUrls = loadCachedUrls()
+      const urlMap = { ...cachedUrls }
       let hasNewUrls = false
       const failedScans = new Set() // Track scans that failed to load
       
+      // Check cache expiry times
+      const now = Date.now()
+      let cachedData = {}
+      try {
+        const cached = localStorage.getItem(SIGNED_URL_CACHE_KEY)
+        if (cached) {
+          cachedData = JSON.parse(cached)
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+      
       for (const scan of scans) {
         if (scan.scan_type === 'image' && scan.image_url) {
-          // Skip if we already have a valid cached URL for this scan
-          if (urlMap[scan.id]) {
-            continue
-          }
+          // Check if cached URL exists and is still valid (not expired)
+          const cachedEntry = cachedData[scan.id]
+          const isExpired = cachedEntry && cachedEntry.expiresAt && cachedEntry.expiresAt <= now
           
-          hasNewUrls = true
-          
-          // Check if it's already a full URL or just a path
-          if (scan.image_url.startsWith('http')) {
-            // Already a URL (might be from old data)
-            urlMap[scan.id] = scan.image_url
-          } else {
-            // It's a path, generate signed URL
-            try {
-              const signedUrl = await getSignedImageUrl(scan.image_url)
-              if (signedUrl) {
-                urlMap[scan.id] = signedUrl
-              } else {
-                console.warn(`⚠️ Failed to generate signed URL for scan ${scan.id} with path: ${scan.image_url}`)
+          // If no cached URL or expired, regenerate
+          if (!urlMap[scan.id] || isExpired) {
+            hasNewUrls = true
+            
+            // Check if it's already a full URL or just a path
+            if (scan.image_url.startsWith('http')) {
+              // Already a URL (might be from old data)
+              urlMap[scan.id] = scan.image_url
+            } else {
+              // It's a path, generate signed URL
+              try {
+                const signedUrl = await getSignedImageUrl(scan.image_url)
+                if (signedUrl) {
+                  urlMap[scan.id] = signedUrl
+                } else {
+                  console.warn(`⚠️ Failed to generate signed URL for scan ${scan.id} with path: ${scan.image_url}`)
+                  failedScans.add(scan.id)
+                  // Set to null so we know it failed (will show fallback icon)
+                  urlMap[scan.id] = null
+                }
+              } catch (error) {
+                console.error(`❌ Error generating signed URL for scan ${scan.id}:`, error)
                 failedScans.add(scan.id)
-                // Set to null so we know it failed (will show fallback icon)
                 urlMap[scan.id] = null
               }
-            } catch (error) {
-              console.error(`❌ Error generating signed URL for scan ${scan.id}:`, error)
-              failedScans.add(scan.id)
-              urlMap[scan.id] = null
             }
           }
         }
       }
       
-      // Only update state and cache if we added new URLs
-      if (hasNewUrls) {
-        setImageUrls(urlMap)
-        // Only cache successful URLs
-        const successfulUrls = {}
-        for (const [key, value] of Object.entries(urlMap)) {
-          if (value !== null) {
-            successfulUrls[key] = value
-          }
+      // Always update state (even if no new URLs, to refresh expired ones)
+      setImageUrls(urlMap)
+      // Only cache successful URLs
+      const successfulUrls = {}
+      for (const [key, value] of Object.entries(urlMap)) {
+        if (value !== null) {
+          successfulUrls[key] = value
         }
-        saveCachedUrls(successfulUrls) // Persist to localStorage
-      } else {
-        // Even if no new URLs, update state from cache in case cache was refreshed
-        setImageUrls(urlMap)
       }
+      saveCachedUrls(successfulUrls) // Persist to localStorage
     }
 
     if (scans.length > 0) {
@@ -588,38 +617,112 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
 
           {/* Scam Type Filter (only show when 'Scam' classification is selected) */}
           {uniqueScamTypes.length > 0 && filterClassification === 'scam' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative" ref={scamTypeDropdownRef}>
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <select
-                value={scamTypeFilter}
-                onChange={(e) => {
-                  const selectedScamType = e.target.value
-                  setScamTypeFilter(selectedScamType)
-                  // Automatically switch to 'scam' classification when a specific scam type is selected
-                  if (selectedScamType !== 'all' && filterClassification !== 'scam') {
-                    setFilterClassification('scam')
-                    if (onFilterChange) onFilterChange('scam')
-                  }
-                }}
-                size={uniqueScamTypes.length + 1 > 8 ? 8 : 1}
-                className={`px-3 py-1.5 rounded-md text-sm min-w-[180px] ${uniqueScamTypes.length + 1 > 8 ? 'overflow-y-auto' : ''}`}
-                style={{
-                  backgroundColor: 'hsl(var(--input))',
-                  color: 'hsl(var(--foreground))',
-                  borderColor: 'hsl(var(--input))',
-                  ...(uniqueScamTypes.length + 1 > 8 && {
-                    maxHeight: '200px',
-                    height: 'auto'
-                  })
-                }}
-              >
-                <option value="all">All Scam Types</option>
-                {uniqueScamTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsScamTypeDropdownOpen(!isScamTypeDropdownOpen)}
+                  className="px-3 py-1.5 rounded-md text-sm min-w-[320px] text-left flex items-center justify-between"
+                  style={{
+                    backgroundColor: 'hsl(var(--input))',
+                    color: 'hsl(var(--foreground))',
+                    borderColor: 'hsl(var(--input))',
+                    border: '1px solid hsl(var(--input))'
+                  }}
+                >
+                  <span>
+                    {scamTypeFilter === 'all' 
+                      ? 'All Scam Types' 
+                      : scamTypeFilter.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 transition-transform flex-shrink-0 ml-2 ${isScamTypeDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {isScamTypeDropdownOpen && (
+                  <div
+                    className="absolute z-50 mt-1 w-full rounded-md border shadow-lg scam-type-dropdown"
+                    style={{
+                      backgroundColor: 'hsl(var(--popover))',
+                      borderColor: 'hsl(var(--border))',
+                      maxHeight: uniqueScamTypes.length + 1 >= 7 ? '210px' : 'auto',
+                      overflowY: uniqueScamTypes.length + 1 >= 7 ? 'auto' : 'visible',
+                      overflowX: 'hidden',
+                      minWidth: '320px'
+                    }}
+                  >
+                    <style>{`
+                      .scam-type-dropdown::-webkit-scrollbar {
+                        width: 8px;
+                      }
+                      .scam-type-dropdown::-webkit-scrollbar-track {
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 4px;
+                      }
+                      .scam-type-dropdown::-webkit-scrollbar-thumb {
+                        background: rgba(168, 85, 247, 0.6);
+                        border-radius: 4px;
+                      }
+                      .scam-type-dropdown::-webkit-scrollbar-thumb:hover {
+                        background: rgba(168, 85, 247, 0.8);
+                      }
+                    `}</style>
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScamTypeFilter('all')
+                          setIsScamTypeDropdownOpen(false)
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 ${
+                          scamTypeFilter === 'all' ? 'bg-primary/10 text-primary' : ''
+                        }`}
+                        style={{
+                          color: scamTypeFilter === 'all' ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'
+                        }}
+                      >
+                        <span className="flex-shrink-0">-</span>
+                        <span>All Scam Types</span>
+                      </button>
+                      {uniqueScamTypes.map((type) => {
+                        const displayName = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                        const isSelected = scamTypeFilter === type
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setScamTypeFilter(type)
+                              setIsScamTypeDropdownOpen(false)
+                              // Automatically switch to 'scam' classification when a specific scam type is selected
+                              if (filterClassification !== 'scam') {
+                                setFilterClassification('scam')
+                                if (onFilterChange) onFilterChange('scam')
+                              }
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-start gap-2 ${
+                              isSelected ? 'bg-primary/10 text-primary' : ''
+                            }`}
+                            style={{
+                              color: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'
+                            }}
+                          >
+                            <span className="flex-shrink-0 mt-0.5">-</span>
+                            <span className="break-words">{displayName}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -670,9 +773,32 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                             src={imageUrls[scan.id]}
                             alt="Scan preview"
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Fallback if signed URL fails to load
-                              console.warn(`⚠️ Image failed to load for scan ${scan.id}:`, imageUrls[scan.id])
+                            onError={async (e) => {
+                              // Image failed to load - try regenerating signed URL (might have expired)
+                              console.warn(`⚠️ Image failed to load for scan ${scan.id}, attempting to regenerate signed URL...`)
+                              
+                              // Only retry if we have an image_url path (not a full URL)
+                              if (scan.image_url && !scan.image_url.startsWith('http')) {
+                                try {
+                                  const newSignedUrl = await getSignedImageUrl(scan.image_url)
+                                  if (newSignedUrl) {
+                                    // Update the URL and retry loading
+                                    setImageUrls(prev => ({
+                                      ...prev,
+                                      [scan.id]: newSignedUrl
+                                    }))
+                                    // Save to cache
+                                    saveCachedUrls({ [scan.id]: newSignedUrl })
+                                    // Update the img src to retry
+                                    e.target.src = newSignedUrl
+                                    return // Don't show fallback yet, let it retry
+                                  }
+                                } catch (error) {
+                                  console.error(`❌ Failed to regenerate signed URL for scan ${scan.id}:`, error)
+                                }
+                              }
+                              
+                              // If retry failed or not applicable, show fallback
                               e.target.style.display = 'none'
                               const fallback = e.target.parentElement.nextElementSibling
                               if (fallback) {
