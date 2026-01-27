@@ -37,13 +37,17 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
       analysis_result: analysisResult
     };
     
-    // Removed verbose logging
+    console.log(`🔍 [scanHistory] Inserting scan to Supabase (scan_history) for user ${insertData.user_id}...`);
     
     const { data, error } = await supabase
       .from('scan_history')
       .insert(insertData)
       .select()
       .single()
+    
+    if (!error && data) {
+      console.log(`✅ [scanHistory] Inserted scan to Supabase (scan_history) for user ${insertData.user_id}`);
+    }
 
     if (error) {
       console.error('❌ Error saving scan to history:', error);
@@ -153,6 +157,7 @@ export async function retryFailedScans(userId) {
           ? scan.content_preview.substring(0, MAX_PREVIEW_LENGTH)
           : scan.content_preview
         
+        console.log(`🔍 [scanHistory] Inserting scan to Supabase (scan_history) for user ${scan.user_id}...`);
         const { data, error } = await supabase
           .from('scan_history')
           .insert({
@@ -165,6 +170,10 @@ export async function retryFailedScans(userId) {
           })
           .select()
           .single()
+        
+        if (!error && data) {
+          console.log(`✅ [scanHistory] Inserted scan to Supabase (scan_history) for user ${scan.user_id}`);
+        }
         
         if (error) {
           // Check if it's a duplicate (already saved)
@@ -223,12 +232,17 @@ export async function getScanHistory(userId) {
     // Calculate date 30 days ago
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     
+    console.log(`🔍 [scanHistory] Fetching scan history from Supabase (scan_history) for user ${userId} (last 30 days)...`);
     const { data, error } = await supabase
       .from('scan_history')
       .select('*')
       .eq('user_id', userId)
       .gte('created_at', thirtyDaysAgo)
       .order('created_at', { ascending: false })
+    
+    if (!error && data) {
+      console.log(`✅ [scanHistory] Fetched ${data.length} scans from Supabase (scan_history) for user ${userId}`);
+    }
 
     if (error) {
       console.error('Error fetching scan history:', error)
@@ -346,10 +360,15 @@ export async function getUserStatsFromDatabase(userId) {
 
   try {
     // Fetch ALL scans for the user (not just latest 3)
+    console.log(`🔍 [scanHistory] Fetching all scans from Supabase (scan_history) for stats calculation (user: ${userId})...`);
     const { data, error } = await supabase
       .from('scan_history')
       .select('classification')
       .eq('user_id', userId)
+    
+    if (!error && data) {
+      console.log(`✅ [scanHistory] Fetched ${data.length} scans from Supabase (scan_history) for stats calculation (user: ${userId})`);
+    }
 
     if (error) {
       console.error('❌ Error fetching scan stats:', error)
@@ -400,6 +419,7 @@ export async function getUserPermanentStats(userId) {
 
   try {
     // Try to get existing stats - use maybeSingle() to avoid errors when no rows exist
+    console.log(`🔍 [scanHistory] Fetching permanent stats from Supabase (user_stats) for user ${userId}...`);
     const { data, error } = await supabase
       .from('user_stats')
       .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
@@ -418,11 +438,16 @@ export async function getUserPermanentStats(userId) {
 
     // If no stats exist, create initial record
     if (!data) {
+      console.log(`🔍 [scanHistory] No stats found, creating initial user_stats record for user ${userId}...`);
       const { data: newStats, error: insertError } = await supabase
         .from('user_stats')
         .insert({ user_id: userId })
         .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
         .single()
+      
+      if (!insertError && newStats) {
+        console.log(`✅ [scanHistory] Created initial user_stats record for user ${userId}`);
+      }
 
       if (insertError) {
         console.error('❌ Error creating initial stats:', insertError)
@@ -442,7 +467,7 @@ export async function getUserPermanentStats(userId) {
       }
     }
 
-    console.log('✅ Fetched permanent stats:', data);
+    console.log(`✅ [scanHistory] Fetched permanent stats from Supabase (user_stats) for user ${userId}:`, data);
     return {
       totalScans: data.total_scans || 0,
       scamsDetected: data.scams_detected || 0,
@@ -475,6 +500,7 @@ export async function incrementUserStats(userId, classification) {
     console.log('📈 Incrementing stats for user:', userId, 'classification:', classification);
     
     // Get current stats or create if not exists
+    console.log(`🔍 [scanHistory] Fetching user_stats from Supabase for increment (user: ${userId})...`);
     let { data: stats, error } = await supabase
       .from('user_stats')
       .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
@@ -483,11 +509,16 @@ export async function incrementUserStats(userId, classification) {
 
     // If no record exists or there was an error, create initial record
     if (error || !stats) {
+      console.log(`🔍 [scanHistory] No user_stats found, creating initial record for user ${userId}...`);
       const { data: newStats, error: insertError } = await supabase
         .from('user_stats')
         .insert({ user_id: userId })
         .select('user_id, total_scans, scams_detected, safe_results, suspicious_results, created_at, updated_at')
         .single()
+      
+      if (!insertError && newStats) {
+        console.log(`✅ [scanHistory] Created initial user_stats record for increment (user: ${userId})`);
+      }
 
       if (insertError) {
         console.error('❌ Error creating initial stats record:', insertError);
@@ -519,15 +550,16 @@ export async function incrementUserStats(userId, classification) {
     console.log('📊 Updating stats with:', updates);
 
     // Update the record
+    console.log(`🔍 [scanHistory] Updating user_stats in Supabase for user ${userId} (classification: ${classification})...`);
     const { error: updateError } = await supabase
       .from('user_stats')
       .update(updates)
       .eq('user_id', userId)
 
     if (updateError) {
-      console.error('❌ Error updating permanent stats:', updateError)
+      console.error(`❌ [scanHistory] Error updating user_stats in Supabase:`, updateError)
     } else {
-      console.log('✅ Successfully incremented permanent stats');
+      console.log(`✅ [scanHistory] Updated user_stats in Supabase for user ${userId} (classification: ${classification})`);
     }
   } catch (error) {
     console.error('❌ Exception incrementing stats:', error)

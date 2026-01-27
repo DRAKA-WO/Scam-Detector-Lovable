@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { isUserLoggedIn, getRemainingFreeChecks, getRemainingUserChecks } from '../../utils/checkLimits'
 import LoginModal from '../LoginModal'
 import SignupModal from '../SignupModal'
+import ContactSupportModal from '../ContactSupportModal'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,14 +33,75 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
+  const [showContactSupportModal, setShowContactSupportModal] = useState(false)
   const [remainingChecks, setRemainingChecks] = useState(0)
   const [userId, setUserId] = useState(null)
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
-  const [userAvatar, setUserAvatar] = useState('')
+  // Helper function to extract base64 data URL from marked initial avatar
+  const INITIAL_AVATAR_MARKER = 'INITIAL_AVATAR:'
+  const getInitialAvatarDataUrl = (avatarUrl) => {
+    if (!avatarUrl) return ''
+    if (avatarUrl.startsWith(INITIAL_AVATAR_MARKER)) {
+      return avatarUrl.substring(INITIAL_AVATAR_MARKER.length)
+    }
+    return avatarUrl
+  }
+  
+  // Initialize avatar from cached sessionStorage first, then fallback to session
+  // This prevents flash when navigating between pages
+  const [userAvatar, setUserAvatar] = useState(() => {
+    // First, try to get cached avatar from sessionStorage (if already fetched)
+    if (typeof window !== 'undefined') {
+      const cachedAvatar = sessionStorage.getItem('header_cached_avatar')
+      if (cachedAvatar) {
+        return cachedAvatar
+      }
+    }
+    
+    // Fallback to session data if no cache
+    try {
+      const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'))
+      if (supabaseKeys.length > 0) {
+        const sessionStr = localStorage.getItem(supabaseKeys[0])
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr)
+          const user = session?.currentSession?.user || session?.user
+          if (user) {
+            // Get avatar from user_metadata first (immediate, no fetch needed)
+            const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || ''
+            // Extract base64 data URL if it's a marked initial avatar
+            return getInitialAvatarDataUrl(avatarUrl)
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    return ''
+  })
   const [avatarError, setAvatarError] = useState(false)
   const [userPlan, setUserPlan] = useState(null) // Start with null to prevent flash
   const [planLoaded, setPlanLoaded] = useState(false) // Track if plan has been loaded
+  // Use sessionStorage to persist fetch flag across page changes
+  const [avatarFetched, setAvatarFetched] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('header_avatar_fetched') === 'true'
+    }
+    return false
+  })
+  
+  // Helper to update avatarFetched and persist to sessionStorage
+  const setAvatarFetchedWithStorage = (value) => {
+    setAvatarFetched(value)
+    if (typeof window !== 'undefined') {
+      if (value) {
+        sessionStorage.setItem('header_avatar_fetched', 'true')
+      } else {
+        sessionStorage.removeItem('header_avatar_fetched')
+      }
+    }
+  }
 
   // Shared logout function
   const handleLogout = async () => {
@@ -51,6 +113,11 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
       setUserName('')
       setUserAvatar('')
       setUserPlan('FREE')
+      setAvatarFetchedWithStorage(false) // Reset fetch flag on logout
+      // Clear cached avatar on logout
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('header_cached_avatar')
+      }
       
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut()
@@ -122,33 +189,149 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
           if (session?.user) {
             setUserId(session.user.id)
             setUserEmail(session.user.email || '')
-            const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
-            const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || ''
-            setUserName(fullName)
-            setUserAvatar(avatarUrl)
-            setAvatarError(false) // Reset error when avatar changes
             const checks = getRemainingUserChecks(session.user.id)
             setRemainingChecks(checks)
             
-            // Fetch user plan from users table
-            try {
-              const { data, error } = await supabase
-                .from('users')
-                .select('plan')
-                .eq('id', session.user.id)
-                .maybeSingle()
-              
-              if (!error && data?.plan) {
-                const planUpper = (data.plan || '').toString().toUpperCase().trim()
-                setUserPlan(planUpper)
-              } else {
+            // Fetch user data from database FIRST (plan, full_name, avatar_url) - database is source of truth
+            // This ensures custom avatar shows immediately, not Google OAuth picture
+            // Only fetch if we haven't fetched yet (prevents refetching on every page change)
+            if (!avatarFetched) {
+              try {
+                const { data, error } = await supabase
+                  .from('users')
+                  .select('plan, full_name, avatar_url')
+                  .eq('id', session.user.id)
+                  .maybeSingle()
+                
+                if (!error && data) {
+                  // Set plan
+                  if (data.plan) {
+                    const planUpper = (data.plan || '').toString().toUpperCase().trim()
+                    setUserPlan(planUpper)
+                    window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: planUpper } }))
+                  } else {
+                    setUserPlan('FREE')
+                    window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
+                  }
+                  
+                  // Set name and avatar from database (source of truth for custom data)
+                  const dbFullName = data.full_name || 
+                                    session.user.user_metadata?.full_name || 
+                                    session.user.user_metadata?.name || 
+                                    session.user.email?.split('@')[0] || 
+                                    'User'
+                  const dbAvatarUrl = data.avatar_url || 
+                                    session.user.user_metadata?.avatar_url || 
+                                    session.user.user_metadata?.picture || 
+                                    ''
+                  
+                  setUserName(dbFullName)
+                  // Extract base64 data URL if it's a marked initial avatar
+                  const extractedDbAvatarUrl = getInitialAvatarDataUrl(dbAvatarUrl)
+                  setUserAvatar(extractedDbAvatarUrl)
+                  // Cache avatar in sessionStorage to prevent flash on page navigation
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('header_cached_avatar', extractedDbAvatarUrl)
+                  }
+                } else {
+                  // Fallback to user_metadata if database fetch fails
+                  const initialFullName = session.user.user_metadata?.full_name || 
+                                         session.user.user_metadata?.name || 
+                                         session.user.email?.split('@')[0] || 
+                                         'User'
+                  const initialAvatarUrl = session.user.user_metadata?.avatar_url || 
+                                           session.user.user_metadata?.picture || 
+                                           ''
+                  setUserName(initialFullName)
+                  const extractedAvatarUrl = getInitialAvatarDataUrl(initialAvatarUrl)
+                  setUserAvatar(extractedAvatarUrl)
+                  // Cache avatar in sessionStorage to prevent flash on page navigation
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('header_cached_avatar', extractedAvatarUrl)
+                  }
+                  setUserPlan('FREE')
+                  window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
+                }
+                setAvatarFetchedWithStorage(true)
+              } catch (fetchError) {
+                // Fallback to user_metadata on error
+                const initialFullName = session.user.user_metadata?.full_name || 
+                                       session.user.user_metadata?.name || 
+                                       session.user.email?.split('@')[0] || 
+                                       'User'
+                const initialAvatarUrl = session.user.user_metadata?.avatar_url || 
+                                         session.user.user_metadata?.picture || 
+                                         ''
+                setUserName(initialFullName)
+                const extractedAvatarUrl = getInitialAvatarDataUrl(initialAvatarUrl) || ''
+                setUserAvatar(extractedAvatarUrl)
+                // Cache avatar in sessionStorage to prevent flash on page navigation
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('header_cached_avatar', extractedAvatarUrl)
+                }
                 setUserPlan('FREE')
+                window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
+                setAvatarFetchedWithStorage(true)
+              } finally {
+                setAvatarError(false)
+                setPlanLoaded(true)
               }
-            } catch (planError) {
-              console.error('Error fetching plan:', planError)
-              setUserPlan('FREE')
-            } finally {
-              setPlanLoaded(true)
+            } else {
+              // Already fetched - use cached avatar to prevent flash
+              // Only check database for updates in background (database is source of truth)
+              // Don't update from session user_metadata as it might have Google avatar
+              ;(async () => {
+                try {
+                  const { data, error } = await supabase
+                    .from('users')
+                    .select('plan, full_name, avatar_url')
+                    .eq('id', session.user.id)
+                    .maybeSingle()
+                  
+                  if (!error && data) {
+                    // Update plan if needed
+                    if (data.plan) {
+                      const planUpper = (data.plan || '').toString().toUpperCase().trim()
+                      if (planUpper !== userPlan) {
+                        setUserPlan(planUpper)
+                        window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: planUpper } }))
+                      }
+                    }
+                    
+                    // Update name and avatar from database if different (silent update)
+                    const dbFullName = data.full_name || 
+                                    session.user.user_metadata?.full_name || 
+                                    session.user.user_metadata?.name || 
+                                    session.user.email?.split('@')[0] || 
+                                    'User'
+                    const dbAvatarUrl = data.avatar_url || 
+                                      session.user.user_metadata?.avatar_url || 
+                                      session.user.user_metadata?.picture || 
+                                      ''
+                    
+                    if (dbFullName !== userName) {
+                      setUserName(dbFullName)
+                    }
+                    // Extract base64 data URL if it's a marked initial avatar
+                    const extractedDbAvatarUrl = getInitialAvatarDataUrl(dbAvatarUrl)
+                    if (extractedDbAvatarUrl !== userAvatar) {
+                      setUserAvatar(extractedDbAvatarUrl)
+                      // Update cache when avatar changes
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('header_cached_avatar', extractedDbAvatarUrl)
+                      }
+                    }
+                  }
+                } catch (fetchError) {
+                  // Silent error
+                }
+              })()
+              
+              if (!planLoaded) {
+                setUserPlan('FREE')
+                setPlanLoaded(true)
+                window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
+              }
             }
           }
         } catch (error) {
@@ -159,6 +342,8 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
         setRemainingChecks(checks)
         setUserPlan('FREE')
         setPlanLoaded(true)
+        // Dispatch event for other components (like Pricing) to listen to
+        window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
       }
     }
     
@@ -174,55 +359,154 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
           if (loggedIn && session?.user) {
             setUserId(session.user.id)
             setUserEmail(session.user.email || '')
-            const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
-            const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || ''
-            
-            setUserName(fullName)
-            setUserAvatar(avatarUrl)
-            setAvatarError(false) // Reset error when avatar changes
             const checks = getRemainingUserChecks(session.user.id)
             setRemainingChecks(checks)
             
-            // Fetch user plan from users table
-            // Add delay to avoid concurrent requests after login
-            ;(async () => {
-              // Small delay to let other components finish their initial requests
-              await new Promise(resolve => setTimeout(resolve, 500))
-              
-              const maxRetries = 3
-              let retryCount = 0
-              
-              while (retryCount < maxRetries) {
+            // Fetch user data from database FIRST (plan, full_name, avatar_url) - database is source of truth
+            // This ensures custom avatar shows immediately, not Google OAuth picture
+            // Only fetch if we haven't fetched yet (prevents refetching on every page change)
+            if (!avatarFetched) {
+              // Fetch immediately without delay to get custom avatar right away
+              ;(async () => {
+                
                 try {
                   const { data, error } = await supabase
                     .from('users')
-                    .select('plan')
+                    .select('plan, full_name, avatar_url')
                     .eq('id', session.user.id)
                     .maybeSingle()
                   
-                  if (!error && data?.plan) {
-                    const planUpper = (data.plan || '').toString().toUpperCase().trim()
-                    setUserPlan(planUpper)
-                    setPlanLoaded(true)
-                    return // Success, exit retry loop
+                  if (!error && data) {
+                    // Set plan
+                    if (data.plan) {
+                      const planUpper = (data.plan || '').toString().toUpperCase().trim()
+                      setUserPlan(planUpper)
+                      window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: planUpper } }))
+                    } else {
+                      setUserPlan('FREE')
+                      window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
+                    }
+                    
+                    // Set name and avatar from database (source of truth for custom data)
+                    const dbFullName = data.full_name || 
+                                    session.user.user_metadata?.full_name || 
+                                    session.user.user_metadata?.name || 
+                                    session.user.email?.split('@')[0] || 
+                                    'User'
+                    const dbAvatarUrl = data.avatar_url || 
+                                      session.user.user_metadata?.avatar_url || 
+                                      session.user.user_metadata?.picture || 
+                                      ''
+                    
+                    setUserName(dbFullName)
+                    // Extract base64 data URL if it's a marked initial avatar
+                    const extractedDbAvatarUrl = getInitialAvatarDataUrl(dbAvatarUrl) || ''
+                    setUserAvatar(extractedDbAvatarUrl)
+                    // Cache avatar in sessionStorage to prevent flash on page navigation
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('header_cached_avatar', extractedDbAvatarUrl)
+                    }
                   } else {
+                    // Fallback to user_metadata if database fetch fails
+                    const initialFullName = session.user.user_metadata?.full_name || 
+                                           session.user.user_metadata?.name || 
+                                           session.user.email?.split('@')[0] || 
+                                           'User'
+                    const initialAvatarUrl = session.user.user_metadata?.avatar_url || 
+                                             session.user.user_metadata?.picture || 
+                                             ''
+                    setUserName(initialFullName)
+                    const extractedAvatarUrl = getInitialAvatarDataUrl(initialAvatarUrl) || ''
+                    setUserAvatar(extractedAvatarUrl)
+                    // Cache avatar in sessionStorage to prevent flash on page navigation
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('header_cached_avatar', extractedAvatarUrl)
+                    }
                     setUserPlan('FREE')
-                    setPlanLoaded(true)
-                    return // Not found, use default
+                    window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
                   }
-                } catch (planError) {
-                  retryCount++
-                  if (retryCount >= maxRetries) {
-                    console.warn('⚠️ Error fetching plan after retries:', planError)
-                    setUserPlan('FREE')
-                    setPlanLoaded(true)
-                  } else {
-                    // Exponential backoff: wait 200ms, 400ms, 800ms
-                    await new Promise(resolve => setTimeout(resolve, 200 * Math.pow(2, retryCount - 1)))
+                  setAvatarFetchedWithStorage(true)
+                } catch (fetchError) {
+                  // Fallback to user_metadata on error
+                  const initialFullName = session.user.user_metadata?.full_name || 
+                                         session.user.user_metadata?.name || 
+                                         session.user.email?.split('@')[0] || 
+                                         'User'
+                  const initialAvatarUrl = session.user.user_metadata?.avatar_url || 
+                                         session.user.user_metadata?.picture || 
+                                         ''
+                  setUserName(initialFullName)
+                  const extractedAvatarUrl = getInitialAvatarDataUrl(initialAvatarUrl)
+                  setUserAvatar(extractedAvatarUrl)
+                  // Cache avatar in sessionStorage to prevent flash on page navigation
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('header_cached_avatar', extractedAvatarUrl)
                   }
+                  setUserPlan('FREE')
+                  window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
+                  setAvatarFetchedWithStorage(true)
+                } finally {
+                  setAvatarError(false)
+                  setPlanLoaded(true)
                 }
+              })()
+            } else {
+              // Already fetched - use cached avatar to prevent flash
+              // Only check database for updates in background (database is source of truth)
+              // Don't update from session user_metadata as it might have Google avatar
+              ;(async () => {
+                try {
+                  const { data, error } = await supabase
+                    .from('users')
+                    .select('plan, full_name, avatar_url')
+                    .eq('id', session.user.id)
+                    .maybeSingle()
+                  
+                  if (!error && data) {
+                    // Update plan if needed
+                    if (data.plan) {
+                      const planUpper = (data.plan || '').toString().toUpperCase().trim()
+                      if (planUpper !== userPlan) {
+                        setUserPlan(planUpper)
+                        window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: planUpper } }))
+                      }
+                    }
+                    
+                    // Update name and avatar from database if different (silent update)
+                    const dbFullName = data.full_name || 
+                                    session.user.user_metadata?.full_name || 
+                                    session.user.user_metadata?.name || 
+                                    session.user.email?.split('@')[0] || 
+                                    'User'
+                    const dbAvatarUrl = data.avatar_url || 
+                                      session.user.user_metadata?.avatar_url || 
+                                      session.user.user_metadata?.picture || 
+                                      ''
+                    
+                    if (dbFullName !== userName) {
+                      setUserName(dbFullName)
+                    }
+                    // Extract base64 data URL if it's a marked initial avatar
+                    const extractedDbAvatarUrl = getInitialAvatarDataUrl(dbAvatarUrl)
+                    if (extractedDbAvatarUrl !== userAvatar) {
+                      setUserAvatar(extractedDbAvatarUrl)
+                      // Update cache when avatar changes
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('header_cached_avatar', extractedDbAvatarUrl)
+                      }
+                    }
+                  }
+                } catch (fetchError) {
+                  // Silent error
+                }
+              })()
+              
+              if (!planLoaded) {
+                setUserPlan('FREE')
+                setPlanLoaded(true)
+                window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
               }
-            })()
+            }
           } else {
             setUserId(null)
             setUserEmail('')
@@ -230,6 +514,8 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
             setUserAvatar('')
             setAvatarError(false)
             setUserPlan('FREE')
+            // Dispatch event for other components (like Pricing) to listen to
+            window.dispatchEvent(new CustomEvent('planUpdated', { detail: { plan: 'FREE' } }))
             const checks = getRemainingFreeChecks()
             setRemainingChecks(checks)
           }
@@ -257,9 +543,28 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
     // Custom event for same-tab updates
     window.addEventListener('checksUpdated', handleStorageChange)
     
+    // Listen for avatar updates from Dashboard
+    const handleAvatarUpdate = (event) => {
+      const { avatar_url, full_name } = (event.detail || {})
+      if (avatar_url !== undefined) {
+        const extractedAvatarUrl = getInitialAvatarDataUrl(avatar_url)
+        setUserAvatar(extractedAvatarUrl)
+        // Update cache
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('header_cached_avatar', extractedAvatarUrl)
+        }
+      }
+      if (full_name !== undefined && full_name !== userName) {
+        setUserName(full_name)
+      }
+    }
+    
+    window.addEventListener('avatarUpdated', handleAvatarUpdate)
+    
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('checksUpdated', handleStorageChange)
+      window.removeEventListener('avatarUpdated', handleAvatarUpdate)
     }
   }, [isLoggedIn, userId])
 
@@ -290,7 +595,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
               <DropdownMenuContent align="start" className="bg-gray-900 border-gray-700 w-[500px] p-3">
                 <div className="grid grid-cols-2 gap-3">
                   <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                    <a href="/#features" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                    <a href="/#features" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
                       <div className="flex-shrink-0 mt-0.5">
                         <Sparkles className="h-5 w-5 text-purple-400" />
                       </div>
@@ -301,7 +606,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                     </a>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                    <a href="/#how-it-works" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                    <a href="/#how-it-works" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
                       <div className="flex-shrink-0 mt-0.5">
                         <PlayCircle className="h-5 w-5 text-blue-400" />
                       </div>
@@ -312,7 +617,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                     </a>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                    <a href="/#faq" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                    <a href="/#faq" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
                       <div className="flex-shrink-0 mt-0.5">
                         <HelpCircle className="h-5 w-5 text-green-400" />
                       </div>
@@ -323,7 +628,10 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                     </a>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                    <a href="/support" className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                    <button 
+                      onClick={() => setShowContactSupportModal(true)}
+                      className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full text-left"
+                    >
                       <div className="flex-shrink-0 mt-0.5">
                         <MessageCircle className="h-5 w-5 text-orange-400" />
                       </div>
@@ -331,7 +639,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                         <div className="text-white font-medium text-sm">Support</div>
                         <div className="text-gray-400 text-xs mt-0.5">Get help from our support team</div>
                       </div>
-                    </a>
+                    </button>
                   </DropdownMenuItem>
                 </div>
               </DropdownMenuContent>
@@ -509,7 +817,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
                     {userAvatar && !avatarError ? (
                       <img 
-                        src={userAvatar} 
+                        src={getInitialAvatarDataUrl(userAvatar)} 
                         alt="User Avatar" 
                         className="w-8 h-8 rounded-full object-cover"
                         onError={() => setAvatarError(true)}
@@ -526,7 +834,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                       <div className="flex items-center gap-3 mb-2">
                         {userAvatar && !avatarError ? (
                           <img 
-                            src={userAvatar} 
+                            src={getInitialAvatarDataUrl(userAvatar)} 
                             alt="User Avatar" 
                             className="w-12 h-12 rounded-full object-cover"
                             onError={() => setAvatarError(true)}
@@ -561,31 +869,34 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                     {/* Menu Items */}
                     <div className="p-2">
                       <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                        <a href="/dashboard" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                        <a href="/dashboard#account-info" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
                           <Settings className="h-4 w-4 text-gray-400" />
                           <span className="text-gray-200 text-sm">Account details</span>
                         </a>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                        <a href="/pricing" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                        <a href="/pricing" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
                           <Zap className="h-4 w-4 text-blue-400" />
                           <span className="text-gray-200 text-sm">Upgrade your plan</span>
                         </a>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                        <a href="/refer" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                        <a href="/refer" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
                           <Gift className="h-4 w-4 text-green-400" />
                           <span className="text-gray-200 text-sm">Refer and earn</span>
                         </a>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                        <a href="/support" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-colors w-full">
+                        <button 
+                          onClick={() => setShowContactSupportModal(true)}
+                          className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full text-left"
+                        >
                           <Mail className="h-4 w-4 text-orange-400" />
                           <span className="text-gray-200 text-sm">Contact us</span>
-                        </a>
+                        </button>
                       </DropdownMenuItem>
                     </div>
 
@@ -645,7 +956,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
           <div className="md:hidden py-4 border-t border-border">
             <nav className="flex flex-col gap-4">
               <div className="text-muted-foreground text-sm font-semibold mb-2">Resources</div>
-              <a href="/#features" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-colors">
+              <a href="/#features" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-all duration-300 hover:scale-105">
                 <div className="flex-shrink-0 mt-0.5">
                   <Sparkles className="h-5 w-5 text-purple-400" />
                 </div>
@@ -654,7 +965,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   <div className="text-muted-foreground text-xs mt-0.5">Explore our powerful AI detection capabilities</div>
                 </div>
               </a>
-              <a href="/#how-it-works" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-colors">
+              <a href="/#how-it-works" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-all duration-300 hover:scale-105">
                 <div className="flex-shrink-0 mt-0.5">
                   <PlayCircle className="h-5 w-5 text-blue-400" />
                 </div>
@@ -663,7 +974,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   <div className="text-muted-foreground text-xs mt-0.5">Learn how our scam detection system works</div>
                 </div>
               </a>
-              <a href="/#faq" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-colors">
+              <a href="/#faq" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-all duration-300 hover:scale-105">
                 <div className="flex-shrink-0 mt-0.5">
                   <HelpCircle className="h-5 w-5 text-green-400" />
                 </div>
@@ -672,7 +983,10 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   <div className="text-muted-foreground text-xs mt-0.5">Find answers to frequently asked questions</div>
                 </div>
               </a>
-              <a href="/support" className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-colors">
+              <button 
+                onClick={() => setShowContactSupportModal(true)}
+                className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-800 transition-all duration-300 hover:scale-105 w-full text-left"
+              >
                 <div className="flex-shrink-0 mt-0.5">
                   <MessageCircle className="h-5 w-5 text-orange-400" />
                 </div>
@@ -680,7 +994,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                   <div className="text-foreground font-medium text-sm">Support</div>
                   <div className="text-muted-foreground text-xs mt-0.5">Get help from our support team</div>
                 </div>
-              </a>
+              </button>
               <a href="/pricing" className="text-muted-foreground hover:text-foreground hover:scale-105 transition-all text-sm font-medium">
                 Pricing
               </a>
@@ -739,6 +1053,12 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
         }}
         remainingChecks={remainingChecks}
         hideOutOfChecksMessage={true}
+      />
+
+      {/* Contact/Support Modal */}
+      <ContactSupportModal
+        open={showContactSupportModal}
+        onOpenChange={setShowContactSupportModal}
       />
     </header>
   )

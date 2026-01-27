@@ -62,8 +62,9 @@ const OAuthCallback = () => {
             if (data?.session && !error) {
               console.log('✅ Session set successfully!');
               
-              // Sync session to extension
-              await syncSessionToExtension(data.session, data.session.user.id);
+              // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+              // Extension fetches checks/plan from Supabase when popup opens
+              await syncSessionToExtension(data.session, data.session.user.id, null, null, true);
               
               // Don't redirect yet - need to process pending scan and initialize checks first
               // Continue to proceedWithRedirect() below
@@ -117,8 +118,9 @@ const OAuthCallback = () => {
             const proceedWithRedirect = async () => {
               console.log('🚀 [OAuthCallback] Starting proceedWithRedirect...');
               
-              // Sync session to extension
-              await syncSessionToExtension(session, session.user.id);
+              // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+              // Extension fetches checks/plan from Supabase when popup opens
+              await syncSessionToExtension(session, session.user.id, null, null, true);
               
               try {
                 // Initialize/sync user checks - will check database first to determine if new or existing user
@@ -291,6 +293,10 @@ const OAuthCallback = () => {
               
               const proceedWithRedirect = async () => {
                 console.log('🚀 [OAuthCallback-v2] Starting proceedWithRedirect...');
+                
+                // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+                // Extension fetches checks/plan from Supabase when popup opens
+                await syncSessionToExtension(session, session.user.id, null, null, true);
                 
                 // Initialize/sync user checks - will check database first to determine if new or existing user
                 console.log('📦 [OAuthCallback-v2] Initializing/syncing user checks...');

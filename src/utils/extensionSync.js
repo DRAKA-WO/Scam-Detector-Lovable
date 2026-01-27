@@ -5,115 +5,89 @@
 
 /**
  * Sync session to extension via custom event
+ * Only syncs session tokens - extension fetches checks/plan from Supabase when popup opens
+ * This eliminates unnecessary Supabase requests since extension always fetches fresh data anyway
  * @param {Object} session - Supabase session object
  * @param {string} userId - User ID
- * @param {number} checks - User's remaining checks (optional)
- * @param {string} plan - User's subscription plan (optional)
+ * @param {number} checks - Deprecated, ignored (extension fetches from Supabase)
+ * @param {string} plan - Deprecated, ignored (extension fetches from Supabase)
+ * @param {boolean} updateAuthMetadata - If true, update user metadata in Supabase auth with database avatar before syncing
  */
-export async function syncSessionToExtension(session, userId, checks = null, plan = null) {
+export async function syncSessionToExtension(session, userId, checks = null, plan = null, updateAuthMetadata = false) {
   try {
-    // Get checks from Supabase (or localStorage fallback) if not provided
-    let checksCount = checks;
-    if (checksCount === null && userId) {
-      // FIX: Check if there's a pending check update (check was just used)
-      // If so, don't sync stale data - let the extension's value take precedence
-      const { pendingCheckUpdates } = await import('./checkLimits.js');
-      const pendingUpdate = pendingCheckUpdates?.get?.(userId);
-      
-      if (pendingUpdate) {
-        const timeSinceUpdate = Date.now() - (pendingUpdate.timestamp || 0);
-        // If update was less than 15 seconds ago, use the pending value (more recent)
-        if (timeSinceUpdate < 15000) {
-          checksCount = pendingUpdate.to; // Use the decremented value
-          if (import.meta.env.DEV) {
-            console.log(`📤 Using pending check value: ${checksCount} (${Math.round(timeSinceUpdate/1000)}s since update)`);
-          }
-        }
-      }
-      
-      // If no pending update or it's old, fetch from Supabase FIRST (source of truth)
-      if (checksCount === null) {
-        try {
-      // CRITICAL: Always fetch from Supabase first - it's the source of truth
-      // Don't use localStorage - it might be stale (e.g., extension updated Supabase)
-      const { syncUserChecksFromSupabase } = await import('./checkLimits.js');
-      checksCount = await syncUserChecksFromSupabase(userId);
-          
-          // If Supabase fetch failed, fallback to localStorage
-          if (checksCount === null || checksCount === 0) {
-            const checksKey = `scam_checker_user_checks_${userId}`;
-            const storedChecks = localStorage.getItem(checksKey);
-            if (storedChecks !== null) {
-              checksCount = parseInt(storedChecks, 10);
-              if (import.meta.env.DEV) {
-                console.log(`⚠️ Using localStorage fallback for checks: ${checksCount}`);
-              }
-            }
-          }
-        } catch (e) {
-          // Fallback: try localStorage if Supabase fetch failed
-          try {
-            const checksKey = `scam_checker_user_checks_${userId}`;
-            const storedChecks = localStorage.getItem(checksKey);
-            if (storedChecks !== null) {
-              checksCount = parseInt(storedChecks, 10);
-            }
-          } catch (localStorageError) {
-            if (import.meta.env.DEV) {
-              console.warn(`⚠️ No checks found for user ${userId}`);
-            }
-          }
-        }
-      }
-    }
+    let sessionToSync = session;
     
-    // Get plan from parameter, or fetch from Supabase, or default to 'FREE'
-    let userPlan = plan;
-    
-    // Fetch plan from Supabase if not provided (or if explicitly null/undefined)
-    if ((userPlan === null || userPlan === undefined) && userId) {
+    // If requested, update auth metadata with database avatar before syncing
+    // This ensures the extension gets the correct avatar whether it reads from event or re-fetches session
+    if (updateAuthMetadata && session?.user) {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        // Use bracket notation to bypass TypeScript type checking in JS file
-        const { data, error } = await supabase
-          .from('users')
-          .select('plan')
-          .eq('id', userId)
-          .maybeSingle(); // Use maybeSingle() instead of single() to handle missing rows
         
-        if (!error && data?.plan) {
-          userPlan = data.plan;
-        } else {
-          // Default to FREE if no plan found or on error
-          userPlan = 'FREE';
-          if (error) {
-            console.warn('⚠️ ExtensionSync: Error fetching plan:', error);
+        // Fetch avatar from database (source of truth)
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+        
+        if (!userError && userData?.avatar_url) {
+          const dbAvatarUrl = userData.avatar_url;
+          
+          // Strip INITIAL_AVATAR marker if present (extension needs clean base64 data URL)
+          const INITIAL_AVATAR_MARKER = 'INITIAL_AVATAR:';
+          const cleanAvatarUrl = dbAvatarUrl.startsWith(INITIAL_AVATAR_MARKER) 
+            ? dbAvatarUrl.substring(INITIAL_AVATAR_MARKER.length)
+            : dbAvatarUrl;
+          
+          const currentAvatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture;
+          // Compare with clean version for current avatar too
+          const cleanCurrentAvatarUrl = currentAvatarUrl?.startsWith(INITIAL_AVATAR_MARKER)
+            ? currentAvatarUrl.substring(INITIAL_AVATAR_MARKER.length)
+            : currentAvatarUrl;
+          
+          // Only update if database avatar is different from current metadata
+          if (cleanAvatarUrl !== cleanCurrentAvatarUrl) {
+            console.log('🔄 [ExtensionSync] Updating auth metadata with database avatar before sync');
+            
+            // Update user metadata in Supabase auth with clean avatar URL (no marker)
+            const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+              data: {
+                ...session.user.user_metadata,
+                avatar_url: cleanAvatarUrl,
+                picture: cleanAvatarUrl // Also update picture for compatibility
+              }
+            });
+            
+            if (!updateError && updateData?.user) {
+              // Get fresh session with updated metadata
+              const { data: { session: freshSession } } = await supabase.auth.getSession();
+              if (freshSession) {
+                sessionToSync = freshSession;
+                console.log('✅ [ExtensionSync] Auth metadata updated with database avatar');
+              }
+            } else if (updateError) {
+              console.warn('⚠️ [ExtensionSync] Failed to update auth metadata:', updateError);
+            }
           }
         }
-      } catch (e) {
-        // Default to FREE on any error - don't block login
-        console.warn('⚠️ ExtensionSync: Exception fetching plan:', e);
-        userPlan = 'FREE';
+      } catch (fetchErr) {
+        console.warn('⚠️ [ExtensionSync] Error fetching/updating avatar for sync:', fetchErr);
+        // Continue with original session if update fails
       }
     }
     
-    // Ensure plan is always set
-    if (!userPlan) {
-      userPlan = 'FREE';
-    }
+    // Only sync session tokens - extension will fetch checks/plan from Supabase when popup opens
+    // This eliminates unnecessary Supabase requests and simplifies the code
     
-    // Only log in development mode
-    if (import.meta.env.DEV) {
-      console.log('📤 Syncing to extension:', { userId, checks: checksCount, plan: userPlan });
-    }
+    console.log(`📤 [ExtensionSync] Syncing session to extension (checks/plan will be fetched by extension when popup opens):`, { 
+      userId
+    });
     
     // Dispatch custom event that content script will listen for
     const event = new CustomEvent('scamChecker:syncSession', {
       detail: {
-        session: session,
+        session: sessionToSync,
         userId: userId,
-        checks: checksCount,
-        plan: userPlan || 'FREE',
         timestamp: Date.now()
       }
     });
@@ -213,12 +187,12 @@ export function initializeExtensionSync() {
         return; // No session, skip
       }
       
-      // Sync silently - no need to log every time
-      // This will fetch from Supabase and sync to extension
-      await syncSessionToExtension(session, session.user.id);
+      // Sync session with auth metadata update - this ensures extension gets database avatar
+      // Extension fetches checks/plan from Supabase when popup opens
+      await syncSessionToExtension(session, session.user.id, null, null, true);
     } catch (error) {
       // Only log errors
-      console.warn('⚠️ Failed to sync checks to extension:', error);
+      console.warn('⚠️ Failed to sync session to extension:', error);
     }
   };
   

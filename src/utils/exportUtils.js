@@ -23,6 +23,56 @@ export function exportToCSV(scanHistory) {
     'Analysis Result'
   ]
 
+  // Helper function to format analysis result as readable text
+  const formatAnalysisResult = (analysisResult) => {
+    if (!analysisResult || typeof analysisResult !== 'object') {
+      return ''
+    }
+
+    const parts = []
+
+    // Add explanation if available
+    if (analysisResult.explanation) {
+      parts.push(`Explanation: ${analysisResult.explanation}`)
+    }
+
+    // Add reasons if available
+    if (analysisResult.reasons && Array.isArray(analysisResult.reasons) && analysisResult.reasons.length > 0) {
+      parts.push(`\nReasons:`)
+      analysisResult.reasons.forEach((reason, index) => {
+        parts.push(`${index + 1}. ${reason}`)
+      })
+    }
+
+    // Add scam type if available (and not already in the Scam Type column)
+    if (analysisResult.scam_type && analysisResult.scam_type !== 'N/A') {
+      parts.push(`\nScam Type: ${analysisResult.scam_type}`)
+    }
+
+    // Add source URL if available
+    if (analysisResult.source_url) {
+      parts.push(`\nSource URL: ${analysisResult.source_url}`)
+    }
+
+    // Add content type if available
+    if (analysisResult.content_type) {
+      parts.push(`\nContent Type: ${analysisResult.content_type}`)
+    }
+
+    // Add confidence score if available
+    if (analysisResult.confidence !== undefined && analysisResult.confidence !== null) {
+      parts.push(`\nConfidence: ${(analysisResult.confidence * 100).toFixed(1)}%`)
+    }
+
+    // Add risk level if available
+    if (analysisResult.risk_level) {
+      parts.push(`\nRisk Level: ${analysisResult.risk_level}`)
+    }
+
+    // Join all parts with line breaks and escape quotes for CSV
+    return parts.join('\n').replace(/"/g, '""')
+  }
+
   // Convert scans to CSV rows
   const rows = scanHistory.map(scan => {
     const date = new Date(scan.created_at).toLocaleString()
@@ -30,7 +80,7 @@ export function exportToCSV(scanHistory) {
     const classification = scan.classification || ''
     const scamType = scan.analysis_result?.scam_type || ''
     const contentPreview = (scan.content_preview || '').replace(/"/g, '""') // Escape quotes
-    const analysisResult = JSON.stringify(scan.analysis_result || {}).replace(/"/g, '""') // Escape quotes
+    const analysisResult = formatAnalysisResult(scan.analysis_result) // Format as readable text
 
     return [
       date,

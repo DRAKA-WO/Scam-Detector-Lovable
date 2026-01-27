@@ -67,6 +67,21 @@ function Dashboard() {
   const [monthlyScans, setMonthlyScans] = useState(0)
   const [userPlan, setUserPlan] = useState<string | null>(null) // Start with null to prevent flash
   const [planLoaded, setPlanLoaded] = useState(false) // Track if plan has been loaded
+  // Initialize dbUserData from cache to prevent flash on page navigation
+  const [dbUserData, setDbUserData] = useState<{ full_name: string | null; avatar_url: string | null } | null>(() => {
+    // Try to get cached avatar from sessionStorage first
+    if (typeof window !== 'undefined') {
+      const cachedAvatar = sessionStorage.getItem('dashboard_cached_avatar')
+      const cachedName = sessionStorage.getItem('dashboard_cached_name')
+      if (cachedAvatar || cachedName) {
+        return {
+          full_name: cachedName || null,
+          avatar_url: cachedAvatar || null
+        }
+      }
+    }
+    return null
+  }) // User data from database
   // Initialize loading state - check if we already have a session
   // IMPORTANT: Use the same logic as user state to ensure consistency
   const [loading, setLoading] = useState(() => {
@@ -97,6 +112,7 @@ function Dashboard() {
   const [selectedScan, setSelectedScan] = useState(null)
   const [scanHistoryFilter, setScanHistoryFilter] = useState('all') // 'all', 'safe', 'suspicious', 'scam'
   const [scanHistoryDateRange, setScanHistoryDateRange] = useState<string | null>(null) // Date range to apply when navigating from stat cards
+  const statCardClickKeyRef = useRef(0) // Key to force filter update when clicking stat cards
   const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
   const [scanHistory, setScanHistory] = useState<any[]>([])
   // Initialize filter to 'thisMonth' to prevent flash (will be adjusted by useEffect if needed)
@@ -118,6 +134,7 @@ function Dashboard() {
   const hasSetInitialScanHistoryDateRange = useRef(false) // Track if we've set the initial scan history date range
   const [isRefreshingHistory, setIsRefreshingHistory] = useState(false)
   const [scanHistoryKey, setScanHistoryKey] = useState(0) // Key to force re-render
+  const [highlightAccountInfo, setHighlightAccountInfo] = useState(false) // Track if account info should be highlighted
   
   // Cache for stats to reduce Supabase requests
   const statsCache = useRef<{ data: any; timestamp: number } | null>(null)
@@ -182,35 +199,12 @@ function Dashboard() {
   // Use context values if available, otherwise use local state
   const alerts = alertsContext?.alerts || localAlerts
   const currentRiskLevel = alertsContext?.currentRiskLevel || localCurrentRiskLevel
-  // Load risk pattern tip expanded state from localStorage (default: true)
-  // Risk patterns tip: Always expanded on first visit, then respects user preference
-  const [isTipExpanded, setIsTipExpanded] = useState(() => {
-    try {
-      const saved = localStorage.getItem('scam_checker_risk_pattern_tip_expanded')
-      // If no saved preference exists, default to expanded (true)
-      // Only use saved value if user has explicitly interacted with it
-      if (saved === null) {
-        return true // First time - always expanded
-      }
-      return JSON.parse(saved)
-    } catch {
-      return true // On error, default to expanded
-    }
-  })
-  // First scan tip: Always expanded on first visit, then respects user preference
-  const [isFirstScanTipExpanded, setIsFirstScanTipExpanded] = useState(() => {
-    try {
-      const saved = localStorage.getItem('scam_checker_first_scan_tip_expanded')
-      // If no saved preference exists, default to expanded (true)
-      // Only use saved value if user has explicitly interacted with it
-      if (saved === null) {
-        return true // First time - always expanded
-      }
-      return JSON.parse(saved)
-    } catch {
-      return true // On error, default to expanded
-    }
-  })
+  // Risk pattern tip: Always expanded when first shown or when risk level changes, then respects user preference (user-specific)
+  const [isTipExpanded, setIsTipExpanded] = useState(true) // Always start expanded
+  const [lastSeenRiskLevel, setLastSeenRiskLevel] = useState<string | null>(null) // Track last risk level user saw
+  
+  // First scan tip: Always expanded on first visit, then respects user preference (user-specific)
+  const [isFirstScanTipExpanded, setIsFirstScanTipExpanded] = useState(true) // Always start expanded
 
   // Helper functions for dismissed alerts persistence
   const getDismissedAlerts = (userId: string): Record<string, boolean> => {
@@ -252,17 +246,37 @@ function Dashboard() {
   const [accountLoading, setAccountLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Get avatar URL (prioritize Gmail picture, then custom avatar, then preview)
+  // Initial avatar marker and helper functions (defined before useMemo that uses them)
+  const INITIAL_AVATAR_MARKER = 'INITIAL_AVATAR:'
+  
+  // Helper function to get the actual base64 data URL from a marked initial avatar
+  const getInitialAvatarDataUrl = (avatarUrl: string | null | undefined): string | null => {
+    if (!avatarUrl) return null
+    if (avatarUrl.startsWith(INITIAL_AVATAR_MARKER)) {
+      return avatarUrl.substring(INITIAL_AVATAR_MARKER.length)
+    }
+    return avatarUrl
+  }
+  
+  // Helper function to check if an avatar URL is a generated initial avatar
+  const isInitialAvatar = (avatarUrl: string | null | undefined): boolean => {
+    return !!avatarUrl && avatarUrl.startsWith(INITIAL_AVATAR_MARKER)
+  }
+
+  // Get avatar URL (prioritize custom avatar_url, then Gmail picture, then preview)
   const avatarUrl = useMemo(() => {
     if (editingSection === 'profile' && avatarPreview) {
-      return avatarPreview
+      // Always extract marker from preview to prevent 431 errors
+      return getInitialAvatarDataUrl(avatarPreview) || avatarPreview
     }
     if (editingSection === 'profile' && shouldRemoveAvatar) {
       return null
     }
-    // Gmail/Google OAuth provides picture, custom uploads use avatar_url
-    return user?.user_metadata?.picture || user?.user_metadata?.avatar_url || null
-  }, [editingSection, avatarPreview, shouldRemoveAvatar, user?.user_metadata?.picture, user?.user_metadata?.avatar_url])
+    // Priority: Database avatar_url (custom uploads) > user_metadata avatar_url > Google OAuth picture > null
+    const url = dbUserData?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+    // If it's a marked initial avatar, extract the actual data URL for display
+    return getInitialAvatarDataUrl(url)
+  }, [editingSection, avatarPreview, shouldRemoveAvatar, dbUserData?.avatar_url, user?.user_metadata?.avatar_url, user?.user_metadata?.picture])
 
   // Reset avatar error when URL changes
   useEffect(() => {
@@ -271,9 +285,51 @@ function Dashboard() {
 
   // Get user's initial for fallback (same logic as Header component)
   const userInitial = useMemo(() => {
-    const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
+    // Priority: Database full_name > user_metadata full_name > user_metadata name > email > 'User'
+    const userName = dbUserData?.full_name || 
+                     user?.user_metadata?.full_name || 
+                     user?.user_metadata?.name || 
+                     user?.email?.split('@')[0] || 
+                     'User'
     return userName.charAt(0).toUpperCase()
-  }, [user?.user_metadata?.full_name, user?.user_metadata?.name, user?.email])
+  }, [dbUserData?.full_name, user?.user_metadata?.full_name, user?.user_metadata?.name, user?.email])
+
+  // Check if storage bucket exists on page load (only once per session)
+  useEffect(() => {
+    const checkBucketExists = async () => {
+      const bucketCheckKey = 'supabase_avatars_bucket_exists'
+      // Only check if we haven't checked yet in this session
+      if (sessionStorage.getItem(bucketCheckKey) === null) {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client')
+          const { error: bucketError } = await supabase.storage
+            .from('avatars')
+            .list('', { limit: 1 })
+          
+          if (bucketError) {
+            const errorStatus = (bucketError as any)?.status || (bucketError as any)?.statusCode || (bucketError as any)?.code
+            const errorMessage = (bucketError.message || '').toLowerCase()
+            const isBucketNotFound = errorStatus === 400 ||
+                                    errorStatus === '400' ||
+                                    errorMessage.includes('bucket not found') ||
+                                    (errorMessage.includes('bucket') && errorMessage.includes('not found'))
+            
+            if (isBucketNotFound) {
+              sessionStorage.setItem(bucketCheckKey, 'false')
+            } else {
+              sessionStorage.setItem(bucketCheckKey, 'true')
+            }
+          } else {
+            sessionStorage.setItem(bucketCheckKey, 'true')
+          }
+        } catch (checkError) {
+          // If check fails, assume bucket doesn't exist
+          sessionStorage.setItem(bucketCheckKey, 'false')
+        }
+      }
+    }
+    checkBucketExists()
+  }, [])
 
   // Auto-sync existing session to extension on Dashboard load and retry failed scans
   useEffect(() => {
@@ -283,23 +339,64 @@ function Dashboard() {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (session && session.user && !error) {
-          // Fetch plan first, then sync with plan
-          let userPlan = 'FREE';
+          // Fetch user data from database (plan, full_name, avatar_url) - database is source of truth
           try {
-            const { data: planData, error: planError } = await (supabase as any)
+            const { data: userData, error: userError } = await (supabase as any)
               .from('users')
-              .select('plan')
+              .select('plan, full_name, avatar_url')
               .eq('id', session.user.id)
               .maybeSingle();
             
-            if (!planError && planData?.plan) {
-              userPlan = planData.plan;
+            if (!userError && userData) {
+              // Set plan
+              if (userData.plan) {
+                setUserPlan(userData.plan.toUpperCase().trim());
+              } else {
+                setUserPlan('FREE');
+              }
+              
+              // Set user data from database (source of truth for custom data)
+              setDbUserData({
+                full_name: userData.full_name,
+                avatar_url: userData.avatar_url
+              });
+              // Cache avatar and name in sessionStorage to prevent flash on page navigation
+              // Also update header cache so header updates immediately
+              if (typeof window !== 'undefined') {
+                if (userData.avatar_url) {
+                  sessionStorage.setItem('dashboard_cached_avatar', userData.avatar_url)
+                  sessionStorage.setItem('header_cached_avatar', userData.avatar_url)
+                }
+                if (userData.full_name) {
+                  sessionStorage.setItem('dashboard_cached_name', userData.full_name)
+                }
+              }
+            } else {
+              setUserPlan('FREE');
+              setDbUserData(null);
+              // Clear cache if no data found
+              if (typeof window !== 'undefined') {
+                sessionStorage.removeItem('dashboard_cached_avatar')
+                sessionStorage.removeItem('dashboard_cached_name')
+              }
             }
-          } catch (planErr) {
-            console.warn('⚠️ Dashboard: Error fetching plan for sync:', planErr);
+            
+            // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+            // Extension fetches checks/plan from Supabase when popup opens
+            await syncSessionToExtension(session, session.user.id, null, null, true);
+          } catch (fetchErr) {
+            console.warn('❌ [Dashboard] Error fetching user data:', fetchErr);
+            setUserPlan('FREE');
+            setDbUserData(null);
+            // Clear cache on error
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('dashboard_cached_avatar')
+              sessionStorage.removeItem('dashboard_cached_name')
+            }
+            
+            // Sync original session if fetch fails (without metadata update)
+            await syncSessionToExtension(session, session.user.id, null, null, false);
           }
-          
-          await syncSessionToExtension(session, session.user.id, null, userPlan);
           
           // Retry any failed scans from localStorage
           try {
@@ -324,6 +421,103 @@ function Dashboard() {
     
     syncExistingSession();
   }, []); // Empty dependency array = runs once on mount
+
+  // Helper function to scroll and highlight Account Information section
+  const scrollToAccountInfo = useCallback(() => {
+    setTimeout(() => {
+      const accountInfoElement = document.getElementById('account-info');
+      if (accountInfoElement) {
+        // Get the current scroll position
+        const elementPosition = accountInfoElement.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - 100; // 100px offset from top
+        
+        // Scroll to the element with offset
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+        
+        // Trigger highlight effect
+        setHighlightAccountInfo(true);
+        
+        // Remove highlight after animation completes (3 seconds)
+        setTimeout(() => {
+          setHighlightAccountInfo(false);
+          // Clear the hash from URL after highlighting
+          window.history.replaceState(null, '', window.location.pathname);
+        }, 3000);
+      }
+    }, 100); // Small delay to ensure DOM is ready
+  }, []);
+
+  // Handle hash navigation to highlight Account Information section
+  useEffect(() => {
+    // Check if URL has #account-info hash on mount
+    if (window.location.hash === '#account-info') {
+      scrollToAccountInfo();
+    }
+
+    // Also listen for hash changes (when clicking link while already on dashboard)
+    const handleHashChange = () => {
+      if (window.location.hash === '#account-info') {
+        scrollToAccountInfo();
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [scrollToAccountInfo]); // Include scrollToAccountInfo in dependencies
+
+  // Load and manage user-specific alert expanded states
+  useEffect(() => {
+    if (!user?.id) return
+
+    // Load "Ready to Get Started" tip state (user-specific)
+    try {
+      const firstScanKey = `scam_checker_first_scan_tip_expanded_${user.id}`
+      const savedFirstScan = localStorage.getItem(firstScanKey)
+      if (savedFirstScan !== null) {
+        setIsFirstScanTipExpanded(JSON.parse(savedFirstScan))
+      } else {
+        // First time seeing this alert - always expanded
+        setIsFirstScanTipExpanded(true)
+      }
+    } catch (error) {
+      console.warn('Error loading first scan tip state:', error)
+      setIsFirstScanTipExpanded(true) // Default to expanded
+    }
+
+    // Load risk pattern tip state (user-specific)
+    try {
+      const riskTipKey = `scam_checker_risk_pattern_tip_expanded_${user.id}`
+      const savedRiskTip = localStorage.getItem(riskTipKey)
+      const savedRiskLevel = localStorage.getItem(`scam_checker_last_risk_level_${user.id}`)
+      
+      // If risk level changed or first time, expand it
+      if (currentRiskLevel && savedRiskLevel !== currentRiskLevel) {
+        setIsTipExpanded(true) // New risk level - always expanded
+        setLastSeenRiskLevel(currentRiskLevel)
+        localStorage.setItem(`scam_checker_last_risk_level_${user.id}`, currentRiskLevel)
+      } else if (savedRiskTip !== null) {
+        // User has seen this risk level before - use saved preference
+        setIsTipExpanded(JSON.parse(savedRiskTip))
+        setLastSeenRiskLevel(savedRiskLevel)
+      } else {
+        // First time - always expanded
+        setIsTipExpanded(true)
+        if (currentRiskLevel) {
+          setLastSeenRiskLevel(currentRiskLevel)
+          localStorage.setItem(`scam_checker_last_risk_level_${user.id}`, currentRiskLevel)
+        }
+      }
+    } catch (error) {
+      console.warn('Error loading risk pattern tip state:', error)
+      setIsTipExpanded(true) // Default to expanded
+    }
+  }, [user?.id, currentRiskLevel]) // Re-run when user or risk level changes
 
   // Listen for checks updates in real-time (sync with Header)
   useEffect(() => {
@@ -859,12 +1053,14 @@ function Dashboard() {
             
             if (!error && data?.plan) {
               const planUpper = (data.plan || '').toString().toUpperCase().trim()
+              console.log(`✅ [Dashboard] Fetched plan from Supabase (plan change): ${planUpper} for user ${user.id}`)
               setUserPlan(planUpper)
               setPlanLoaded(true)
-              // Sync plan to extension
+              // Sync session to extension with auth metadata update - ensures extension gets clean avatar
+              // Extension fetches plan when popup opens
               const { data: { session } } = await supabase.auth.getSession()
               if (session) {
-                await syncSessionToExtension(session, user.id, null, planUpper)
+                await syncSessionToExtension(session, user.id, null, null, true)
               }
               return // Success
             }
@@ -1237,7 +1433,15 @@ function Dashboard() {
         setTimeout(() => {
           const scanHistorySection = document.getElementById('scan-history-section')
           if (scanHistorySection) {
-            scanHistorySection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            // Get the element's position relative to the viewport
+            const elementTop = scanHistorySection.getBoundingClientRect().top + window.pageYOffset
+            // Add offset to account for any fixed headers (e.g., 80px for header)
+            const offset = 80
+            // Scroll to position with offset to ensure section is fully visible
+            window.scrollTo({
+              top: elementTop - offset,
+              behavior: 'smooth'
+            })
           }
         }, 300)
         
@@ -1327,6 +1531,7 @@ function Dashboard() {
         
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
+            console.log(`🔍 [Dashboard] Fetching plan from Supabase for user ${session.user.id}...`);
             const { data, error } = await (supabase as any)
               .from('users')
               .select('plan')
@@ -1335,14 +1540,16 @@ function Dashboard() {
             
             if (!error && data?.plan) {
               const planUpper = (data.plan || '').toString().toUpperCase().trim()
-              console.log('📊 Dashboard: User plan', planUpper)
+              console.log(`✅ [Dashboard] Fetched plan from Supabase: ${planUpper} for user ${session.user.id}`)
               setUserPlan(planUpper)
               setPlanLoaded(true)
-              // Sync plan to extension
-              await syncSessionToExtension(session, session.user.id, null, planUpper)
+              // Sync session to extension with auth metadata update - ensures extension gets clean avatar
+              // Extension fetches plan when popup opens
+              await syncSessionToExtension(session, session.user.id, null, null, true)
               return // Success
             } else {
               // Default to FREE if no plan found
+              console.log(`⚠️ [Dashboard] No plan found in Supabase, defaulting to FREE for user ${session.user.id}`)
               setUserPlan('FREE')
               setPlanLoaded(true)
               return
@@ -1548,9 +1755,21 @@ function Dashboard() {
 
 
   const startEditingProfile = () => {
-    setEditingUsername(user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || '')
+    // Priority: Database full_name > user_metadata full_name > user_metadata name > email > ''
+    const userName = dbUserData?.full_name || 
+                     user?.user_metadata?.full_name || 
+                     user?.user_metadata?.name || 
+                     user?.email?.split('@')[0] || 
+                     ''
+    setEditingUsername(userName)
     setAvatarFile(null)
-    setAvatarPreview(user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null)
+    // Priority: Database avatar_url > user_metadata avatar_url > user_metadata picture > null
+    const avatar = dbUserData?.avatar_url || 
+                   user?.user_metadata?.avatar_url || 
+                   user?.user_metadata?.picture || 
+                   null
+    // Extract marker when setting preview to prevent 431 errors
+    setAvatarPreview(getInitialAvatarDataUrl(avatar) || avatar)
     setShouldRemoveAvatar(false)
     setAvatarImageError(false)
     setAccountError('')
@@ -1604,13 +1823,69 @@ function Dashboard() {
     }
   }
 
+  // Generate a base64 initial avatar (circle with user's initial)
+  // Uses a specific marker prefix so we can identify it as a generated initial avatar
+  // Matches the purple-to-pink gradient used in the header
+  const generateInitialAvatar = (initial: string): string => {
+    const size = 200
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    
+    if (!ctx) return ''
+    
+    // Background circle with purple-to-pink gradient (matching header: from-purple-500 to-pink-500)
+    // Purple-500: #a855f7, Pink-500: #ec4899
+    const gradient = ctx.createLinearGradient(0, 0, size, size)
+    gradient.addColorStop(0, '#a855f7') // purple-500
+    gradient.addColorStop(1, '#ec4899') // pink-500
+    
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // White text for initial
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `bold ${size * 0.5}px Arial`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(initial, size / 2, size / 2)
+    
+    // Convert to base64 data URL and add marker prefix
+    const base64DataUrl = canvas.toDataURL('image/png')
+    // Store as: "INITIAL_AVATAR:data:image/png;base64,..." so we can identify it
+    return INITIAL_AVATAR_MARKER + base64DataUrl
+  }
+
   const uploadAvatar = async (file: File, userId: string): Promise<string | null> => {
     try {
+      // Check if we've already determined the bucket doesn't exist (cache in sessionStorage)
+      // This prevents repeated 400 errors in the network tab
+      // The bucket check happens on page load, so we just use the cached result here
+      const bucketCheckKey = 'supabase_avatars_bucket_exists'
+      const bucketExistsCache = sessionStorage.getItem(bucketCheckKey)
+      
+      // If we know the bucket doesn't exist, skip upload and go straight to base64
+      if (bucketExistsCache === 'false') {
+        if (import.meta.env.DEV) {
+          console.warn('Storage bucket "avatars" not found (cached). Using base64 fallback.')
+        }
+        return new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = () => resolve(null)
+          reader.readAsDataURL(file)
+        })
+      }
+      
       const fileExt = file.name.split('.').pop()
       const fileName = `${userId}/${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      // Don't include 'avatars/' in the path since we're already uploading to the 'avatars' bucket
+      const filePath = fileName
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -1618,7 +1893,51 @@ function Dashboard() {
         })
 
       if (uploadError) {
+        // Check if bucket doesn't exist FIRST - fallback to base64 for any file size
+        // This prevents logging errors for expected behavior when bucket doesn't exist
+        // 400 Bad Request often indicates bucket doesn't exist or is misconfigured
+        // Check multiple ways the error might indicate bucket doesn't exist
+        const errorStatus = (uploadError as any)?.status || (uploadError as any)?.statusCode || (uploadError as any)?.code
+        const errorMessage = (uploadError.message || '').toLowerCase()
+        const isBucketError = errorMessage.includes('bucket not found') || 
+                              (errorMessage.includes('bucket') && errorMessage.includes('not found')) ||
+                              errorStatus === 400 ||
+                              errorStatus === '400' ||
+                              errorMessage.includes('bucket') && errorMessage.includes('does not exist')
+        
+        if (isBucketError) {
+          // Cache that bucket doesn't exist to prevent future attempts
+          sessionStorage.setItem('supabase_avatars_bucket_exists', 'false')
+          // Silently fallback to base64 - this is expected if bucket doesn't exist
+          // Only log in dev mode to avoid console noise
+          if (import.meta.env.DEV) {
+            console.warn('Storage bucket "avatars" not found. Using base64 fallback.')
+          }
+          // Fallback to base64 encoding for any file size if bucket doesn't exist
+          return new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = () => resolve(null)
+            reader.readAsDataURL(file)
+          })
+        }
+        
+        // Log other errors (not bucket not found) - these are actual problems
+        console.error('Avatar upload error:', uploadError)
+        
+        // Check if it's a file size issue
+        if (uploadError.message?.includes('File size') || uploadError.message?.includes('too large')) {
+          throw new Error('File is too large. Please use an image smaller than 2MB.')
+        }
+        
+        // Check if it's an invalid file type
+        if (uploadError.message?.includes('Invalid file type') || uploadError.message?.includes('not allowed')) {
+          throw new Error('Invalid file type. Please use JPG, PNG, or WebP images.')
+        }
+        
+        // For small files, try base64 fallback
         if (file.size < 500 * 1024) {
+          console.warn('Upload failed, using base64 fallback for small file.')
           return new Promise((resolve) => {
             const reader = new FileReader()
             reader.onloadend = () => resolve(reader.result as string)
@@ -1626,18 +1945,44 @@ function Dashboard() {
             reader.readAsDataURL(file)
           })
         } else {
-          throw new Error('Avatar upload failed. Please ensure the storage bucket "avatars" exists in Supabase.')
+          throw new Error(`Avatar upload failed: ${uploadError.message || 'Please ensure the storage bucket "avatars" exists in Supabase.'}`)
         }
       }
 
+      // Get public URL for the uploaded file
       const { data: urlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath)
 
       return urlData?.publicUrl || null
     } catch (error: any) {
+      // Check if this is a bucket-related error (400 Bad Request)
+      const errorStatus = error?.status || error?.statusCode || error?.code
+      const errorMessage = (error?.message || '').toLowerCase()
+      const isBucketError = errorStatus === 400 ||
+                           errorStatus === '400' ||
+                           errorMessage.includes('bucket not found') ||
+                           (errorMessage.includes('bucket') && errorMessage.includes('not found'))
+      
+      if (isBucketError) {
+        // Silently fallback to base64 - this is expected if bucket doesn't exist
+        // Only log in dev mode to avoid console noise
+        if (import.meta.env.DEV) {
+          console.warn('Storage bucket "avatars" not found. Using base64 fallback.')
+        }
+        // Fallback to base64 encoding for any file size if bucket doesn't exist
+        return new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = () => resolve(null)
+          reader.readAsDataURL(file)
+        })
+      }
+      
+      // Log other errors (not bucket not found) - these are actual problems
       console.error('Error uploading avatar:', error)
-      return null
+      // Re-throw the error so saveProfileChanges can handle it properly
+      throw error
     }
   }
 
@@ -1670,10 +2015,12 @@ function Dashboard() {
         try {
           const uploadedUrl = await uploadAvatar(avatarFile, user.id)
           if (uploadedUrl) {
+            // Only set avatar_url for custom uploads - don't overwrite picture
+            // This ensures custom avatars persist even if Google OAuth overwrites picture on re-login
             updates.user_metadata = {
               ...baseMetadata,
-              avatar_url: uploadedUrl,
-              picture: uploadedUrl
+              avatar_url: uploadedUrl
+              // Don't set picture - let Google OAuth manage that, but avatar_url takes priority in display
             }
             // Clear removal flag since we're uploading a new avatar
             setShouldRemoveAvatar(false)
@@ -1686,26 +2033,59 @@ function Dashboard() {
           return
         }
       } else if (shouldRemoveAvatar) {
-        // Remove avatar from user metadata (only if no new file is being uploaded)
-        // Only update if avatar actually exists (don't send unnecessary nulls)
+        // Remove avatar - generate initial avatar as base64 instead of setting to null
+        // This prevents the database trigger from overwriting with Google OAuth avatar
         const hasExistingAvatar = baseMetadata.avatar_url || baseMetadata.picture
         if (hasExistingAvatar) {
+          // Get user's initial for the avatar
+          const userName = dbUserData?.full_name || 
+                          baseMetadata.full_name || 
+                          baseMetadata.name || 
+                          user.email?.split('@')[0] || 
+                          'User'
+          const initial = userName.charAt(0).toUpperCase()
+          
+          // Generate base64 initial avatar (with marker for database storage)
+          const initialAvatarBase64 = generateInitialAvatar(initial)
+          
+          // Strip marker before saving to auth metadata (extension needs clean base64)
+          const cleanInitialAvatar = getInitialAvatarDataUrl(initialAvatarBase64) || initialAvatarBase64
+          
+          // Store marked version for database (web app needs marker to identify initial avatars)
+          // Store clean version for auth metadata (extension needs clean base64)
+          const initialAvatarForDb = initialAvatarBase64 // Keep marker for database
+          
           updates.user_metadata = {
             ...baseMetadata,
-            avatar_url: null,
-            picture: null
+            avatar_url: cleanInitialAvatar, // Save clean base64 (no marker) to auth metadata for extension
+            picture: null // Clear Google OAuth picture
           }
+          
+          // Store marked version for database update (will be used later)
+          updates._dbAvatarUrl = initialAvatarForDb
         }
       }
 
       // Update username if changed
       const currentUsername = baseMetadata.full_name || baseMetadata.name || user.email?.split('@')[0] || ''
       if (editingUsername && editingUsername.trim() !== currentUsername) {
-        // Merge with existing updates if any, otherwise use base metadata
-        updates.user_metadata = {
-          ...(updates.user_metadata || baseMetadata),
-          full_name: editingUsername.trim(),
-          name: editingUsername.trim()
+        // Merge with existing updates if any
+        // If no existing updates, only include non-avatar fields from baseMetadata to prevent overwriting avatar
+        if (updates.user_metadata) {
+          // Already have updates (e.g., avatar changes), just add username
+          updates.user_metadata = {
+            ...updates.user_metadata,
+            full_name: editingUsername.trim(),
+            name: editingUsername.trim()
+          }
+        } else {
+          // Only updating username - exclude avatar fields to preserve existing avatar
+          const { avatar_url, picture, ...baseMetadataWithoutAvatar } = baseMetadata
+          updates.user_metadata = {
+            ...baseMetadataWithoutAvatar,
+            full_name: editingUsername.trim(),
+            name: editingUsername.trim()
+          }
         }
       }
 
@@ -1733,6 +2113,37 @@ function Dashboard() {
             throw new Error('No user data returned from update')
           }
 
+          // Update local user state with the updated user (has fresh metadata)
+          setUser(updateData.user)
+
+          // Update dbUserData immediately with the new values so UI updates right away
+          if (updates.user_metadata) {
+            const newDbUserData = {
+              full_name: updates.user_metadata.full_name !== undefined 
+                ? updates.user_metadata.full_name 
+                : (dbUserData?.full_name || null),
+              avatar_url: updates.user_metadata.avatar_url !== undefined 
+                ? updates.user_metadata.avatar_url 
+                : (dbUserData?.avatar_url || null)
+            }
+            setDbUserData(newDbUserData)
+            // Cache avatar and name in sessionStorage to prevent flash
+            // Also update header cache so header updates immediately
+            if (typeof window !== 'undefined') {
+              if (newDbUserData.avatar_url) {
+                sessionStorage.setItem('dashboard_cached_avatar', newDbUserData.avatar_url)
+                sessionStorage.setItem('header_cached_avatar', newDbUserData.avatar_url)
+              }
+              if (newDbUserData.full_name) {
+                sessionStorage.setItem('dashboard_cached_name', newDbUserData.full_name)
+              }
+              // Dispatch event to notify Header component to update
+              window.dispatchEvent(new CustomEvent('avatarUpdated', { 
+                detail: { avatar_url: newDbUserData.avatar_url, full_name: newDbUserData.full_name } 
+              }))
+            }
+          }
+
           // Step 2: Also update public.users table to keep it in sync
           const usersTableUpdates: { full_name?: string | null; avatar_url?: string | null } = {}
           
@@ -1742,11 +2153,18 @@ function Dashboard() {
           }
           
           // Sync avatar_url if it was updated
+          // Important: If avatar was removed (shouldRemoveAvatar), we saved initial avatar as base64
+          // So we should save that base64, not null, to prevent database trigger from overwriting
           if (updates.user_metadata.hasOwnProperty('avatar_url')) {
-            usersTableUpdates.avatar_url = updates.user_metadata.avatar_url || null
+            // Use marked version for database if available (for initial avatars), otherwise use clean version
+            // Database needs marker to identify initial avatars, but auth metadata has clean version for extension
+            const avatarForDb = (updates as any)._dbAvatarUrl || updates.user_metadata.avatar_url || null
+            usersTableUpdates.avatar_url = avatarForDb
           }
 
           // Update public.users table if we have changes
+          // IMPORTANT: Complete database update BEFORE syncing to extension
+          // This ensures extension fetches the latest avatar when it opens
           if (Object.keys(usersTableUpdates).length > 0) {
             const { error: dbUpdateError } = await (supabase as any)
               .from('users')
@@ -1758,7 +2176,52 @@ function Dashboard() {
               // Don't throw here - auth update succeeded, just log the DB sync error
               // The user will see success, but the DB might be slightly out of sync
               // This is better than failing the entire operation
+            } else {
+              // Database update succeeded - dbUserData was already updated above, but ensure it's in sync
+              const updatedDbUserData = {
+                full_name: usersTableUpdates.full_name !== undefined ? usersTableUpdates.full_name : (dbUserData?.full_name || null),
+                avatar_url: usersTableUpdates.avatar_url !== undefined ? usersTableUpdates.avatar_url : (dbUserData?.avatar_url || null)
+              }
+              setDbUserData(updatedDbUserData)
+              // Cache avatar and name in sessionStorage to prevent flash
+              // Also update header cache so header updates immediately
+              if (typeof window !== 'undefined') {
+                if (updatedDbUserData.avatar_url) {
+                  sessionStorage.setItem('dashboard_cached_avatar', updatedDbUserData.avatar_url)
+                  sessionStorage.setItem('header_cached_avatar', updatedDbUserData.avatar_url)
+                }
+                if (updatedDbUserData.full_name) {
+                  sessionStorage.setItem('dashboard_cached_name', updatedDbUserData.full_name)
+                }
+                // Dispatch event to notify Header component to update
+                window.dispatchEvent(new CustomEvent('avatarUpdated', { 
+                  detail: { avatar_url: updatedDbUserData.avatar_url, full_name: updatedDbUserData.full_name } 
+                }))
+              }
             }
+          }
+
+          // IMPORTANT: Wait a moment to ensure database update is fully committed
+          // Then sync session to extension with updated metadata
+          // Extension fetches avatar from database when popup opens, but we also send updated session
+          await new Promise(resolve => setTimeout(resolve, 200))
+          
+          // Get fresh session with updated user metadata for extension sync
+          // Use updateData.user which already has the updated metadata, but we need the full session
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+          if (sessionError) {
+            console.error('Error getting session after update:', sessionError)
+          }
+          if (session?.user) {
+            // Ensure session has the updated user (updateData.user has fresh metadata)
+            // Create a session-like object with updated user for extension sync
+            const updatedSession = {
+              ...session,
+              user: updateData.user // Use the updated user with fresh metadata
+            }
+            // Sync session to extension with auth metadata update - ensures extension gets clean avatar (no marker)
+            // Extension fetches avatar from database when popup opens, but we also send updated session
+            await syncSessionToExtension(updatedSession, session.user.id, null, null, true)
           }
 
         } catch (fetchError: any) {
@@ -1774,16 +2237,6 @@ function Dashboard() {
         
         // Reset avatar removal flag
         setShouldRemoveAvatar(false)
-        
-        // Refresh user data
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) {
-          console.error('Error getting session after update:', sessionError)
-        }
-        if (session?.user) {
-          setUser(session.user)
-          await syncSessionToExtension(session, session.user.id)
-        }
         
         // Close editing mode after delay
         setTimeout(() => {
@@ -2000,7 +2453,7 @@ function Dashboard() {
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold mb-1 text-foreground">
-                Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! 👋
+                Welcome back{(dbUserData?.full_name || user?.user_metadata?.full_name) ? `, ${(dbUserData?.full_name || user?.user_metadata?.full_name || '').split(' ')[0]}` : ''}! 👋
               </h1>
               <p className="text-muted-foreground">
                 Manage your scam detection activity and track your protection stats
@@ -2105,7 +2558,48 @@ function Dashboard() {
           </div>
 
           {/* Scans This Month Card */}
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 via-card to-card border border-blue-500/20 p-5 group hover:border-blue-500/40 transition-all hover:shadow-lg hover:shadow-blue-500/10">
+          <div 
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 via-card to-card border border-blue-500/20 p-5 cursor-pointer group hover:border-blue-500/40 transition-all hover:shadow-lg hover:shadow-blue-500/10"
+            onClick={() => {
+              // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
+              const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
+              const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
+              
+              // Set filter first
+              setScanHistoryFilter('all')
+              
+              // Temporarily clear date range to reset ScanHistory's ref, then set the new value
+              // This ensures the filter is applied even if history is already open
+              setScanHistoryDateRange(null)
+              
+              // Use requestAnimationFrame to ensure state updates are processed
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  setScanHistoryDateRange(mappedDateRange)
+                  statCardClickKeyRef.current += 1 // Increment key to force update
+                  
+                  // Show history if not already shown
+                  setShowHistory(true)
+                  
+                  // Scroll after a delay to allow React to process state updates and re-render
+                  setTimeout(() => {
+                    const historySection = document.getElementById('scan-history-section')
+                    if (historySection) {
+                      // Get the element's position relative to the viewport
+                      const elementTop = historySection.getBoundingClientRect().top + window.pageYOffset
+                      // Add offset to account for any fixed headers (e.g., 80px for header)
+                      const offset = 80
+                      // Scroll to position with offset to ensure section is fully visible
+                      window.scrollTo({
+                        top: elementTop - offset,
+                        behavior: 'smooth'
+                      })
+                    }
+                  }, 300) // Increased timeout to allow state updates to propagate
+                })
+              })
+            }}
+          >
             <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl"></div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">
@@ -2130,15 +2624,43 @@ function Dashboard() {
                 <div 
                   className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/10 via-card to-card border border-red-500/20 p-5 cursor-pointer group hover:border-red-500/40 transition-all hover:shadow-lg hover:shadow-red-500/10"
                   onClick={() => {
-                    setScanHistoryFilter('scam')
                     // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
                     const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
                     const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
-                    setScanHistoryDateRange(mappedDateRange)
-                    setShowHistory(true)
-                    setTimeout(() => {
-                      document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }, 100)
+                    
+                    // Set filter first
+                    setScanHistoryFilter('scam')
+                    
+                    // Temporarily clear date range to reset ScanHistory's ref, then set the new value
+                    // This ensures the filter is applied even if history is already open
+                    setScanHistoryDateRange(null)
+                    
+                    // Use requestAnimationFrame to ensure state updates are processed
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        setScanHistoryDateRange(mappedDateRange)
+                        statCardClickKeyRef.current += 1 // Increment key to force update
+                        
+                        // Show history if not already shown
+                        setShowHistory(true)
+                        
+                        // Scroll after a delay to allow React to process state updates and re-render
+                        setTimeout(() => {
+                          const historySection = document.getElementById('scan-history-section')
+                          if (historySection) {
+                            // Get the element's position relative to the viewport
+                            const elementTop = historySection.getBoundingClientRect().top + window.pageYOffset
+                            // Add offset to account for any fixed headers (e.g., 80px for header)
+                            const offset = 80
+                            // Scroll to position with offset to ensure section is fully visible
+                            window.scrollTo({
+                              top: elementTop - offset,
+                              behavior: 'smooth'
+                            })
+                          }
+                        }, 300) // Increased timeout to allow state updates to propagate
+                      })
+                    })
                   }}
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-2xl"></div>
@@ -2180,15 +2702,43 @@ function Dashboard() {
           <div 
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-500/10 via-card to-card border border-yellow-500/20 p-5 cursor-pointer group hover:border-yellow-500/40 transition-all hover:shadow-lg hover:shadow-yellow-500/10"
             onClick={() => {
-              setScanHistoryFilter('suspicious')
               // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
               const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
               const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
-              setScanHistoryDateRange(mappedDateRange)
-              setShowHistory(true)
-              setTimeout(() => {
-                document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }, 100)
+              
+              // Set filter first
+              setScanHistoryFilter('suspicious')
+              
+              // Temporarily clear date range to reset ScanHistory's ref, then set the new value
+              // This ensures the filter is applied even if history is already open
+              setScanHistoryDateRange(null)
+              
+              // Use requestAnimationFrame to ensure state updates are processed
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  setScanHistoryDateRange(mappedDateRange)
+                  statCardClickKeyRef.current += 1 // Increment key to force update
+                  
+                  // Show history if not already shown
+                  setShowHistory(true)
+                  
+                  // Scroll after a delay to allow React to process state updates and re-render
+                  setTimeout(() => {
+                    const historySection = document.getElementById('scan-history-section')
+                    if (historySection) {
+                      // Get the element's position relative to the viewport
+                      const elementTop = historySection.getBoundingClientRect().top + window.pageYOffset
+                      // Add offset to account for any fixed headers (e.g., 80px for header)
+                      const offset = 80
+                      // Scroll to position with offset to ensure section is fully visible
+                      window.scrollTo({
+                        top: elementTop - offset,
+                        behavior: 'smooth'
+                      })
+                    }
+                  }, 300) // Increased timeout to allow state updates to propagate
+                })
+              })
             }}
           >
             <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/5 rounded-full blur-2xl"></div>
@@ -2206,15 +2756,43 @@ function Dashboard() {
           <div 
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-500/10 via-card to-card border border-green-500/20 p-5 cursor-pointer group hover:border-green-500/40 transition-all hover:shadow-lg hover:shadow-green-500/10"
             onClick={() => {
-              setScanHistoryFilter('safe')
               // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
               const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
               const mappedDateRange = dateRangeMap[statsTimeFilter] || '30'
-              setScanHistoryDateRange(mappedDateRange)
-              setShowHistory(true)
-              setTimeout(() => {
-                document.getElementById('scan-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }, 100)
+              
+              // Set filter first
+              setScanHistoryFilter('safe')
+              
+              // Temporarily clear date range to reset ScanHistory's ref, then set the new value
+              // This ensures the filter is applied even if history is already open
+              setScanHistoryDateRange(null)
+              
+              // Use requestAnimationFrame to ensure state updates are processed
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  setScanHistoryDateRange(mappedDateRange)
+                  statCardClickKeyRef.current += 1 // Increment key to force update
+                  
+                  // Show history if not already shown
+                  setShowHistory(true)
+                  
+                  // Scroll after a delay to allow React to process state updates and re-render
+                  setTimeout(() => {
+                    const historySection = document.getElementById('scan-history-section')
+                    if (historySection) {
+                      // Get the element's position relative to the viewport
+                      const elementTop = historySection.getBoundingClientRect().top + window.pageYOffset
+                      // Add offset to account for any fixed headers (e.g., 80px for header)
+                      const offset = 80
+                      // Scroll to position with offset to ensure section is fully visible
+                      window.scrollTo({
+                        top: elementTop - offset,
+                        behavior: 'smooth'
+                      })
+                    }
+                  }, 300) // Increased timeout to allow state updates to propagate
+                })
+              })
             }}
           >
             <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full blur-2xl"></div>
@@ -2249,11 +2827,13 @@ function Dashboard() {
                     {/* First Scan Header - Clickable to toggle tip */}
                     <button
                       onClick={() => {
+                        if (!user?.id) return
                         const newValue = !isFirstScanTipExpanded
                         setIsFirstScanTipExpanded(newValue)
-                        // Persist to localStorage
+                        // Persist to localStorage (user-specific)
                         try {
-                          localStorage.setItem('scam_checker_first_scan_tip_expanded', JSON.stringify(newValue))
+                          const key = `scam_checker_first_scan_tip_expanded_${user.id}`
+                          localStorage.setItem(key, JSON.stringify(newValue))
                         } catch (error) {
                           console.warn('Failed to save first scan tip state:', error)
                         }
@@ -2314,11 +2894,17 @@ function Dashboard() {
                     {/* Risk Level Header - Clickable to toggle tip */}
                     <button
                       onClick={() => {
+                        if (!user?.id) return
                         const newValue = !isTipExpanded
                         setIsTipExpanded(newValue)
-                        // Persist to localStorage
+                        // Persist to localStorage (user-specific)
                         try {
-                          localStorage.setItem('scam_checker_risk_pattern_tip_expanded', JSON.stringify(newValue))
+                          const key = `scam_checker_risk_pattern_tip_expanded_${user.id}`
+                          localStorage.setItem(key, JSON.stringify(newValue))
+                          // Also save current risk level so we know user has seen it
+                          if (currentRiskLevel) {
+                            localStorage.setItem(`scam_checker_last_risk_level_${user.id}`, currentRiskLevel)
+                          }
                         } catch (error) {
                           console.warn('Failed to save risk pattern tip state:', error)
                         }
@@ -2441,7 +3027,26 @@ function Dashboard() {
                 variant="outline"
                 className="w-full h-12"
                 size="lg"
-                onClick={() => setShowHistory(!showHistory)}
+                onClick={() => {
+                  const willShow = !showHistory
+                  // Toggle history visibility
+                  setShowHistory(willShow)
+                  
+                  // If showing, scroll to scan history section after a short delay to ensure it's rendered
+                  if (willShow) {
+                    setTimeout(() => {
+                      const scanHistorySection = document.getElementById('scan-history-section')
+                      if (scanHistorySection) {
+                        const elementTop = scanHistorySection.getBoundingClientRect().top + window.pageYOffset
+                        const offset = 80 // Account for fixed header
+                        window.scrollTo({
+                          top: elementTop - offset,
+                          behavior: 'smooth'
+                        })
+                      }
+                    }, 100)
+                  }
+                }}
               >
                 <History className="w-4 h-4 mr-2" />
                 {showHistory ? 'Hide' : 'View'} Scan History
@@ -2449,7 +3054,14 @@ function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card/50 backdrop-blur-sm">
+          <Card 
+            id="account-info" 
+            className={`border-border bg-card/50 backdrop-blur-sm transition-all duration-1000 ${
+              highlightAccountInfo 
+                ? 'border-primary shadow-lg shadow-primary/50 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]' 
+                : ''
+            }`}
+          >
             <CardHeader className="relative">
               <div className="flex items-center justify-between">
                 <div>
@@ -2477,7 +3089,7 @@ function Dashboard() {
                       /* Avatar image - Gmail picture or custom upload */
                       <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
                         <img
-                          src={avatarUrl}
+                          src={getInitialAvatarDataUrl(avatarUrl) || avatarUrl}
                           alt="Avatar"
                           className="w-full h-full rounded-full object-cover"
                           onError={() => {
@@ -2493,8 +3105,27 @@ function Dashboard() {
                         </div>
                       </div>
                     )}
-                    {/* X button - shown only when editing and avatar exists */}
-                    {editingSection === 'profile' && avatarUrl && (
+                    {/* X button - shown only when editing and there's a real custom avatar (not just initial) */}
+                    {editingSection === 'profile' && (() => {
+                      // Check if there's a real custom avatar to remove
+                      // Don't show X if the avatar is a generated initial avatar
+                      const currentAvatarUrl = dbUserData?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture
+                      
+                      // Don't show X if it's a generated initial avatar
+                      if (isInitialAvatar(currentAvatarUrl)) {
+                        return false
+                      }
+                      
+                      // Show X if there's a Google OAuth picture or a real uploaded avatar
+                      const hasGooglePicture = user?.user_metadata?.picture
+                      const hasRealAvatarUrl = currentAvatarUrl && 
+                                               (currentAvatarUrl.startsWith('http://') || 
+                                                currentAvatarUrl.startsWith('https://') ||
+                                                (currentAvatarUrl.startsWith('data:image') && !isInitialAvatar(currentAvatarUrl)))
+                      
+                      // Only show X if there's a real custom avatar (not initial)
+                      return (hasGooglePicture || hasRealAvatarUrl) && avatarUrl
+                    })() && (
                       <button
                         type="button"
                         onClick={handleRemoveAvatar}
@@ -2577,7 +3208,7 @@ function Dashboard() {
                   ) : (
                     <>
                       <h3 className="font-semibold text-lg mb-1">
-                        {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
+                        {dbUserData?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                         <Mail className="w-3.5 h-3.5" />
@@ -2724,7 +3355,7 @@ function Dashboard() {
                         const { getScanHistory } = await import('@/utils/scanHistory')
                         const history = await getScanHistory(user.id)
                         setScanHistory([...history]) // Force re-render with new array reference
-                        setScanHistoryKey(prev => prev + 1) // Force component re-render
+                        // Don't change scanHistoryKey - it causes component remount and resets date range
                         await refreshStats(0, true) // Force refresh after manual refresh
                       } catch (error) {
                         console.error('❌ Error refreshing scan history:', error)

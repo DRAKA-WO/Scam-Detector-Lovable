@@ -422,12 +422,8 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   if (scans.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Scan History</CardTitle>
-          <CardDescription>Your recent scans will appear here</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">
+        <CardContent className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground text-center">
             No scans yet. Start analyzing content to see your history!
           </p>
         </CardContent>

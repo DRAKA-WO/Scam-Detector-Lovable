@@ -10,6 +10,9 @@ const SIGNUP_BONUS_CHECKS = 5 // Checks given on signup
 let lastFetchTime = 0;
 const MIN_FETCH_INTERVAL = 150; // Minimum 150ms between any Supabase fetches
 
+// Track ongoing sync operations to prevent duplicates
+const ongoingSyncs = new Set();
+
 /**
  * Get remaining free checks for anonymous users
  * @returns {number} Number of remaining free checks
@@ -251,6 +254,11 @@ export async function initializeUserChecks(userId, forceInit = false) {
       
       // Dispatch event to update UI
       window.dispatchEvent(new Event('checksUpdated'))
+      
+      // Don't sync user profile data here for existing users
+      // Profile data sync is handled by OAuthCallback and Dashboard on login
+      // This prevents unnecessary database updates on every login
+      
       return
     }
     
@@ -258,17 +266,34 @@ export async function initializeUserChecks(userId, forceInit = false) {
     // Give them 5 signup bonus checks
     console.log(`🆕 New user detected - giving ${SIGNUP_BONUS_CHECKS} signup bonus checks`)
     
-    // Create new user record in Supabase with signup bonus
+    // Try to get user data from auth session
+    let userData = { id: userId, checks: SIGNUP_BONUS_CHECKS }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        userData.email = session.user.email || null
+        userData.full_name = session.user.user_metadata?.full_name || 
+                            session.user.user_metadata?.name || 
+                            null
+        userData.avatar_url = session.user.user_metadata?.avatar_url || 
+                             session.user.user_metadata?.picture || 
+                             null
+      }
+    } catch (authError) {
+      console.warn('⚠️ Could not fetch user auth data for new user creation:', authError)
+    }
+    
+    // Create new user record in Supabase with signup bonus and user data
     const { error: insertError } = await supabase
       .from('users')
-      .insert({ id: userId, checks: SIGNUP_BONUS_CHECKS })
+      .insert(userData)
     
     if (insertError) {
       console.error('❌ Error creating user record in Supabase:', insertError)
       // Still update localStorage as fallback
       localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
     } else {
-      console.log(`✅ Created new user record in Supabase with ${SIGNUP_BONUS_CHECKS} checks`)
+      console.log(`✅ Created new user record in Supabase with ${SIGNUP_BONUS_CHECKS} checks and user data`)
       // Update localStorage to match database
       localStorage.setItem(key, SIGNUP_BONUS_CHECKS.toString())
     }
@@ -307,6 +332,7 @@ export async function useUserCheck(userId) {
   let currentChecks = null;
   try {
     const { supabase } = await import('@/integrations/supabase/client')
+    console.log(`🔍 [checkLimits] Fetching checks from Supabase (useUserCheck) for user ${userId}...`);
     const { data, error } = await supabase
       .from('users')
       .select('checks')
@@ -314,14 +340,14 @@ export async function useUserCheck(userId) {
       .maybeSingle()
     
     if (error) {
-      console.error('Error fetching checks from Supabase:', error)
+      console.error(`❌ [checkLimits] Error fetching checks from Supabase (useUserCheck):`, error)
       // Fallback to localStorage if Supabase fetch fails
       currentChecks = getRemainingUserChecks(userId)
     } else if (data && typeof data.checks === 'number') {
       currentChecks = data.checks
       // Update localStorage with fresh value from Supabase
       localStorage.setItem(key, currentChecks.toString())
-      console.log(`✅ Fetched fresh checks from Supabase: ${currentChecks}`)
+      console.log(`✅ [checkLimits] Fetched checks from Supabase (useUserCheck): ${currentChecks} for user ${userId}`)
     } else {
       // Fallback to localStorage if no data
       currentChecks = getRemainingUserChecks(userId)
@@ -351,19 +377,20 @@ export async function useUserCheck(userId) {
   ;(async () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client')
+      console.log(`🔍 [checkLimits] Updating checks in Supabase (useUserCheck): ${currentChecks} → ${newCount} for user ${userId}...`);
       const { error } = await supabase
         .from('users')
         .update({ checks: newCount })
         .eq('id', userId)
       
       if (error) {
-        console.error('Error updating checks in Supabase:', error)
+        console.error(`❌ [checkLimits] Error updating checks in Supabase (useUserCheck):`, error)
         // On error, keep pending flag longer to prevent overwrite
         setTimeout(() => {
           pendingCheckUpdates.delete(userId)
         }, 5000) // Clear after 5 seconds
       } else {
-        console.log(`✅ Decremented checks in Supabase: ${currentChecks} → ${newCount}`)
+        console.log(`✅ [checkLimits] Updated checks in Supabase (useUserCheck): ${currentChecks} → ${newCount} for user ${userId}`)
         // Clear pending flag after a short delay to ensure database has committed
         setTimeout(() => {
           pendingCheckUpdates.delete(userId)
@@ -435,6 +462,7 @@ export async function refundUserCheck(userId) {
   let currentChecks = null;
   try {
     const { supabase } = await import('@/integrations/supabase/client')
+    console.log(`🔍 [checkLimits] Fetching checks from Supabase (refundUserCheck) for user ${userId}...`);
     const { data, error } = await supabase
       .from('users')
       .select('checks')
@@ -442,14 +470,14 @@ export async function refundUserCheck(userId) {
       .maybeSingle()
     
     if (error) {
-      console.error('Error fetching checks from Supabase:', error)
+      console.error(`❌ [checkLimits] Error fetching checks from Supabase (refundUserCheck):`, error)
       // Fallback to localStorage if Supabase fetch fails
       currentChecks = getRemainingUserChecks(userId)
     } else if (data && typeof data.checks === 'number') {
       currentChecks = data.checks
       // Update localStorage with fresh value from Supabase
       localStorage.setItem(key, currentChecks.toString())
-      console.log(`✅ Fetched fresh checks from Supabase for refund: ${currentChecks}`)
+      console.log(`✅ [checkLimits] Fetched checks from Supabase (refundUserCheck): ${currentChecks} for user ${userId}`)
     } else {
       // Fallback to localStorage if no data
       currentChecks = getRemainingUserChecks(userId)
@@ -476,15 +504,16 @@ export async function refundUserCheck(userId) {
   ;(async () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client')
+      console.log(`🔍 [checkLimits] Updating checks in Supabase (refundUserCheck): ${currentChecks} → ${newCount} for user ${userId}...`);
       const { error } = await supabase
         .from('users')
         .update({ checks: newCount })
         .eq('id', userId)
       
       if (error) {
-        console.error('Error refunding check in Supabase:', error)
+        console.error(`❌ [checkLimits] Error updating checks in Supabase (refundUserCheck):`, error)
       } else {
-        console.log(`✅ Refunded check in Supabase: ${currentChecks} → ${newCount}`)
+        console.log(`✅ [checkLimits] Updated checks in Supabase (refundUserCheck): ${currentChecks} → ${newCount} for user ${userId}`)
       }
     } catch (error) {
       console.error('Exception refunding check in Supabase:', error)
@@ -558,6 +587,155 @@ export function updateUserStats(userId, resultType) {
   
   const key = `${USER_STATS_KEY_PREFIX}${userId}`
   localStorage.setItem(key, JSON.stringify(stats))
+}
+
+/**
+ * Restore custom avatar/name from database to user_metadata if Google OAuth overwrote them
+ * This function ONLY reads from database and writes to user_metadata, never updates database
+ * The database trigger handles syncing from auth to database (but preserves custom data)
+ * @param {string} userId - User ID from Supabase
+ */
+export async function syncUserProfileData(userId) {
+  if (typeof window === 'undefined' || !userId) return
+  
+  // Prevent duplicate syncs for the same user
+  if (ongoingSyncs.has(userId)) {
+    return // Already syncing this user
+  }
+  
+  ongoingSyncs.add(userId)
+  
+  try {
+    const { supabase } = await import('@/integrations/supabase/client')
+    
+    // Wait a bit after login to let network stabilize (especially after OAuth redirect)
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Throttle to prevent too many concurrent requests
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime;
+    if (timeSinceLastFetch < MIN_FETCH_INTERVAL) {
+      await new Promise(resolve => setTimeout(resolve, MIN_FETCH_INTERVAL - timeSinceLastFetch));
+    }
+    lastFetchTime = Date.now();
+    
+    // Get current user data from auth
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) {
+      return // No session, can't sync
+    }
+    
+    // Get current user record from database with retry logic
+    let existingUser = null
+    let fetchError = null
+    const maxRetries = 2
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await supabase
+          .from('users')
+          .select('email, full_name, avatar_url')
+          .eq('id', userId)
+          .maybeSingle()
+        
+        if (result.error) {
+          fetchError = result.error
+          // Retry on network errors
+          if (attempt < maxRetries && (
+            result.error.message?.includes('Failed to fetch') ||
+            result.error.message?.includes('ERR_CONNECTION') ||
+            result.error.message?.includes('NetworkError')
+          )) {
+            await new Promise(resolve => setTimeout(resolve, 200 * Math.pow(2, attempt)));
+            continue
+          }
+          break
+        }
+        
+        existingUser = result.data
+        break
+      } catch (err) {
+        fetchError = err
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 200 * Math.pow(2, attempt)));
+          continue
+        }
+        break
+      }
+    }
+    
+    if (fetchError) {
+      // Silent error - only log in dev mode
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Error fetching user for profile sync:', fetchError)
+      }
+      return
+    }
+    
+    if (!existingUser) {
+      // User doesn't exist yet - database trigger will create it
+      return
+    }
+    
+    // EXISTING USER: Only restore custom data from database to user_metadata
+    // Database is source of truth - restore it to user_metadata if Google OAuth overwrote it
+    
+    let needsRestore = false
+    const restoreData = { ...session.user.user_metadata }
+    
+    // Check if custom avatar_url needs to be restored
+    if (existingUser.avatar_url && existingUser.avatar_url !== null) {
+      const currentMetadataAvatar = session.user.user_metadata?.avatar_url
+      // Only restore if it's different (Google OAuth might have overwritten it)
+      if (currentMetadataAvatar !== existingUser.avatar_url) {
+        restoreData.avatar_url = existingUser.avatar_url
+        needsRestore = true
+      }
+    }
+    
+    // Check if custom full_name needs to be restored
+    if (existingUser.full_name && existingUser.full_name !== null) {
+      const currentMetadataName = session.user.user_metadata?.full_name || session.user.user_metadata?.name
+      if (currentMetadataName !== existingUser.full_name) {
+        restoreData.full_name = existingUser.full_name
+        restoreData.name = existingUser.full_name
+        needsRestore = true
+      }
+    }
+    
+    // Only call updateUser if something actually needs to be restored
+    if (needsRestore) {
+      try {
+        const { error: restoreError } = await supabase.auth.updateUser({
+          data: restoreData
+        })
+        
+        if (restoreError) {
+          // Silent error - only log in dev mode
+          if (import.meta.env.DEV) {
+            console.warn('⚠️ Could not restore custom profile data to user_metadata:', restoreError)
+          }
+        } else {
+          // Refresh the session to update the UI immediately
+          // This ensures the restored avatar/name appears in the UI right away
+          await supabase.auth.refreshSession()
+        }
+      } catch (restoreErr) {
+        // Silent error - only log in dev mode
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Exception restoring custom profile data:', restoreErr)
+        }
+      }
+    }
+  } catch (error) {
+    // Silent error - only log in dev mode
+    if (import.meta.env.DEV) {
+      console.error('❌ Exception syncing user profile data:', error)
+    }
+  } finally {
+    // Always remove from ongoing syncs, even on error
+    ongoingSyncs.delete(userId)
+  }
 }
 
 /**

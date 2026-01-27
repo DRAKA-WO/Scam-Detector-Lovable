@@ -22,7 +22,10 @@ const Index = () => {
         
         if (session && session.user && !error) {
           console.log('🔍 Existing session detected on Index page, syncing to extension...');
-          await syncSessionToExtension(session, session.user.id);
+          
+          // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+          // Extension fetches checks/plan from Supabase when popup opens
+          await syncSessionToExtension(session, session.user.id, null, null, true);
           console.log('✅ Existing session synced to extension');
         }
       } catch (error) {

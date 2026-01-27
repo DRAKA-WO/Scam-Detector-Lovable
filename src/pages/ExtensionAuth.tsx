@@ -16,8 +16,9 @@ function ExtensionAuth() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
-          // User is already logged in (e.g., from OAuth callback) - sync session to extension
-          await syncSessionToExtension(session, session.user.id)
+          // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+          // Extension fetches checks/plan from Supabase when popup opens
+          await syncSessionToExtension(session, session.user.id, null, null, true)
           
           // Show success message
           setIsCheckingAuth(false)
@@ -54,8 +55,35 @@ function ExtensionAuth() {
         // Close modal immediately
         setShowAuthModal(false)
         
-        // Sync session to extension (may already be synced by modal, but sync again to be sure)
-        await syncSessionToExtension(session, session.user.id)
+        // Fetch user data from database first (avatar_url) - database is source of truth
+        let sessionToSync = session;
+        try {
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('avatar_url')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          
+          if (!userError && userData?.avatar_url) {
+            // Create modified session with database avatar_url in user_metadata for extension sync
+            sessionToSync = {
+              ...session,
+              user: {
+                ...session.user,
+                user_metadata: {
+                  ...session.user.user_metadata,
+                  avatar_url: userData.avatar_url,
+                  picture: userData.avatar_url
+                }
+              }
+            };
+          }
+        } catch (fetchErr) {
+          console.warn('⚠️ [ExtensionAuth] Error fetching user data for extension sync:', fetchErr);
+        }
+        
+        // Sync session with database avatar to extension - extension fetches checks/plan from Supabase when popup opens
+        await syncSessionToExtension(sessionToSync, session.user.id)
         
         // Show success message
         setAuthSuccess(true)
@@ -81,8 +109,9 @@ function ExtensionAuth() {
           // Close modal
           setShowAuthModal(false)
           
-          // Sync session to extension (may already be synced, but sync again to be sure)
-          await syncSessionToExtension(session, session.user.id)
+          // Sync session to extension with auth metadata update - this will fetch database avatar and update auth metadata
+          // Extension fetches checks/plan from Supabase when popup opens
+          await syncSessionToExtension(session, session.user.id, null, null, true)
           
           // Show success message
           setAuthSuccess(true)

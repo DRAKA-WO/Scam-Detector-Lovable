@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/landing/Header'
 import Footer from '../components/landing/Footer'
@@ -17,113 +17,94 @@ const Pricing = () => {
   const [userPlan, setUserPlan] = useState<string>('FREE') // Default to FREE
   const [planLoaded, setPlanLoaded] = useState(false) // Track loading state
   const [billingPeriod, setBillingPeriod] = useState<'annual' | 'monthly'>('annual') // Annual is default
+  const planReceivedRef = useRef(false) // Track if we've received a plan update from Header
+  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null) // Track the fallback timeout
 
-  // Fetch user plan with timeout to prevent hanging (like Header does)
+  // Listen for plan updates from Header component (Header already fetches the plan)
+  // This avoids duplicate Supabase requests since Header is rendered on this page
   useEffect(() => {
-    const fetchPlan = async () => {
+    const handlePlanUpdate = (event: CustomEvent) => {
+      const plan = event.detail?.plan || 'FREE'
+      console.log(`📥 [Pricing] Received plan update from Header: ${plan}`)
+      planReceivedRef.current = true // Mark that we received an update
+      
+      // Clear the fallback timeout since we got the plan
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current)
+        fallbackTimeoutRef.current = null
+      }
+      
+      setUserPlan(plan)
+      setPlanLoaded(true)
+    }
+
+    // Listen for custom event from Header
+    window.addEventListener('planUpdated', handlePlanUpdate as EventListener)
+
+    // Check auth state immediately to handle logged-out users
+    const checkAuthAndSetFallback = async () => {
       try {
-        // Get session first
-        const sessionPromise = supabase.auth.getSession()
-        const sessionTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('getSession timeout')), 3000)
-        )
-        
-        const { data: { session }, error: sessionError } = await Promise.race([
-          sessionPromise,
-          sessionTimeout
-        ]) as any
-        
-        if (sessionError || !session?.user) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) {
+          // User is not logged in, set to FREE immediately
+          planReceivedRef.current = true
           setUserPlan('FREE')
           setPlanLoaded(true)
           return
         }
         
-        // Fetch plan with timeout
-        const planPromise = supabase
-          .from('users')
-          .select('plan')
-          .eq('id', session.user.id)
-          .maybeSingle()
-        
-        const planTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('plan query timeout')), 3000)
-        )
-        
-        const { data, error } = await Promise.race([
-          planPromise,
-          planTimeout
-        ]) as any
-        
-        if (!error && data?.plan) {
-          const planUpper = (data.plan || '').toString().toUpperCase().trim()
-          setUserPlan(planUpper)
-        } else {
-          setUserPlan('FREE')
-        }
-      } catch (error: any) {
-        // Timeout or error - default to FREE (silently, auth state change will handle it)
-        setUserPlan('FREE')
-      } finally {
-        setPlanLoaded(true)
-      }
-    }
-    
-    fetchPlan()
-    
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.user) {
-        setUserPlan('FREE')
-        setPlanLoaded(true)
-        return
-      }
-      
-      // Fetch plan with timeout
-      try {
-        const planPromise = supabase
-          .from('users')
-          .select('plan')
-          .eq('id', session.user.id)
-          .maybeSingle()
-        
-        const planTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('plan query timeout')), 3000)
-        )
-        
-        const { data, error } = await Promise.race([
-          planPromise,
-          planTimeout
-        ]) as any
-        
-        if (!error && data?.plan) {
-          const planUpper = (data.plan || '').toString().toUpperCase().trim()
-          setUserPlan(planUpper)
-          setPlanLoaded(true)
-        } else if (!error && !data?.plan) {
-          // Query succeeded but no plan found - only set FREE if we don't already have a plan
-          setUserPlan('FREE')
-          setPlanLoaded(true)
-        } else {
-          // Query had an error - don't overwrite existing plan, just mark as loaded
-          // Don't change plan on error - keep what we have
-          if (!planLoaded) {
+        // User is logged in - wait for Header to send the plan update
+        // Set a fallback timeout only if we haven't received an update
+        fallbackTimeoutRef.current = setTimeout(() => {
+          // Only set to FREE if we still haven't received a plan update
+          if (!planReceivedRef.current) {
+            console.log(`⏱️ [Pricing] No plan update from Header after 3s, defaulting to FREE`)
+            setUserPlan('FREE')
             setPlanLoaded(true)
           }
+        }, 3000) // Wait 3 seconds for Header to fetch and dispatch
+      } catch (error) {
+        // On error, default to FREE
+        planReceivedRef.current = true
+        setUserPlan('FREE')
+        setPlanLoaded(true)
+      }
+    }
+    
+    checkAuthAndSetFallback()
+
+    // Listen for auth changes to reset plan
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        planReceivedRef.current = true
+        setUserPlan('FREE')
+        setPlanLoaded(true)
+      } else {
+        // User logged in - reset the flag and wait for Header's update
+        planReceivedRef.current = false
+        setPlanLoaded(false)
+        // Set a new fallback timeout
+        if (fallbackTimeoutRef.current) {
+          clearTimeout(fallbackTimeoutRef.current)
         }
-      } catch (error: any) {
-        // Timeout or other error - don't overwrite existing plan
-        // Don't change plan on timeout - keep what we have (don't revert to FREE)
-        if (!planLoaded) {
-          setPlanLoaded(true)
-        }
+        fallbackTimeoutRef.current = setTimeout(() => {
+          if (!planReceivedRef.current) {
+            console.log(`⏱️ [Pricing] No plan update from Header after login, defaulting to FREE`)
+            setUserPlan('FREE')
+            setPlanLoaded(true)
+          }
+        }, 3000)
       }
     })
-    
+
     return () => {
+      window.removeEventListener('planUpdated', handlePlanUpdate as EventListener)
       subscription.unsubscribe()
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current)
+      }
     }
-  }, [])
+  }, []) // Empty deps - only run once on mount
 
   const allFeatures = [
     { icon: Puzzle, text: 'Browser Extension Access' },
