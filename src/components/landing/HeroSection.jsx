@@ -53,7 +53,7 @@ function HeroSection() {
             <span className="gradient-text">They Catch You</span>
           </h1>
 
-          {/* Subtitle */}
+          {/* Subtitle - stretched to align with analyze box */}
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
             Upload suspicious images, paste URLs, or enter text messages to instantly identify phishing attempts, fraud
             schemes, and online scams with advanced AI analysis.
@@ -86,7 +86,7 @@ function HeroSection() {
             </a>
           </div>
 
-          {/* Stats */}
+          {/* Stats - stretched to align with analyze box, same gaps */}
           <div className="mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto">
             <div className="text-center">
               <div className="font-display text-2xl sm:text-4xl font-bold gradient-text">50K+</div>

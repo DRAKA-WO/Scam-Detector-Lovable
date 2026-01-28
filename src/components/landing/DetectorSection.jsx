@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
 import FloatingDiamond from "../ui/FloatingDiamond"
 import ImageUpload from '../ImageUpload'
@@ -42,8 +43,10 @@ function DetectorSection() {
   const [showBlurredPreview, setShowBlurredPreview] = useState(false)
   const [showOutOfChecksModal, setShowOutOfChecksModal] = useState(false)
 
+  const navigate = useNavigate()
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
   const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
+  const resultSectionRef = useRef(null)
 
   // Check authentication status on mount and when it changes
   useEffect(() => {
@@ -768,6 +771,25 @@ function DetectorSection() {
     setShowBlurredPreview(false)
   }
 
+  // Locked overlay on Index: only loading or blurred signup preview; result/error go to /detector
+  const isAnalyzeLocked = loading || (!!result && showBlurredPreview)
+
+  // When we have result (not blurred) or error, navigate to /detector with state
+  useEffect(() => {
+    if (result && !showBlurredPreview) {
+      navigate('/detector', { state: { result, error: null, activeTab } })
+    } else if (error) {
+      navigate('/detector', { state: { result: null, error, activeTab } })
+    }
+  }, [result, error, showBlurredPreview, activeTab, navigate])
+
+  // Scroll the analyze result section into view when result appears (so it's not cut off)
+  useEffect(() => {
+    if (result && !showBlurredPreview && resultSectionRef.current && !isAnalyzeLocked) {
+      resultSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [result, showBlurredPreview, isAnalyzeLocked])
+
   const tabs = [
     { id: 'image', label: 'Image', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -787,103 +809,120 @@ function DetectorSection() {
   ]
 
   return (
-    <section id="detector" className="py-20 relative overflow-hidden">
-      {/* Floating Diamonds */}
-      <FloatingDiamond className="top-20 left-[8%]" delay={0} size="md" />
-      <FloatingDiamond className="top-32 right-[10%]" delay={0.6} size="lg" />
-      <FloatingDiamond className="bottom-28 left-[12%]" delay={1.2} size="sm" />
-      <FloatingDiamond className="bottom-20 right-[15%]" delay={1.8} size="md" />
-
-      {/* Background glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div 
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-20"
-          style={{
-            background: 'radial-gradient(circle, hsl(270 70% 60% / 0.3) 0%, transparent 70%)',
-          }}
-        />
-      </div>
-
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="max-w-2xl mx-auto">
-          {/* Section Header - Hide when analyzing */}
-          {!loading && (
-            <div 
-              ref={headerRef}
-              className={`text-center mb-10 transition-all duration-700 ${
-                headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-              }`}
+    <section id="detector" className="py-20 relative">
+      {/* Locked full-page analyze view: from loading through result/error */}
+      {isAnalyzeLocked && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black">
+          {/* Effects on sides (same as main page) */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <FloatingDiamond className="top-20 left-[8%]" delay={0} size="md" />
+            <FloatingDiamond className="top-32 right-[10%]" delay={0.6} size="lg" />
+            <FloatingDiamond className="bottom-28 left-[12%]" delay={1.2} size="sm" />
+            <FloatingDiamond className="bottom-20 right-[15%]" delay={1.8} size="md" />
+            <div
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-20"
+              style={{
+                background: 'radial-gradient(circle, hsl(270 70% 60% / 0.3) 0%, transparent 70%)',
+              }}
+            />
+          </div>
+          <div className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border bg-card/90 z-10 relative">
+            <button
+              type="button"
+              onClick={handleNewAnalysis}
+              className="flex items-center gap-2 text-foreground hover:text-foreground font-medium transition-colors py-2 px-3 rounded-lg hover:bg-secondary/50"
+              aria-label="Back to analyzer"
             >
-              <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
-                <span className="gradient-text">Analyze</span> Any Content
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                Paste, upload, or enter suspicious content to get instant AI analysis
-              </p>
-            </div>
-          )}
-
-          {!result && !loading && (
-            <div 
-              ref={cardRef}
-              className={`bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-6 md:p-8 glow-effect gradient-border transition-all duration-700 delay-150 ${
-                cardVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
-              }`}
-            >
-              {/* Tabs */}
-              <div className="flex bg-secondary rounded-xl p-1 mb-6">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      activeTab === tab.id
-                        ? 'gradient-button text-primary-foreground shadow-lg'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {tab.icon}
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab Content */}
-              <div className="min-h-[300px]">
-                {activeTab === 'image' && <ImageUpload onUpload={handleImageUpload} />}
-                {activeTab === 'url' && <UrlInput onAnalyze={handleUrlAnalyze} />}
-                {activeTab === 'text' && <TextInput onAnalyze={handleTextAnalyze} loading={loading} />}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>Back to analyzer</span>
+            </button>
+            <span className="text-sm text-foreground">Analysis</span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 min-h-0 flex flex-col">
+              <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col">
+                {loading && <AnalyzingSteps type={activeTab} />}
+                {showBlurredPreview && result && !loading && (
+                  <div className="animate-fade-in">
+                    <BlurredResultPreview
+                      classification={result.classification}
+                      onSignup={() => setShowSignupModal(true)}
+                    />
+                  </div>
+                )}
               </div>
             </div>
-          )}
-
-          {loading && <AnalyzingSteps type={activeTab} />}
-
-          {error && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 backdrop-blur-xl animate-fade-in">
-              <p className="text-destructive whitespace-pre-line">{error}</p>
-            </div>
-          )}
-
-          {result && !showBlurredPreview && (
-            <div className="animate-fade-in">
-              <ResultCard
-                result={result}
-                onNewAnalysis={handleNewAnalysis}
-              />
-            </div>
-          )}
-
-          {showBlurredPreview && result && (
-            <div className="animate-fade-in">
-              <BlurredResultPreview
-                classification={result.classification}
-                onSignup={() => setShowSignupModal(true)}
-              />
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Regular view: header + tab card (hidden when locked) */}
+      {!isAnalyzeLocked && (
+        <>
+          {/* Decorative layer - overflow hidden only here so result card is never clipped */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <FloatingDiamond className="top-20 left-[8%]" delay={0} size="md" />
+            <FloatingDiamond className="top-32 right-[10%]" delay={0.6} size="lg" />
+            <FloatingDiamond className="bottom-28 left-[12%]" delay={1.2} size="sm" />
+            <FloatingDiamond className="bottom-20 right-[15%]" delay={1.8} size="md" />
+            <div 
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-20"
+              style={{
+                background: 'radial-gradient(circle, hsl(270 70% 60% / 0.3) 0%, transparent 70%)',
+              }}
+            />
+          </div>
+
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-4xl mx-auto">
+              <div 
+                ref={headerRef}
+                className={`text-center mb-10 transition-all duration-700 ${
+                  headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                }`}
+              >
+                <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
+                  <span className="gradient-text">Analyze</span> Any Content
+                </h2>
+                <p className="text-muted-foreground text-lg">
+                  Paste, upload, or enter suspicious content to get instant AI analysis
+                </p>
+              </div>
+
+              <div 
+                ref={cardRef}
+                className={`bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-6 md:p-8 glow-effect gradient-border transition-all duration-700 delay-150 ${
+                  cardVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+                }`}
+              >
+                <div className="flex bg-secondary rounded-xl p-1 mb-6">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
+                        activeTab === tab.id
+                          ? 'gradient-button text-primary-foreground shadow-lg'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="min-h-[300px]">
+                  {activeTab === 'image' && <ImageUpload onUpload={handleImageUpload} />}
+                  {activeTab === 'url' && <UrlInput onAnalyze={handleUrlAnalyze} />}
+                  {activeTab === 'text' && <TextInput onAnalyze={handleTextAnalyze} loading={loading} />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <LoginModal
         isOpen={showAuthModal}

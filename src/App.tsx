@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { syncSessionToExtension, initializeExtensionSync } from "./utils/extensionSync";
 import { AlertsProvider } from "./contexts/AlertsContext";
 import Index from "./pages/Index";
+import DetectorPage from "./pages/DetectorPage";
 import Dashboard from "./pages/Dashboard";
 import Business from "./pages/Business";
 import ExtensionAuth from "./pages/ExtensionAuth";
@@ -481,6 +482,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/detector" element={<DetectorPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/business" element={<Business />} />
             <Route path="/pricing" element={<Pricing />} />
