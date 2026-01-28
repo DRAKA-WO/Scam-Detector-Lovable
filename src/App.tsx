@@ -243,7 +243,7 @@ const OAuthCallback = () => {
           }
         });
         
-        subscription = data;
+        subscription = (data as any)?.subscription ?? data;
         
         // Also try to get session directly (in case it's already processed)
         const checkSession = async (attempt = 0) => {
@@ -434,8 +434,8 @@ const OAuthCallback = () => {
     
     return () => {
       mounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
+      if (subscription && typeof (subscription as any).unsubscribe === 'function') {
+        (subscription as any).unsubscribe();
       }
     };
   }, [navigate]);
@@ -482,7 +482,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/detector" element={<DetectorPage />} />
+            <Route path="/results" element={<DetectorPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/business" element={<Business />} />
             <Route path="/pricing" element={<Pricing />} />

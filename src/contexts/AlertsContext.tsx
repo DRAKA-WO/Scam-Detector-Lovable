@@ -48,7 +48,7 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => { if (subscription && typeof subscription.unsubscribe === 'function') subscription.unsubscribe() }
   }, [])
 
   // Helper functions for dismissed alerts persistence

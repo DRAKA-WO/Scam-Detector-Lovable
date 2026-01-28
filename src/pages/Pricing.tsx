@@ -99,7 +99,7 @@ const Pricing = () => {
 
     return () => {
       window.removeEventListener('planUpdated', handlePlanUpdate as EventListener)
-      subscription.unsubscribe()
+      if (subscription && typeof subscription.unsubscribe === 'function') subscription.unsubscribe()
       if (fallbackTimeoutRef.current) {
         clearTimeout(fallbackTimeoutRef.current)
       }

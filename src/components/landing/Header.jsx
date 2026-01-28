@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAlerts } from '../../contexts/AlertsContext'
 
-function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
+function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert, backToAnalyzerOnClick }) {
   // Use context alerts if available, otherwise fall back to props (for backward compatibility)
   let alertsContext
   try {
@@ -520,7 +520,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
             setRemainingChecks(checks)
           }
         })
-        return () => subscription.unsubscribe()
+        return () => { if (subscription && typeof subscription.unsubscribe === 'function') subscription.unsubscribe() }
       } catch (error) {
         // Supabase not available
       }
@@ -572,18 +572,32 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
     <header className="fixed top-0 left-0 right-0 z-50 nav-blur border-b border-border">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <a 
-            href="/" 
-            className="flex items-center gap-2"
-          >
-            <div className="w-8 h-8 rounded-lg gradient-button flex items-center justify-center">
-              <svg className="w-5 h-5 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          {/* Logo or Back to analyzer */}
+          {backToAnalyzerOnClick ? (
+            <button
+              type="button"
+              onClick={backToAnalyzerOnClick}
+              className="flex items-center gap-2 text-foreground hover:text-foreground font-medium transition-colors py-2 px-3 rounded-lg hover:bg-secondary/50"
+              aria-label="Back to analyzer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-            </div>
-            <span className="font-display font-bold text-xl text-foreground">ScamGuard</span>
-          </a>
+              <span>Back to analyzer</span>
+            </button>
+          ) : (
+            <a 
+              href="/" 
+              className="flex items-center gap-2"
+            >
+              <div className="w-8 h-8 rounded-lg gradient-button flex items-center justify-center">
+                <svg className="w-5 h-5 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <span className="font-display font-bold text-xl text-foreground">ScamGuard</span>
+            </a>
+          )}
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-baseline gap-8">

@@ -133,7 +133,7 @@ function ExtensionAuth() {
     }, 200) // Check every 200ms for faster detection
 
     return () => {
-      subscription.unsubscribe()
+      if (subscription && typeof subscription.unsubscribe === 'function') subscription.unsubscribe()
       if (intervalId) clearInterval(intervalId)
     }
   }, [isCheckingAuth, authSuccess])

@@ -48,6 +48,7 @@ function ScamResult({ result, onNewAnalysis }) {
   const [learnMoreLoading, setLearnMoreLoading] = useState(false)
   const [learnMoreError, setLearnMoreError] = useState(null)
   const [learnMoreRevealed, setLearnMoreRevealed] = useState(false)
+  const [loadingStep, setLoadingStep] = useState(0)
 
   const handleLearnMore = useCallback(async () => {
     if (!scam_type) return
@@ -84,33 +85,68 @@ function ScamResult({ result, onNewAnalysis }) {
     if (!showLearnMoreView) setLearnMoreRevealed(false)
   }, [showLearnMoreView])
 
+  const LEARN_MORE_LOADING_STEPS = ['Fetching scam details...', 'Loading how it works...', 'Loading prevention tips...']
+
+  // Cycle through loading steps while fetching learn more
+  useEffect(() => {
+    if (!learnMoreLoading) {
+      setLoadingStep(0)
+      return
+    }
+    setLoadingStep(0)
+    const steps = LEARN_MORE_LOADING_STEPS
+    const interval = setInterval(() => {
+      setLoadingStep((s) => Math.min(s + 1, steps.length - 1))
+    }, 700)
+    return () => clearInterval(interval)
+  }, [learnMoreLoading])
+
   const nextSteps = next_steps && next_steps.length > 0 ? next_steps : getScamNextSteps(scam_type)
 
   const cardClassName = 'bg-card backdrop-blur-xl rounded-xl sm:rounded-2xl border border-border glow-effect animate-fade-in'
 
   if (showLearnMoreView) {
     return (
-      <div className={`${cardClassName} flex flex-col h-full min-h-0 text-sm sm:text-base`}>
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border flex-shrink-0">
-          <h2 className="text-lg font-bold text-white">Learn more about this scam</h2>
-          <button
-            type="button"
-            onClick={() => setShowLearnMoreView(false)}
-            className="p-2 rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-            aria-label="Back to results"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-          {learnMoreLoading && (
-            <div className="flex flex-col items-center justify-center py-14 text-gray-400 text-sm sm:text-base">
-              <div className="w-10 h-10 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-3" />
-              <p>Loading...</p>
-            </div>
-          )}
+      <div className="flex-1 flex flex-col items-center justify-center w-full min-h-[calc(100vh-5rem)] py-6">
+        <div className={`${cardClassName} flex flex-col w-full max-w-5xl min-h-[420px] text-sm sm:text-base mx-auto`}>
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border flex-shrink-0">
+            <h2 className="text-lg font-bold text-white">Learn more about this scam</h2>
+            <button
+              type="button"
+              onClick={() => setShowLearnMoreView(false)}
+              className="p-2 rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+              aria-label="Back to results"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+            {learnMoreLoading && (
+              <div className="flex flex-col items-center justify-center py-14 text-gray-400 text-sm sm:text-base">
+                <div className="w-10 h-10 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-6" />
+                <p className="text-white font-medium mb-4">What we're loading</p>
+                <ul className="space-y-3 flex flex-col items-center">
+                  {LEARN_MORE_LOADING_STEPS.map((label, i) => (
+                    <li key={i} className="flex items-center gap-3 justify-center">
+                      {i < loadingStep ? (
+                        <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      ) : i === loadingStep ? (
+                        <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-gray-600 flex-shrink-0" />
+                      )}
+                      <span className={i <= loadingStep ? 'text-gray-300' : 'text-gray-500'}>{label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           {learnMoreError && !learnMoreLoading && (
             <div className="space-y-4">
               <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-4 text-red-400 text-sm">
@@ -215,6 +251,7 @@ function ScamResult({ result, onNewAnalysis }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+        </div>
         </div>
       </div>
     )

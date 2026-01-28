@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import FloatingDiamond from '@/components/ui/FloatingDiamond'
+import Header from '@/components/landing/Header'
 import ResultCard from '@/components/ResultCard'
 
 const DetectorPage = () => {
@@ -9,12 +10,33 @@ const DetectorPage = () => {
 
   const result = state?.result
   const error = state?.error
+  const [showScrollHint, setShowScrollHint] = useState(true)
+  const hasScrolledDown = useRef(false)
 
   useEffect(() => {
     if (!result && !error) {
       window.location.href = '/#detector'
     }
   }, [result, error])
+
+  // Start at top when result/error is shown (arrow stays visible until user scrolls)
+  useEffect(() => {
+    if (!result && !error) return
+    window.scrollTo(0, 0)
+  }, [result, error])
+
+  // Hide scroll-down arrow once user scrolls — disappears forever for this page view
+  useEffect(() => {
+    const handleScroll = () => {
+      if (hasScrolledDown.current) return
+      if (window.scrollY >= 60) {
+        hasScrolledDown.current = true
+        setShowScrollHint(false)
+      }
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const goToAnalyzer = () => {
     window.location.href = '/#detector'
@@ -39,23 +61,10 @@ const DetectorPage = () => {
           }}
         />
       </div>
-      <div className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border bg-card/90 z-10 relative">
-        <button
-          type="button"
-          onClick={goToAnalyzer}
-          className="flex items-center gap-2 text-foreground hover:text-foreground font-medium transition-colors py-2 px-3 rounded-lg hover:bg-secondary/50"
-          aria-label="Back to analyzer"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          <span>Back to analyzer</span>
-        </button>
-        <span className="text-sm text-foreground">Analysis</span>
-      </div>
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-10">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 min-h-0 flex flex-col">
-          <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col">
+      <Header backToAnalyzerOnClick={goToAnalyzer} />
+      <div className="flex-1 flex flex-col relative z-10 min-h-0 pt-16">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col">
+          <div className="max-w-5xl mx-auto flex flex-col w-full">
             {error && (
               <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 backdrop-blur-xl animate-fade-in">
                 <p className="text-destructive whitespace-pre-line">{error}</p>
@@ -69,7 +78,7 @@ const DetectorPage = () => {
               </div>
             )}
             {result && (
-              <div className="animate-fade-in flex-1 min-h-0 flex flex-col">
+              <div className="animate-fade-in flex flex-col">
                 <ResultCard
                   result={result as Parameters<typeof ResultCard>[0]['result']}
                   onNewAnalysis={goToAnalyzer}
@@ -79,6 +88,23 @@ const DetectorPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Animated scroll-down hint (double chevron, glowing) — disappears forever once user scrolls */}
+      {showScrollHint && (result || error) && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-300"
+          aria-hidden
+          style={{
+            filter: 'drop-shadow(0 0 12px hsl(var(--primary) / 0.8)) drop-shadow(0 0 24px hsl(var(--primary) / 0.5))',
+          }}
+        >
+          <div className="animate-bounce">
+            <svg className="w-9 h-9 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
+            </svg>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useScrollAnimation } from '../../hooks/useScrollAnimation'
 import FloatingDiamond from "../ui/FloatingDiamond"
+import Header from '../landing/Header'
 import ImageUpload from '../ImageUpload'
 import UrlInput from '../UrlInput'
 import TextInput from '../TextInput'
@@ -143,7 +144,7 @@ function DetectorSection() {
             setRemainingChecks(checks)
           }
         })
-        subscription = data
+        subscription = data?.subscription ?? data
       } catch (error) {
         console.warn('Supabase not available, auth features disabled:', error)
       }
@@ -152,7 +153,7 @@ function DetectorSection() {
     setupAuthListener()
 
     return () => {
-      if (subscription) {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
         subscription.unsubscribe()
       }
     }
@@ -771,15 +772,15 @@ function DetectorSection() {
     setShowBlurredPreview(false)
   }
 
-  // Locked overlay on Index: only loading or blurred signup preview; result/error go to /detector
+  // Locked overlay on Index: only loading or blurred signup preview; result/error go to /results
   const isAnalyzeLocked = loading || (!!result && showBlurredPreview)
 
-  // When we have result (not blurred) or error, navigate to /detector with state
+  // When we have result (not blurred) or error, navigate to /results with state
   useEffect(() => {
     if (result && !showBlurredPreview) {
-      navigate('/detector', { state: { result, error: null, activeTab } })
+      navigate('/results', { state: { result, error: null, activeTab } })
     } else if (error) {
-      navigate('/detector', { state: { result: null, error, activeTab } })
+      navigate('/results', { state: { result: null, error, activeTab } })
     }
   }, [result, error, showBlurredPreview, activeTab, navigate])
 
@@ -826,23 +827,10 @@ function DetectorSection() {
               }}
             />
           </div>
-          <div className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border bg-card/90 z-10 relative">
-            <button
-              type="button"
-              onClick={handleNewAnalysis}
-              className="flex items-center gap-2 text-foreground hover:text-foreground font-medium transition-colors py-2 px-3 rounded-lg hover:bg-secondary/50"
-              aria-label="Back to analyzer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span>Back to analyzer</span>
-            </button>
-            <span className="text-sm text-foreground">Analysis</span>
-          </div>
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-10">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 min-h-0 flex flex-col">
-              <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col">
+          <Header backToAnalyzerOnClick={handleNewAnalysis} />
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-10 pt-16">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 min-h-0 flex flex-col items-center justify-center">
+              <div className="w-full max-w-4xl mx-auto flex flex-col">
                 {loading && <AnalyzingSteps type={activeTab} />}
                 {showBlurredPreview && result && !loading && (
                   <div className="animate-fade-in">
@@ -876,7 +864,7 @@ function DetectorSection() {
           </div>
 
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-3xl mx-auto">
               <div 
                 ref={headerRef}
                 className={`text-center mb-10 transition-all duration-700 ${

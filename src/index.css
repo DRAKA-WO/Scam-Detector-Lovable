@@ -53,17 +53,31 @@
     border-color: hsl(var(--border));
   }
 
+/* Single scrollbar: only the document (html) scrolls; body must never be a scroll container */
 html {
   overflow-x: hidden;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  height: auto;
+  min-height: 100%;
 }
 
 body {
   background-color: hsl(var(--background));
-  overflow-x: hidden;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 100%;
     color: hsl(var(--foreground));
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    min-height: 100vh;
+    overflow: visible;
   }
 }
 
