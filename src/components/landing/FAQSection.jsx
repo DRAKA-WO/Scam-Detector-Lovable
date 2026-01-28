@@ -25,8 +25,8 @@ function FAQSection() {
       answer: 'Yes! Basic scam detection is completely free. We offer this as a public service to help keep everyone safe online.',
     },
     {
-      question: 'How do I report a confirmed scam?',
-      answer: 'After receiving your analysis, you can click the "Report Scam" button to submit the content to our database. This helps protect others from the same threat.',
+      question: 'How can I learn more about a scam?',
+      answer: 'When a scam is detected, click "Learn more about this scam" to see how it works and how to stay safe. You\'ll get clear, step-by-step guidance tailored to that scam type.',
     },
   ]
 

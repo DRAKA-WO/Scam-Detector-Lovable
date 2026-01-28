@@ -1,7 +1,41 @@
+import { useState, useCallback } from 'react'
 import getScamNextSteps from '../utils/scamNextSteps'
+import { API_ENDPOINTS } from '../config'
+import LearnMoreModal from './LearnMoreModal'
 
-function ScamResult({ result, onNewAnalysis, onReportScam }) {
+function ScamResult({ result, onNewAnalysis }) {
   const { reasons, explanation, scam_type, next_steps } = result
+  const [learnMoreOpen, setLearnMoreOpen] = useState(false)
+  const [learnMoreData, setLearnMoreData] = useState(null)
+  const [learnMoreLoading, setLearnMoreLoading] = useState(false)
+  const [learnMoreError, setLearnMoreError] = useState(null)
+
+  const handleLearnMore = useCallback(async () => {
+    if (!scam_type) return
+    setLearnMoreOpen(true)
+    setLearnMoreData(null)
+    setLearnMoreError(null)
+    setLearnMoreLoading(true)
+    try {
+      const res = await fetch(API_ENDPOINTS.learnMore, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scam_type,
+          reasons: reasons || [],
+          explanation: explanation || '',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load')
+      setLearnMoreData(data)
+    } catch (e) {
+      setLearnMoreError(e.message || 'Could not load learn more content.')
+    } finally {
+      setLearnMoreLoading(false)
+    }
+  }, [scam_type, reasons, explanation])
+
   const nextSteps = next_steps && next_steps.length > 0 ? next_steps : getScamNextSteps(scam_type)
 
   return (
@@ -112,12 +146,17 @@ function ScamResult({ result, onNewAnalysis, onReportScam }) {
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-        <button
-          onClick={onReportScam}
-          className="flex-1 border-2 border-red-500 text-red-500 hover:bg-red-500/10 font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base transition-colors"
-        >
-          Report this scam
-        </button>
+        {scam_type && (
+          <button
+            onClick={handleLearnMore}
+            className="flex-1 border-2 border-amber-500/60 text-amber-400 hover:bg-amber-500/10 font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base transition-colors flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            Learn more about this scam
+          </button>
+        )}
         <button
           onClick={onNewAnalysis}
           className="flex-1 gradient-button text-primary-foreground font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
@@ -138,6 +177,14 @@ function ScamResult({ result, onNewAnalysis, onReportScam }) {
           </svg>
         </button>
       </div>
+
+      <LearnMoreModal
+        isOpen={learnMoreOpen}
+        onClose={() => setLearnMoreOpen(false)}
+        data={learnMoreData}
+        isLoading={learnMoreLoading}
+        error={learnMoreError}
+      />
     </div>
   )
 }

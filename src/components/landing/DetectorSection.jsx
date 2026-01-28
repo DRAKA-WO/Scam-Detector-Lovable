@@ -5,7 +5,6 @@ import ImageUpload from '../ImageUpload'
 import UrlInput from '../UrlInput'
 import TextInput from '../TextInput'
 import ResultCard from '../ResultCard'
-import ReportModal from '../ReportModal'
 import LoginModal from '../LoginModal'
 import SignupModal from '../SignupModal'
 import BlurredResultPreview from '../BlurredResultPreview'
@@ -35,10 +34,8 @@ function DetectorSection() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [showReportModal, setShowReportModal] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
-  const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const [remainingChecks, setRemainingChecks] = useState(getRemainingFreeChecks())
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userId, setUserId] = useState(null)
@@ -771,54 +768,6 @@ function DetectorSection() {
     setShowBlurredPreview(false)
   }
 
-  const handleReportScam = () => {
-    setShowReportModal(true)
-  }
-
-  const handleConfirmReport = async (userConsent) => {
-    if ((!image && !url && !text) || !result) {
-      alert('Error: Missing source or analysis data')
-      return
-    }
-    setIsSubmittingReport(true)
-    try {
-      const formData = new FormData()
-      if (image) {
-        formData.append('image', image)
-      } else if (url) {
-        formData.append('source_type', 'url')
-        formData.append('source_url', url)
-      } else if (text) {
-        formData.append('source_type', 'text')
-        formData.append('source_text', text)
-      }
-      const analysisData = {
-        classification: result.classification,
-        content_type: result.content_type,
-        scam_type: result.scam_type || 'Unknown',
-        reasons: result.reasons || [],
-        explanation: result.explanation || '',
-        timestamp: new Date().toISOString()
-      }
-      formData.append('data', JSON.stringify(analysisData))
-      formData.append('user_consent', userConsent.toString())
-      const response = await fetch(API_ENDPOINTS.report, {
-        method: 'POST',
-        body: formData
-      })
-      if (!response.ok) {
-        const errorMessage = await handleApiError(response, 'report')
-        throw new Error(errorMessage)
-      }
-      alert('Thank you for reporting! Your report has been submitted successfully.')
-      setShowReportModal(false)
-    } catch (err) {
-      alert(getUserFriendlyError(err.message, 'report'))
-    } finally {
-      setIsSubmittingReport(false)
-    }
-  }
-
   const tabs = [
     { id: 'image', label: 'Image', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -921,7 +870,6 @@ function DetectorSection() {
               <ResultCard
                 result={result}
                 onNewAnalysis={handleNewAnalysis}
-                onReportScam={handleReportScam}
               />
             </div>
           )}
@@ -936,13 +884,6 @@ function DetectorSection() {
           )}
         </div>
       </div>
-
-      <ReportModal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        onConfirm={handleConfirmReport}
-        isSubmitting={isSubmittingReport}
-      />
 
       <LoginModal
         isOpen={showAuthModal}

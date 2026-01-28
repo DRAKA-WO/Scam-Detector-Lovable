@@ -2,7 +2,7 @@ import SafeResult from './SafeResult'
 import SuspiciousResult from './SuspiciousResult'
 import ScamResult from './ScamResult'
 
-function ResultCard({ result, onNewAnalysis, onReportScam }) {
+function ResultCard({ result, onNewAnalysis }) {
   const { classification } = result
 
   if (classification === 'safe') {
@@ -17,7 +17,6 @@ function ResultCard({ result, onNewAnalysis, onReportScam }) {
       <SuspiciousResult
         result={result}
         onNewAnalysis={onNewAnalysis}
-        onReportScam={onReportScam}
       />
     )
   } else if (classification === 'scam') {
@@ -25,7 +24,6 @@ function ResultCard({ result, onNewAnalysis, onReportScam }) {
       <ScamResult
         result={result}
         onNewAnalysis={onNewAnalysis}
-        onReportScam={onReportScam}
       />
     )
   }

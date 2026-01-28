@@ -1,4 +1,4 @@
-function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
+function SuspiciousResult({ result, onNewAnalysis }) {
   const { reasons, explanation, verification_steps } = result
 
   return (
@@ -88,12 +88,6 @@ function SuspiciousResult({ result, onNewAnalysis, onReportScam }) {
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-        <button
-          onClick={onReportScam}
-          className="flex-1 border-2 border-orange-500 text-orange-500 hover:bg-orange-500/10 font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base transition-colors"
-        >
-          Report this scam
-        </button>
         <button
           onClick={onNewAnalysis}
           className="flex-1 gradient-button text-white font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"

@@ -722,11 +722,17 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                     <div className="max-h-96 overflow-y-auto dark-scrollbar">
                       {alerts && alerts.length > 0 ? (
                         <div className="p-3 space-y-2">
-                          {alerts.map((alert) => (
+                          {alerts.map((alert) => {
+                            // Special styling for first-scam alert (orange/amber) to differentiate from risk pattern alerts
+                            const isFirstScam = alert.type === 'first-scam'
+                            
+                            return (
                             <Card
                               key={alert.id || alert.type}
                               className={`relative overflow-hidden rounded-lg border transition-all ${
-                                alert.severity === 'error' 
+                                isFirstScam
+                                  ? 'bg-gradient-to-br from-orange-500/10 via-card/50 to-card/50 border-orange-500/30 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10' :
+                                  alert.severity === 'error' 
                                   ? 'bg-gradient-to-br from-red-500/10 via-card/50 to-card/50 border-red-500/30 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10' :
                                   alert.severity === 'warning' 
                                   ? 'bg-gradient-to-br from-yellow-500/10 via-card/50 to-card/50 border-yellow-500/30 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-yellow-500/10' :
@@ -734,6 +740,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                               }`}
                             >
                               <div className={`absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl opacity-30 ${
+                                isFirstScam ? 'bg-orange-500' :
                                 alert.severity === 'error' ? 'bg-red-500' :
                                 alert.severity === 'warning' ? 'bg-yellow-500' :
                                 'bg-blue-500'
@@ -741,11 +748,13 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                               <CardContent className="pt-3 pb-3 px-3 relative">
                                 <div className="flex items-start gap-3">
                                   <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                                    isFirstScam ? 'bg-orange-500/20' :
                                     alert.severity === 'error' ? 'bg-red-500/20' :
                                     alert.severity === 'warning' ? 'bg-yellow-500/20' :
                                     'bg-blue-500/20'
                                   }`}>
                                     <AlertTriangle className={`h-4 w-4 ${
+                                      isFirstScam ? 'text-orange-400' :
                                       alert.severity === 'error' ? 'text-red-400' :
                                       alert.severity === 'warning' ? 'text-yellow-400' :
                                       'text-blue-400'
@@ -753,6 +762,7 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className={`text-sm leading-relaxed ${
+                                      isFirstScam ? 'text-orange-300' :
                                       alert.severity === 'error' ? 'text-red-300' :
                                       alert.severity === 'warning' ? 'text-yellow-300' :
                                       'text-blue-300'
@@ -763,7 +773,9 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                                       <Button
                                         onClick={alert.actionButton.onClick}
                                         className={`mt-3 text-xs h-8 px-3 font-medium transition-all ${
-                                          alert.severity === 'error' 
+                                          isFirstScam
+                                            ? 'bg-orange-500 hover:bg-orange-600 text-white' :
+                                            alert.severity === 'error' 
                                             ? 'bg-red-500 hover:bg-red-600 text-white' :
                                             alert.severity === 'warning'
                                             ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
@@ -789,7 +801,8 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert }) {
                                 </div>
                               </CardContent>
                             </Card>
-                          ))}
+                            )
+                          })}
                         </div>
                       ) : (
                         <div className="p-6">

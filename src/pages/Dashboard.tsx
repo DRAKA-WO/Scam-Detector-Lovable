@@ -3390,7 +3390,6 @@ function Dashboard() {
                     isRestoringScroll.current = true
                     setSelectedScan(null)
                   }}
-                  onReportScam={() => {}}
                 />
               </div>
             ) : (

@@ -55,7 +55,6 @@ export function getUserFriendlyError(errorMessage, context = '') {
     image: 'Failed to analyze the image. Please try again.',
     url: 'Failed to analyze the website. Please try again.',
     text: 'Failed to analyze the text. Please try again.',
-    report: 'Failed to submit the report. Please try again.',
   }
 
   return contextMessages[context] || GENERIC_ERROR_MESSAGE

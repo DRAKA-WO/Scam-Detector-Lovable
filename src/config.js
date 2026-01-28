@@ -7,6 +7,6 @@ export const API_ENDPOINTS = {
   analyze: `${API_BASE_URL}/api/analyze`,
   analyzeUrl: `${API_BASE_URL}/api/analyze-url`,
   analyzeText: `${API_BASE_URL}/api/analyze-text`,
-  report: `${API_BASE_URL}/api/report`,
+  learnMore: `${API_BASE_URL}/api/learn-more`,
   health: `${API_BASE_URL}/api/health`,
 };
