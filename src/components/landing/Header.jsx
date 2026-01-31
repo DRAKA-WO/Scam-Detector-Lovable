@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown, Sparkles, PlayCircle, HelpCircle, MessageCircle, Zap, User, Settings, Gift, Mail, LogOut, Bell, AlertTriangle, X, Download } from "lucide-react"
+import { ChevronDown, Sparkles, PlayCircle, HelpCircle, MessageCircle, Zap, User, Settings, History, BookOpen, Mail, LogOut, Bell, AlertTriangle, X, Download } from "lucide-react"
 import { supabase } from '@/integrations/supabase/client'
 import { clearExtensionSession } from '@/utils/extensionSync'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -903,16 +903,23 @@ function Header({ alerts: propsAlerts, onDismissAlert: propsOnDismissAlert, back
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                        <a href="/pricing" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
-                          <Zap className="h-4 w-4 text-blue-400" />
-                          <span className="text-gray-200 text-sm">Upgrade your plan</span>
+                        <a href="/dashboard#scan-history-section" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
+                          <History className="h-4 w-4 text-yellow-400" />
+                          <span className="text-gray-200 text-sm">My Scan history</span>
                         </a>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
-                        <a href="/refer" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
-                          <Gift className="h-4 w-4 text-green-400" />
-                          <span className="text-gray-200 text-sm">Refer and earn</span>
+                        <a href="/dashboard#unlocked-scam-learning" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
+                          <BookOpen className="h-4 w-4 text-purple-400" />
+                          <span className="text-gray-200 text-sm">My Scam Library</span>
+                        </a>
+                      </DropdownMenuItem>
+                      
+                      <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
+                        <a href="/pricing" className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-md transition-all duration-300 hover:scale-105 w-full">
+                          <Zap className="h-4 w-4 text-blue-400" />
+                          <span className="text-gray-200 text-sm">Upgrade your plan</span>
                         </a>
                       </DropdownMenuItem>
                       

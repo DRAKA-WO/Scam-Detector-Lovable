@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { syncSessionToExtension, initializeExtensionSync } from "./utils/extensionSync";
@@ -13,6 +13,8 @@ import Dashboard from "./pages/Dashboard";
 import Business from "./pages/Business";
 import ExtensionAuth from "./pages/ExtensionAuth";
 import Pricing from "./pages/Pricing";
+import CheckEmail from "./pages/CheckEmail";
+import VerifyEmail from "./pages/VerifyEmail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -473,6 +475,21 @@ const OAuthCallback = () => {
   );
 };
 
+// If user lands on / with auth tokens in hash (e.g. old email confirmation link), send to callback
+const AuthHashRedirect = () => {
+  const location = useLocation();
+  useEffect(() => {
+    if (location.pathname !== '/' || !location.hash) return;
+    const hashParams = new URLSearchParams(location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    if (accessToken || type === 'signup' || type === 'recovery') {
+      window.location.replace(`/auth/callback${location.hash}`);
+    }
+  }, [location.pathname, location.hash]);
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -480,6 +497,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AuthHashRedirect />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/results" element={<DetectorPage />} />
@@ -488,6 +506,8 @@ const App = () => (
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/extension-auth" element={<ExtensionAuth />} />
             <Route path="/auth/callback" element={<OAuthCallback />} />
+            <Route path="/checkemail" element={<CheckEmail />} />
+            <Route path="/verifyemail" element={<VerifyEmail />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

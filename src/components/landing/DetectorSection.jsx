@@ -27,6 +27,8 @@ import { saveScanToHistory, uploadScanImage } from '../../utils/scanHistory'
 // Supabase import removed - will be loaded dynamically to avoid build errors
 
 const PENDING_SCAN_KEY = 'scam_checker_pending_scan'
+const ANALYSIS_TIMEOUT_MS = 20000 // Show timeout message and refund if analysis takes longer
+const ANALYSIS_TIMEOUT_MESSAGE = "It seems like it's taking so much longer.\n\n✅ Your check has been refunded. You can try again."
 
 function DetectorSection() {
   const [activeTab, setActiveTab] = useState('image')
@@ -48,6 +50,8 @@ function DetectorSection() {
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
   const { ref: cardRef, isVisible: cardVisible } = useScrollAnimation()
   const resultSectionRef = useRef(null)
+  const analysisTimeoutRef = useRef(null)
+  const analysisTimedOutRef = useRef(false)
 
   // Check authentication status on mount and when it changes
   useEffect(() => {
@@ -320,7 +324,6 @@ function DetectorSection() {
 
   const handleImageUpload = async (file) => {
     console.log('📸 handleImageUpload called')
-    // Check BEFORE using check - if no checks remaining, show modal and block
     if (!checkAndShowSignup()) {
       console.log('⛔ Analysis blocked - signup required')
       return
@@ -331,30 +334,55 @@ function DetectorSection() {
     setText(null)
     setResult(null)
     setError(null)
-    setLoading(true)
+
+    if (isLoggedIn && userId) {
+      await useUserCheck(userId)
+      const after = getRemainingUserChecks(userId)
+      setRemainingChecks(after)
+      window.dispatchEvent(new Event('checksUpdated'))
+    } else {
+      useFreeCheck()
+      const after = getRemainingFreeChecks()
+      setRemainingChecks(after)
+      window.dispatchEvent(new Event('checksUpdated'))
+    }
+
+    const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
+    const isLastFreeCheck = !isLoggedIn && checksAfter === 0
+
+    if (isLastFreeCheck) {
+      setLoading(true)
+    } else {
+      navigate('/results', { state: { analyzing: true, activeTab: 'image' } })
+    }
+
+    analysisTimedOutRef.current = false
+    analysisTimeoutRef.current = setTimeout(async () => {
+      analysisTimeoutRef.current = null
+      analysisTimedOutRef.current = true
+      let refunded = false
+      if (isLoggedIn && userId) {
+        refunded = await refundUserCheck(userId)
+        if (refunded) {
+          setRemainingChecks(getRemainingUserChecks(userId))
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      } else {
+        refunded = refundFreeCheck()
+        if (refunded) {
+          setRemainingChecks(getRemainingFreeChecks())
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      }
+      if (isLastFreeCheck) {
+        setError(ANALYSIS_TIMEOUT_MESSAGE)
+        setLoading(false)
+      } else {
+        navigate('/results', { state: { result: null, error: ANALYSIS_TIMEOUT_MESSAGE, activeTab: 'image' }, replace: true })
+      }
+    }, ANALYSIS_TIMEOUT_MS)
 
     try {
-      // Use a check (user check if logged in, free check if not)
-      if (isLoggedIn && userId) {
-        const before = getRemainingUserChecks(userId)
-        console.log(`💳 Before using user check: ${before}`)
-        await useUserCheck(userId)
-        const after = getRemainingUserChecks(userId)
-        console.log(`💳 After using user check: ${after}`)
-        setRemainingChecks(after)
-        // Notify header and extension to update
-        window.dispatchEvent(new Event('checksUpdated'))
-      } else {
-        const before = getRemainingFreeChecks()
-        console.log(`💳 Before using free check: ${before}`)
-        useFreeCheck()
-        const after = getRemainingFreeChecks()
-        console.log(`💳 After using free check: ${after}`)
-        setRemainingChecks(after)
-        // Notify header and extension to update
-        window.dispatchEvent(new Event('checksUpdated'))
-      }
-
       const formData = new FormData()
       formData.append('image', file)
       const response = await fetch(API_ENDPOINTS.analyze, {
@@ -366,66 +394,40 @@ function DetectorSection() {
         throw new Error(errorMessage)
       }
       const data = await response.json()
-      
-      // Check if this was the last free check for anonymous user
-      const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
-      const isLastFreeCheck = !isLoggedIn && checksAfter === 0
-      
-      console.log('🔍 After image analysis:', { isLoggedIn, checksAfter, isLastFreeCheck });
-      
+
+      clearTimeout(analysisTimeoutRef.current)
+      analysisTimeoutRef.current = null
+      if (analysisTimedOutRef.current) return
+
       if (isLastFreeCheck) {
-        console.log('🎯 LAST FREE CHECK DETECTED - Storing pending scan and showing preview');
-        
-        // Store this scan for after signup (await since it's async now)
         await storePendingScan('image', file, null, null, data.classification, data)
-        
-        // Show blurred preview and signup modal (only for anonymous users)
         setResult(data)
         setShowBlurredPreview(true)
         if (!isLoggedIn) {
-        setShowSignupModal(true)
-        console.log('✅ Blurred preview and signup modal should now be visible');
+          setShowSignupModal(true)
+          console.log('✅ Blurred preview and signup modal should now be visible')
         }
-      } else {
-        console.log('ℹ️ Normal flow - not last free check');
-        // Normal flow - show full result
-        setResult(data)
-        // FIX: Stop loading immediately so result shows without delay
         setLoading(false)
-        
-        // Save to history if logged in (in background, don't block UI)
+      } else {
         if (isLoggedIn && userId && data) {
-          // Don't await - save in background so it doesn't block showing the result
-          (async () => {
-            try {
-              // Upload image to Supabase Storage
-              const imageUrl = await uploadScanImage(file, userId)
-              
-              // Save scan to history (stats auto-incremented in Supabase)
-              await saveScanToHistory(
-                userId,
-                'image',
-                imageUrl,
-                null, // No content preview for images
-                data.classification,
-                data
-              )
-              console.log('✅ Scan saved to history')
-            } catch (error) {
-              console.error('❌ Error saving scan to history:', error)
-              // Show user-friendly error notification
-              if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-                console.warn('⚠️ Network error - scan will be retried automatically')
-              } else {
-                console.error('❌ Failed to save scan - it may not appear in history:', error.message)
-              }
-              // Don't block the user if history save fails - retry logic will handle it
+          try {
+            const imageUrl = await uploadScanImage(file, userId)
+            const savedScan = await saveScanToHistory(userId, 'image', imageUrl, null, data.classification, data)
+            if (savedScan?.id) {
+              const scanForUI = { ...savedScan, created_at: savedScan.created_at || new Date().toISOString(), classification: savedScan.classification || data.classification, scan_type: savedScan.scan_type || 'image', content_preview: savedScan.content_preview || null, analysis_result: savedScan.analysis_result || data }
+              window.dispatchEvent(new CustomEvent('scanSaved', { detail: scanForUI }))
+              if (typeof window !== 'undefined') sessionStorage.setItem('lastSavedScan', JSON.stringify(scanForUI))
             }
-          })()
+          } catch (saveErr) {
+            console.error('❌ Error saving scan to history:', saveErr)
+          }
         }
+        navigate('/results', { state: { result: data, error: null, activeTab: 'image' }, replace: true })
       }
     } catch (err) {
-      // IMPORTANT: Refund the check since API call failed
+      clearTimeout(analysisTimeoutRef.current)
+      analysisTimeoutRef.current = null
+      if (analysisTimedOutRef.current) return
       let refunded = false
       if (isLoggedIn && userId) {
         refunded = await refundUserCheck(userId)
@@ -440,21 +442,19 @@ function DetectorSection() {
           window.dispatchEvent(new Event('checksUpdated'))
         }
       }
-      
-      // Add refund message to error if check was refunded
       let errorMessage = getUserFriendlyError(err.message, 'image')
-      if (refunded) {
-        errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      if (refunded) errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      if (isLastFreeCheck) {
+        setError(errorMessage)
+        setLoading(false)
+      } else {
+        navigate('/results', { state: { result: null, error: errorMessage, activeTab: 'image' }, replace: true })
       }
-      
-      setError(errorMessage)
-      setLoading(false)
     }
   }
 
   const handleUrlAnalyze = async (urlToAnalyze) => {
     console.log('🔗 handleUrlAnalyze called')
-    // Check BEFORE using check - if no checks remaining, show modal and block
     if (!checkAndShowSignup()) {
       console.log('⛔ Analysis blocked - signup required')
       return
@@ -465,30 +465,55 @@ function DetectorSection() {
     setText(null)
     setResult(null)
     setError(null)
-    setLoading(true)
+
+    if (isLoggedIn && userId) {
+      await useUserCheck(userId)
+      const after = getRemainingUserChecks(userId)
+      setRemainingChecks(after)
+      window.dispatchEvent(new Event('checksUpdated'))
+    } else {
+      useFreeCheck()
+      const after = getRemainingFreeChecks()
+      setRemainingChecks(after)
+      window.dispatchEvent(new Event('checksUpdated'))
+    }
+
+    const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
+    const isLastFreeCheck = !isLoggedIn && checksAfter === 0
+
+    if (isLastFreeCheck) {
+      setLoading(true)
+    } else {
+      navigate('/results', { state: { analyzing: true, activeTab: 'url' } })
+    }
+
+    analysisTimedOutRef.current = false
+    analysisTimeoutRef.current = setTimeout(async () => {
+      analysisTimeoutRef.current = null
+      analysisTimedOutRef.current = true
+      let refunded = false
+      if (isLoggedIn && userId) {
+        refunded = await refundUserCheck(userId)
+        if (refunded) {
+          setRemainingChecks(getRemainingUserChecks(userId))
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      } else {
+        refunded = refundFreeCheck()
+        if (refunded) {
+          setRemainingChecks(getRemainingFreeChecks())
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      }
+      if (isLastFreeCheck) {
+        setError(ANALYSIS_TIMEOUT_MESSAGE)
+        setLoading(false)
+      } else {
+        navigate('/results', { state: { result: null, error: ANALYSIS_TIMEOUT_MESSAGE, activeTab: 'url' }, replace: true })
+      }
+    }, ANALYSIS_TIMEOUT_MS)
 
     try {
-      // Use a check (user check if logged in, free check if not)
-      if (isLoggedIn && userId) {
-        const before = getRemainingUserChecks(userId)
-        console.log(`💳 Before using user check: ${before}`)
-        await useUserCheck(userId)
-        const after = getRemainingUserChecks(userId)
-        console.log(`💳 After using user check: ${after}`)
-        setRemainingChecks(after)
-        // Notify header to update
-        window.dispatchEvent(new Event('checksUpdated'))
-      } else {
-        const before = getRemainingFreeChecks()
-        console.log(`💳 Before using free check: ${before}`)
-        useFreeCheck()
-        const after = getRemainingFreeChecks()
-        console.log(`💳 After using free check: ${after}`)
-        setRemainingChecks(after)
-        // Notify header to update
-        window.dispatchEvent(new Event('checksUpdated'))
-      }
-
       const response = await fetch(API_ENDPOINTS.analyzeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -499,64 +524,41 @@ function DetectorSection() {
         throw new Error(errorMessage)
       }
       const data = await response.json()
-      
-      // Check if this was the last free check for anonymous user
-      const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
-      const isLastFreeCheck = !isLoggedIn && checksAfter === 0
-      
+
+      clearTimeout(analysisTimeoutRef.current)
+      analysisTimeoutRef.current = null
+      if (analysisTimedOutRef.current) return
+
       if (isLastFreeCheck) {
-        // Create preview for storage
         const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
-        
-        // Store this scan for after signup (await since it's async now)
         await storePendingScan('url', null, null, contentPreview, data.classification, data)
-        
-        // Show blurred preview and signup modal (only for anonymous users)
         setResult(data)
         setShowBlurredPreview(true)
         if (!isLoggedIn) {
-        setShowSignupModal(true)
-        console.log('🎯 Last free check used - showing blurred preview and signup modal')
+          setShowSignupModal(true)
+          console.log('🎯 Last free check used - showing blurred preview and signup modal')
         }
-      } else {
-        // Normal flow - show full result
-        setResult(data)
-        // FIX: Stop loading immediately so result shows without delay
         setLoading(false)
-        
-        // Save to history if logged in (in background, don't block UI)
+      } else {
         if (isLoggedIn && userId && data) {
-          // Don't await - save in background so it doesn't block showing the result
-          (async () => {
-            try {
-              // Create preview (first 200 chars of URL)
-              const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
-              
-              // Save scan to history (stats auto-incremented in Supabase)
-              await saveScanToHistory(
-                userId,
-                'url',
-                null, // No image for URL scans
-                contentPreview,
-                data.classification,
-                data
-              )
-              console.log('✅ Scan saved to history')
-            } catch (error) {
-              console.error('❌ Error saving scan to history:', error)
-              // Show user-friendly error notification
-              if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-                console.warn('⚠️ Network error - scan will be retried automatically')
-              } else {
-                console.error('❌ Failed to save scan - it may not appear in history:', error.message)
-              }
-              // Don't block the user if history save fails - retry logic will handle it
+          try {
+            const contentPreview = urlToAnalyze.length > 200 ? urlToAnalyze.substring(0, 200) + '...' : urlToAnalyze
+            const savedScan = await saveScanToHistory(userId, 'url', null, contentPreview, data.classification, data)
+            if (savedScan?.id) {
+              const scanForUI = { ...savedScan, created_at: savedScan.created_at || new Date().toISOString(), classification: savedScan.classification || data.classification, scan_type: savedScan.scan_type || 'url', content_preview: savedScan.content_preview || contentPreview, analysis_result: savedScan.analysis_result || data }
+              window.dispatchEvent(new CustomEvent('scanSaved', { detail: scanForUI }))
+              if (typeof window !== 'undefined') sessionStorage.setItem('lastSavedScan', JSON.stringify(scanForUI))
             }
-          })()
+          } catch (saveErr) {
+            console.error('❌ Error saving scan to history:', saveErr)
+          }
         }
+        navigate('/results', { state: { result: data, error: null, activeTab: 'url' }, replace: true })
       }
     } catch (err) {
-      // IMPORTANT: Refund the check since API call failed
+      clearTimeout(analysisTimeoutRef.current)
+      analysisTimeoutRef.current = null
+      if (analysisTimedOutRef.current) return
       let refunded = false
       if (isLoggedIn && userId) {
         refunded = await refundUserCheck(userId)
@@ -571,21 +573,19 @@ function DetectorSection() {
           window.dispatchEvent(new Event('checksUpdated'))
         }
       }
-      
-      // Add refund message to error if check was refunded
       let errorMessage = getUserFriendlyError(err.message, 'url')
-      if (refunded) {
-        errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      if (refunded) errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      if (isLastFreeCheck) {
+        setError(errorMessage)
+        setLoading(false)
+      } else {
+        navigate('/results', { state: { result: null, error: errorMessage, activeTab: 'url' }, replace: true })
       }
-      
-      setError(errorMessage)
-      setLoading(false)
     }
   }
 
   const handleTextAnalyze = async (textContent) => {
     console.log('📝 handleTextAnalyze called')
-    // Check BEFORE using check - if no checks remaining, show modal and block
     if (!checkAndShowSignup()) {
       console.log('⛔ Analysis blocked - signup required')
       return
@@ -596,147 +596,32 @@ function DetectorSection() {
     setUrl(null)
     setResult(null)
     setError(null)
-    setLoading(true)
 
-    try {
-      // Use a check (user check if logged in, free check if not)
-      if (isLoggedIn && userId) {
-        const before = getRemainingUserChecks(userId)
-        console.log(`💳 Before using user check: ${before}`)
-        await useUserCheck(userId)
-        const after = getRemainingUserChecks(userId)
-        console.log(`💳 After using user check: ${after}`)
-        setRemainingChecks(after)
-        // Notify header to update
-        window.dispatchEvent(new Event('checksUpdated'))
-      } else {
-        const before = getRemainingFreeChecks()
-        console.log(`💳 Before using free check: ${before}`)
-        useFreeCheck()
-        const after = getRemainingFreeChecks()
-        console.log(`💳 After using free check: ${after}`)
-        setRemainingChecks(after)
-        // Notify header to update
-        window.dispatchEvent(new Event('checksUpdated'))
-      }
+    if (isLoggedIn && userId) {
+      await useUserCheck(userId)
+      const after = getRemainingUserChecks(userId)
+      setRemainingChecks(after)
+      window.dispatchEvent(new Event('checksUpdated'))
+    } else {
+      useFreeCheck()
+      const after = getRemainingFreeChecks()
+      setRemainingChecks(after)
+      window.dispatchEvent(new Event('checksUpdated'))
+    }
 
-      const response = await fetch(API_ENDPOINTS.analyzeText, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textContent }),
-      })
-      if (!response.ok) {
-        const errorMessage = await handleApiError(response, 'text')
-        throw new Error(errorMessage)
-      }
-      const data = await response.json()
-      
-      // Check if this was the last free check for anonymous user
-      const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
-      const isLastFreeCheck = !isLoggedIn && checksAfter === 0
-      
-      if (isLastFreeCheck) {
-        // Save preview text (first 1000 chars) - full text stored in analysis_result
-        const PREVIEW_LENGTH = 1000 // Reasonable preview size to prevent timeout
-        const contentPreview = textContent.length > PREVIEW_LENGTH 
-          ? textContent.substring(0, PREVIEW_LENGTH) + '...' 
-          : textContent
-        
-        // Store this scan for after signup (await since it's async now)
-        await storePendingScan('text', null, null, contentPreview, data.classification, data)
-        
-        // Show blurred preview and signup modal (only for anonymous users)
-        setResult(data)
-        setShowBlurredPreview(true)
-        if (!isLoggedIn) {
-        setShowSignupModal(true)
-        console.log('🎯 Last free check used - showing blurred preview and signup modal')
-        }
-      } else {
-        // Normal flow - show full result
-        setResult(data)
-        // FIX: Stop loading immediately so result shows without delay
-        setLoading(false)
-        
-        // Save to history if logged in (in background, don't block UI)
-        if (isLoggedIn && userId && data) {
-          // Don't await - save in background so it doesn't block showing the result
-          (async () => {
-            try {
-              // Save preview text (first 1000 chars) - full text stored in analysis_result
-              // This prevents timeout issues with large text inserts
-              const PREVIEW_LENGTH = 1000 // Reasonable preview size to prevent timeout
-              const contentPreview = textContent.length > PREVIEW_LENGTH 
-                ? textContent.substring(0, PREVIEW_LENGTH) + '...' 
-                : textContent
-              
-              // Save scan to history (stats auto-incremented in Supabase)
-              try {
-                const savedScan = await saveScanToHistory(
-                  userId,
-                  'text',
-                  null, // No image for text scans
-                  contentPreview,
-                  data.classification,
-                  data
-                )
-                
-                if (savedScan && savedScan.id) {
-                  // Ensure the scan has all required fields for the UI
-                  const scanForUI = {
-                    ...savedScan,
-                    created_at: savedScan.created_at || new Date().toISOString(),
-                    classification: savedScan.classification || data.classification,
-                    scan_type: savedScan.scan_type || 'text',
-                    content_preview: savedScan.content_preview || contentPreview,
-                    analysis_result: savedScan.analysis_result || data
-                  }
-                  
-                  // Trigger stats refresh immediately with complete scan data
-                  window.dispatchEvent(new CustomEvent('scanSaved', { detail: scanForUI }))
-                  
-                  // Also store in sessionStorage as backup in case event is missed
-                  if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('lastSavedScan', JSON.stringify(scanForUI))
-                  }
-                } else {
-                  // Still trigger refresh to try to get the scan from database
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('scanSaved', { detail: null }))
-                  }, 1000)
-                }
-              } catch (saveError) {
-                console.error('❌ Error saving scan to history:', saveError)
-                // Still trigger refresh to try to get the scan from database
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('scanSaved', { detail: null }))
-                }, 2000)
-              }
-            } catch (error) {
-              console.error('❌ Error saving scan to history:', error)
-              console.error('❌ Full error object:', JSON.stringify(error, null, 2))
-              
-              // Show user-friendly error notification
-              if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-                console.warn('⚠️ Network error - scan will be retried automatically')
-              } else if (error.message?.includes('constraint') || error.message?.includes('check_content_preview_length')) {
-                console.error('❌ Database constraint error - migration may not have been run!')
-                alert('⚠️ Error saving scan: Database constraint violation. Please run the migration to fix this.')
-              } else if (error.code === '23514' || error.code === 'PGRST116') {
-                console.error('❌ Database constraint violation:', error.message)
-                alert('⚠️ Error saving scan: Content too long. Please contact support.')
-              } else {
-                console.error('❌ Failed to save scan - it may not appear in history:', error.message)
-                // Show error to user so they know something went wrong
-                console.warn('⚠️ Scan may not appear in history. Error:', error.message)
-              }
-              // Don't block the user if history save fails - retry logic will handle it
-            }
-          })()
-        }
-      }
-    } catch (err) {
-      // IMPORTANT: Refund the check since API call failed
+    const checksAfter = isLoggedIn ? getRemainingUserChecks(userId) : getRemainingFreeChecks()
+    const isLastFreeCheck = !isLoggedIn && checksAfter === 0
+
+    if (isLastFreeCheck) {
+      setLoading(true)
+    } else {
+      navigate('/results', { state: { analyzing: true, activeTab: 'text' } })
+    }
+
+    analysisTimedOutRef.current = false
+    analysisTimeoutRef.current = setTimeout(async () => {
+      analysisTimeoutRef.current = null
+      analysisTimedOutRef.current = true
       let refunded = false
       if (isLoggedIn && userId) {
         refunded = await refundUserCheck(userId)
@@ -751,15 +636,84 @@ function DetectorSection() {
           window.dispatchEvent(new Event('checksUpdated'))
         }
       }
-      
-      // Add refund message to error if check was refunded
-      let errorMessage = getUserFriendlyError(err.message, 'text')
-      if (refunded) {
-        errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      if (isLastFreeCheck) {
+        setError(ANALYSIS_TIMEOUT_MESSAGE)
+        setLoading(false)
+      } else {
+        navigate('/results', { state: { result: null, error: ANALYSIS_TIMEOUT_MESSAGE, activeTab: 'text' }, replace: true })
       }
-      
-      setError(errorMessage)
-      setLoading(false)
+    }, ANALYSIS_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(API_ENDPOINTS.analyzeText, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textContent }),
+      })
+      if (!response.ok) {
+        const errorMessage = await handleApiError(response, 'text')
+        throw new Error(errorMessage)
+      }
+      const data = await response.json()
+
+      clearTimeout(analysisTimeoutRef.current)
+      analysisTimeoutRef.current = null
+      if (analysisTimedOutRef.current) return
+
+      if (isLastFreeCheck) {
+        const PREVIEW_LENGTH = 1000
+        const contentPreview = textContent.length > PREVIEW_LENGTH ? textContent.substring(0, PREVIEW_LENGTH) + '...' : textContent
+        await storePendingScan('text', null, null, contentPreview, data.classification, data)
+        setResult(data)
+        setShowBlurredPreview(true)
+        if (!isLoggedIn) {
+          setShowSignupModal(true)
+          console.log('🎯 Last free check used - showing blurred preview and signup modal')
+        }
+        setLoading(false)
+      } else {
+        if (isLoggedIn && userId && data) {
+          try {
+            const PREVIEW_LENGTH = 1000
+            const contentPreview = textContent.length > PREVIEW_LENGTH ? textContent.substring(0, PREVIEW_LENGTH) + '...' : textContent
+            const savedScan = await saveScanToHistory(userId, 'text', null, contentPreview, data.classification, data)
+            if (savedScan?.id) {
+              const scanForUI = { ...savedScan, created_at: savedScan.created_at || new Date().toISOString(), classification: savedScan.classification || data.classification, scan_type: savedScan.scan_type || 'text', content_preview: savedScan.content_preview || contentPreview, analysis_result: savedScan.analysis_result || data }
+              window.dispatchEvent(new CustomEvent('scanSaved', { detail: scanForUI }))
+              if (typeof window !== 'undefined') sessionStorage.setItem('lastSavedScan', JSON.stringify(scanForUI))
+            }
+          } catch (saveErr) {
+            console.error('❌ Error saving scan to history:', saveErr)
+          }
+        }
+        navigate('/results', { state: { result: data, error: null, activeTab: 'text' }, replace: true })
+      }
+    } catch (err) {
+      clearTimeout(analysisTimeoutRef.current)
+      analysisTimeoutRef.current = null
+      if (analysisTimedOutRef.current) return
+      let refunded = false
+      if (isLoggedIn && userId) {
+        refunded = await refundUserCheck(userId)
+        if (refunded) {
+          setRemainingChecks(getRemainingUserChecks(userId))
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      } else {
+        refunded = refundFreeCheck()
+        if (refunded) {
+          setRemainingChecks(getRemainingFreeChecks())
+          window.dispatchEvent(new Event('checksUpdated'))
+        }
+      }
+      let errorMessage = getUserFriendlyError(err.message, 'text')
+      if (refunded) errorMessage = `${errorMessage}\n\n✅ Your check has been refunded. You can try again.`
+      if (isLastFreeCheck) {
+        setError(errorMessage)
+        setLoading(false)
+      } else {
+        navigate('/results', { state: { result: null, error: errorMessage, activeTab: 'text' }, replace: true })
+      }
     }
   }
 

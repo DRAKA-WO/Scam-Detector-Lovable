@@ -128,7 +128,7 @@ function saveCachedUrls(urlMap) {
   }
 }
 
-function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', onFilterChange, scans: externalScans, initialDateRange, savedScrollPosition, onScrollRestored }) {
+function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', onFilterChange, initialScamTypeFilter = 'all', onScamTypeFilterChange, scans: externalScans, initialDateRange, onDateRangeChange, savedScrollPosition, onScrollRestored }) {
   // Initialize with externalScans if provided to prevent empty flash
   const [scans, setScans] = useState(externalScans || [])
   const [loading, setLoading] = useState(externalScans && externalScans.length > 0 ? false : true)
@@ -138,7 +138,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   const [previewText, setPreviewText] = useState(null) // For text preview modal: {content: string, scanId: string} | null
   const [searchQuery, setSearchQuery] = useState('') // Search query
   const [dateRange, setDateRange] = useState(initialDateRange || '30') // '0' (today), '7' (last 7 days), '30' (last 30 days)
-  const [scamTypeFilter, setScamTypeFilter] = useState('all') // Filter by scam type
+  const [scamTypeFilter, setScamTypeFilter] = useState(initialScamTypeFilter) // Filter by scam type (lifted so "Back to history" restores it)
   const [isScamTypeDropdownOpen, setIsScamTypeDropdownOpen] = useState(false) // State for custom dropdown
   const scrollContainerRef = useRef(null) // Ref for the scrollable container
   const isRestoringScroll = useRef(false) // Flag to prevent scroll reset during restoration
@@ -150,6 +150,13 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       setFilterClassification(initialFilter)
     }
   }, [initialFilter])
+
+  // Sync scam type filter when initialScamTypeFilter changes (e.g. restored after "Back to history")
+  useEffect(() => {
+    if (initialScamTypeFilter !== undefined && initialScamTypeFilter !== scamTypeFilter) {
+      setScamTypeFilter(initialScamTypeFilter)
+    }
+  }, [initialScamTypeFilter])
 
   // Track the last applied initialDateRange to prevent resetting on refresh
   const lastAppliedInitialDateRange = useRef(null)
@@ -211,16 +218,55 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
   useEffect(() => {
     if (initialDateRange !== undefined && initialDateRange !== null) {
       // Only apply if it's a new value (different from what we last applied)
-      // This prevents resetting when component re-renders with the same prop value
-      if (initialDateRange !== lastAppliedInitialDateRange.current) {
+      const prevApplied = lastAppliedInitialDateRange.current
+      if (initialDateRange !== prevApplied) {
         setDateRange(initialDateRange)
         lastAppliedInitialDateRange.current = initialDateRange
+        onDateRangeChange?.(initialDateRange)
+        // Only reset scam type when date range was explicitly changed (e.g. stat card click), not on first mount (e.g. "Back to history")
+        if (prevApplied !== null) {
+          setScamTypeFilter('all')
+          onScamTypeFilterChange?.('all')
+        }
       }
     } else {
       // If initialDateRange becomes null/undefined, reset the ref so it can be applied again
       lastAppliedInitialDateRange.current = null
     }
-  }, [initialDateRange])
+  }, [initialDateRange, onDateRangeChange])
+
+  // Reset scam type filter when selected type is not in current date range (e.g. switched from 30 days to Today)
+  useEffect(() => {
+    if (scamTypeFilter === 'all') return
+    const now = new Date()
+    const daysAgo = parseInt(dateRange, 10)
+    const isTodayFilter = daysAgo === 0
+    const todayLocalDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const inRange = scans.filter(scan => {
+      if (!scan.created_at) return false
+      const scanDate = new Date(scan.created_at)
+      if (isNaN(scanDate.getTime())) return false
+      if (isTodayFilter) {
+        const scanLocalDateStr = `${scanDate.getFullYear()}-${String(scanDate.getMonth() + 1).padStart(2, '0')}-${String(scanDate.getDate()).padStart(2, '0')}`
+        return scanLocalDateStr === todayLocalDateStr
+      }
+      const cutoffDate = new Date(now)
+      cutoffDate.setDate(now.getDate() - daysAgo)
+      cutoffDate.setHours(0, 0, 0, 0)
+      const scanDateStart = new Date(scanDate)
+      scanDateStart.setHours(0, 0, 0, 0)
+      return scanDateStart >= cutoffDate
+    })
+    const typesInRange = [...new Set(
+      inRange
+        .filter(scan => scan.classification === 'scam' && scan.analysis_result?.scam_type)
+        .map(scan => normalizeScamType(scan.analysis_result.scam_type))
+    )]
+    if (!typesInRange.includes(scamTypeFilter)) {
+      setScamTypeFilter('all')
+      onScamTypeFilterChange?.('all')
+    }
+  }, [dateRange, scans, scamTypeFilter])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -372,6 +418,16 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
     }
   }
 
+  /** Left accent bar color by classification for card separation */
+  const getClassificationBar = (classification) => {
+    switch (classification) {
+      case 'scam': return 'bg-red-500'
+      case 'suspicious': return 'bg-amber-500'
+      case 'safe': return 'bg-emerald-500'
+      default: return 'bg-zinc-500'
+    }
+  }
+
   const getScanTypeIcon = (scanType) => {
     switch (scanType) {
       case 'image':
@@ -421,64 +477,69 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
 
   if (scans.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground text-center">
-            No scans yet. Start analyzing content to see your history!
-          </p>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
+        <p className="text-muted-foreground">
+          No scans yet. Start analyzing content to see your history!
+        </p>
+      </div>
     )
   }
 
-  // Get unique scam types for filter dropdown (normalized to group similar types)
+  // Filter scans based on selected classification, date range, search, and scam type
+  const now = new Date()
+  const daysAgo = parseInt(dateRange, 10)
+  const isTodayFilter = daysAgo === 0
+  const todayLocalDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+  // Scans in current date range only (used for scam type dropdown so it matches the date filter)
+  const scansInDateRange = scans.filter(scan => {
+    if (!scan.created_at) return false
+    const scanDate = new Date(scan.created_at)
+    if (isNaN(scanDate.getTime())) return false
+    if (isTodayFilter) {
+      const scanLocalDateStr = `${scanDate.getFullYear()}-${String(scanDate.getMonth() + 1).padStart(2, '0')}-${String(scanDate.getDate()).padStart(2, '0')}`
+      if (scanLocalDateStr !== todayLocalDateStr) return false
+    } else {
+      const cutoffDate = new Date(now)
+      cutoffDate.setDate(now.getDate() - daysAgo)
+      cutoffDate.setHours(0, 0, 0, 0)
+      const scanDateStart = new Date(scanDate)
+      scanDateStart.setHours(0, 0, 0, 0)
+      if (scanDateStart < cutoffDate) return false
+    }
+    return true
+  })
+
+  // Get unique scam types for filter dropdown from scans IN CURRENT DATE RANGE (not all scans)
   const uniqueScamTypes = [...new Set(
-    scans
+    scansInDateRange
       .filter(scan => scan.classification === 'scam' && scan.analysis_result?.scam_type)
       .map(scan => normalizeScamType(scan.analysis_result.scam_type))
   )].sort()
 
-  // Filter scans based on selected classification, date range, search, and scam type
   let filteredScans = scans.filter(scan => {
     // Classification filter
     if (filterClassification !== 'all' && scan.classification !== filterClassification) {
       return false
     }
 
-    // Date range filter
+    // Date range filter - require valid created_at
+    if (!scan.created_at) return false
     const scanDate = new Date(scan.created_at)
-    const now = new Date()
-    const daysAgo = parseInt(dateRange)
-    
-    if (daysAgo === 0) {
-      // Today filter - compare local date strings
-      const scanLocalYear = scanDate.getFullYear()
-      const scanLocalMonth = scanDate.getMonth()
-      const scanLocalDate = scanDate.getDate()
-      const scanLocalDateStr = `${scanLocalYear}-${String(scanLocalMonth + 1).padStart(2, '0')}-${String(scanLocalDate).padStart(2, '0')}`
-      
-      const todayLocalYear = now.getFullYear()
-      const todayLocalMonth = now.getMonth()
-      const todayLocalDate = now.getDate()
-      const todayLocalDateStr = `${todayLocalYear}-${String(todayLocalMonth + 1).padStart(2, '0')}-${String(todayLocalDate).padStart(2, '0')}`
-      
-      if (scanLocalDateStr !== todayLocalDateStr) {
-        return false
-      }
+    if (isNaN(scanDate.getTime())) return false
+
+    if (isTodayFilter) {
+      // Today: same calendar day in user's local timezone
+      const scanLocalDateStr = `${scanDate.getFullYear()}-${String(scanDate.getMonth() + 1).padStart(2, '0')}-${String(scanDate.getDate()).padStart(2, '0')}`
+      if (scanLocalDateStr !== todayLocalDateStr) return false
     } else {
-      // Last N days filter
-      // Set cutoff date to start of day (00:00:00) for accurate comparison
+      // Last N days: scan on or after (now - N days) at start of day
       const cutoffDate = new Date(now)
       cutoffDate.setDate(now.getDate() - daysAgo)
       cutoffDate.setHours(0, 0, 0, 0)
-      
-      // Set scan date to start of day for comparison
       const scanDateStart = new Date(scanDate)
       scanDateStart.setHours(0, 0, 0, 0)
-      
-      if (scanDateStart < cutoffDate) {
-        return false
-      }
+      if (scanDateStart < cutoffDate) return false
     }
 
     // Scam type filter (only applies to scam classification) - use normalized types
@@ -513,34 +574,37 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
       <div className="space-y-4 mb-4">
         {/* Search and Date Range Row */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search Input */}
           <div className="flex-1 relative">
             <Input
               type="text"
               placeholder="Search scans (content, URL, type...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-9 h-8 text-sm px-3"
+              className="pr-9 h-9 text-sm px-3 rounded-lg border-border bg-input/80 focus:ring-2 focus:ring-primary/30"
               style={{
                 backgroundColor: 'hsl(var(--input))',
                 color: 'hsl(var(--foreground))',
-                borderColor: 'hsl(var(--input))'
+                borderColor: 'hsl(var(--border))'
               }}
             />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
           </div>
-          
-          {/* Date Range Selector */}
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-zinc-500" />
             <select
               value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="px-3 py-1.5 h-8 rounded-md text-sm"
+              onChange={(e) => {
+                const value = e.target.value
+                setDateRange(value)
+                onDateRangeChange?.(value)
+                setScamTypeFilter('all')
+                onScamTypeFilterChange?.('all')
+              }}
+              className="px-3 py-2 h-9 rounded-lg text-sm font-medium border border-border bg-input/80 cursor-pointer hover:border-primary/40 transition-colors"
               style={{
                 backgroundColor: 'hsl(var(--input))',
                 color: 'hsl(var(--foreground))',
-                borderColor: 'hsl(var(--input))'
+                borderColor: 'hsl(var(--border))'
               }}
             >
               <option value="0">Today</option>
@@ -552,17 +616,18 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
 
         {/* Classification and Scam Type Filters */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          {/* Classification Filter Buttons */}
-          <div className="flex gap-2 flex-wrap p-1 bg-card/50 rounded-lg border border-border">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mr-1">Filter by status</span>
+          <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => {
             setFilterClassification('all')
             if (onFilterChange) onFilterChange('all')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          className={`rounded-full px-4 py-2 text-sm font-medium border transition-all duration-200 cursor-pointer active:scale-[0.98] flex items-center gap-1.5 ${
             filterClassification === 'all'
-              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25 ring-2 ring-primary/50 ring-offset-2 ring-offset-background'
+              : 'bg-muted/50 text-zinc-400 border-border hover:bg-muted hover:text-foreground hover:border-primary/40'
           }`}
         >
           All
@@ -572,10 +637,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             setFilterClassification('safe')
             if (onFilterChange) onFilterChange('safe')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+          className={`rounded-full px-4 py-2 text-sm font-medium border transition-all duration-200 cursor-pointer active:scale-[0.98] flex items-center gap-1.5 ${
             filterClassification === 'safe'
-              ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-lg shadow-green-500/10'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-md shadow-emerald-500/10 ring-2 ring-emerald-500/30 ring-offset-2 ring-offset-background'
+              : 'bg-muted/50 text-zinc-400 border-border hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/40'
           }`}
         >
           <CheckCircle className="h-4 w-4" />
@@ -586,10 +651,10 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             setFilterClassification('suspicious')
             if (onFilterChange) onFilterChange('suspicious')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+          className={`rounded-full px-4 py-2 text-sm font-medium border transition-all duration-200 cursor-pointer active:scale-[0.98] flex items-center gap-1.5 ${
             filterClassification === 'suspicious'
-              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-lg shadow-yellow-500/10'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-md shadow-amber-500/10 ring-2 ring-amber-500/30 ring-offset-2 ring-offset-background'
+              : 'bg-muted/50 text-zinc-400 border-border hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/40'
           }`}
         >
           <AlertCircle className="h-4 w-4" />
@@ -600,15 +665,16 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
             setFilterClassification('scam')
             if (onFilterChange) onFilterChange('scam')
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+          className={`rounded-full px-4 py-2 text-sm font-medium border transition-all duration-200 cursor-pointer active:scale-[0.98] flex items-center gap-1.5 ${
             filterClassification === 'scam'
-              ? 'bg-red-500/20 text-red-400 border border-red-500/50 shadow-lg shadow-red-500/10'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ? 'bg-red-500/20 text-red-400 border-red-500/50 shadow-md shadow-red-500/10 ring-2 ring-red-500/30 ring-offset-2 ring-offset-background'
+              : 'bg-muted/50 text-zinc-400 border-border hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/40'
           }`}
         >
           <AlertTriangle className="h-4 w-4" />
           Scam
         </button>
+          </div>
           </div>
 
           {/* Scam Type Filter (only show when 'Scam' classification is selected) */}
@@ -675,6 +741,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                         type="button"
                         onClick={() => {
                           setScamTypeFilter('all')
+                          onScamTypeFilterChange?.('all')
                           setIsScamTypeDropdownOpen(false)
                         }}
                         className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 ${
@@ -696,6 +763,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                             type="button"
                             onClick={() => {
                               setScamTypeFilter(type)
+                              onScamTypeFilterChange?.(type)
                               setIsScamTypeDropdownOpen(false)
                               // Automatically switch to 'scam' classification when a specific scam type is selected
                               if (filterClassification !== 'scam') {
@@ -738,19 +806,21 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
           filteredScans.map((scan) => (
           <Card
             key={scan.id}
-            className={`cursor-pointer transition-all hover:shadow-lg border rounded-xl overflow-hidden relative group hover:shadow-lg ${getClassificationColor(scan.classification)} ${
-              scan.classification === 'scam' ? 'hover:border-red-500/40 hover:shadow-red-500/10' :
-              scan.classification === 'suspicious' ? 'hover:border-yellow-500/40 hover:shadow-yellow-500/10' :
-              scan.classification === 'safe' ? 'hover:border-green-500/40 hover:shadow-green-500/10' :
-              'hover:border-gray-500/40'
+            className={`cursor-pointer transition-all hover:shadow-xl border rounded-xl overflow-hidden relative group ${getClassificationColor(scan.classification)} ${
+              scan.classification === 'scam' ? 'hover:border-red-500/40 hover:shadow-red-500/15' :
+              scan.classification === 'suspicious' ? 'hover:border-amber-500/40 hover:shadow-amber-500/15' :
+              scan.classification === 'safe' ? 'hover:border-emerald-500/40 hover:shadow-emerald-500/15' :
+              'hover:border-zinc-500/40'
             }`}
             onClick={() => {
-              // Save scroll position before navigating to scan result
               const scrollPos = scrollContainerRef.current ? scrollContainerRef.current.scrollTop : 0
               onScanClick && onScanClick(scan, scrollPos)
             }}
           >
-            <CardContent className="p-4">
+            <div className="flex items-stretch gap-0 min-h-0">
+              {/* Left accent bar by classification */}
+              <div className={`w-1.5 flex-shrink-0 ${getClassificationBar(scan.classification)} opacity-90`} />
+            <CardContent className="p-4 flex-1 min-w-0">
               <div className="flex items-center gap-4 relative">
                 {/* Image, Text, or URL Preview */}
                 <div className="flex-shrink-0 relative">
@@ -848,58 +918,49 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    {/* Classification Badge */}
-                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                <div className="flex-1 min-w-0 space-y-2.5">
+                  {/* Badges row: classification (accent) + scan type (muted) */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border ${
                       scan.classification === 'scam' 
-                        ? 'bg-red-900/40 text-red-300 border border-red-800/50' 
+                        ? 'bg-red-500/15 text-red-400 border-red-500/40' 
                         : scan.classification === 'suspicious'
-                        ? 'bg-yellow-900/40 text-yellow-300 border border-yellow-800/50'
+                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'
                         : scan.classification === 'safe'
-                        ? 'bg-green-900/40 text-green-300 border border-green-800/50'
-                        : 'bg-gray-900/40 text-gray-300 border border-gray-800/50'
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40'
+                        : 'bg-zinc-500/15 text-zinc-400 border-zinc-500/40'
                     }`}>
                       {getClassificationIcon(scan.classification)}
-                      <span className="capitalize">{scan.classification}</span>
+                      <span>{scan.classification}</span>
                     </div>
-                    {/* Scan Type Badge */}
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-900/40 text-gray-300 border border-gray-800/50">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-500/15 text-zinc-400 border border-zinc-500/30">
                       {getScanTypeIcon(scan.scan_type)}
-                      <span className="capitalize">{scan.scan_type}</span>
+                      <span className="uppercase">{scan.scan_type}</span>
                     </div>
+                    {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-300 border border-red-500/30">
+                        {(typeof scan.analysis_result.scam_type === 'string'
+                          ? scan.analysis_result.scam_type
+                          : normalizeScamType(scan.analysis_result.scam_type)
+                        ).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Preview */}
+                  {/* Content preview: muted, separated */}
                   {scan.content_preview && (() => {
-                    // Don't show content preview if it looks like a scam type description for safe/suspicious results
                     const isScamTypeDescription = (scan.classification === 'safe' || scan.classification === 'suspicious') &&
                       (scan.content_preview.toLowerCase().includes('scam') || 
                        scan.content_preview.toLowerCase().includes('phishing') ||
                        scan.content_preview.toLowerCase().includes('credential'));
-                    
-                    if (isScamTypeDescription) {
-                      return null; // Don't show scam type info for safe/suspicious results
-                    }
-                    
-                    // For text scans, don't show content in the card (only in modal)
-                    if (scan.scan_type === 'text') {
-                      return null;
-                    }
-                    
+                    if (isScamTypeDescription || scan.scan_type === 'text') return null;
                     return (
-                      <div className="mb-2">
+                      <div className="border-l-2 border-zinc-600/50 pl-3">
                         {scan.scan_type === 'url' ? (
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <p 
-                                  className="text-sm text-muted-foreground line-clamp-1 break-all select-none cursor-default"
-                                  style={{ 
-                                    userSelect: 'none'
-                                  }}
-                                  onClick={(e) => e.preventDefault()}
-                                >
+                                <p className="text-sm text-zinc-400 line-clamp-1 break-all select-none cursor-default" onClick={(e) => e.preventDefault()}>
                                   {blurUrlPart(scan.content_preview)}
                                 </p>
                               </TooltipTrigger>
@@ -909,7 +970,7 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                             </Tooltip>
                           </TooltipProvider>
                         ) : (
-                          <p className="text-sm text-muted-foreground line-clamp-2 break-words">
+                          <p className="text-sm text-zinc-400 line-clamp-2 break-words leading-relaxed">
                             {scan.content_preview}
                           </p>
                         )}
@@ -917,53 +978,40 @@ function ScanHistory({ userId, onScanClick, onRefresh, initialFilter = 'all', on
                     );
                   })()}
 
-                  {/* Metadata */}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                  {/* Meta row: time + CTA */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
                       {formatDate(scan.created_at)}
-                    </div>
-                    {/* Scam Type Badge - Only show for scam results */}
-                    {scan.classification === 'scam' && scan.analysis_result?.scam_type && (
-                      <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-900/40 text-red-300 border border-red-800/50">
-                        {scan.analysis_result.scam_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Instructional Text */}
-                  <div className="mt-2 text-xs text-muted-foreground/80 italic">
-                    {scan.classification === 'safe' && (
-                      <span>Click to see verification steps</span>
-                    )}
-                    {scan.classification === 'suspicious' && (
-                      <span>Click to see suspicious indicators plus verification steps</span>
-                    )}
-                    {scan.classification === 'scam' && (
-                      <span>Click to see scam indicators and what to do</span>
-                    )}
+                    </p>
+                    <span className="text-xs font-medium text-zinc-500">
+                      {scan.classification === 'safe' && 'View verification steps'}
+                      {scan.classification === 'suspicious' && 'View indicators and verification steps'}
+                      {scan.classification === 'scam' && 'View details and how to stay safe'}
+                    </span>
                   </div>
                 </div>
                 
-                {/* Clickable Arrow Indicator */}
-                <div className="flex-shrink-0 flex items-center justify-center">
-                  <ChevronRight className="h-6 w-6 text-white/70 group-hover:text-white transition-colors" />
+                {/* Arrow / action hint */}
+                <div className="flex-shrink-0 flex items-center justify-center rounded-lg border border-border bg-muted/30 p-2 group-hover:bg-primary/10 group-hover:border-primary/40 transition-colors">
+                  <ChevronRight className="h-5 w-5 text-zinc-500 group-hover:text-primary transition-colors" />
                 </div>
               </div>
             </CardContent>
+            </div>
           </Card>
           ))
         )}
       </div>
 
-      {/* Export Button - Bottom Right */}
+      {/* Export Button */}
       {filteredScans.length > 0 && (
         <div className="flex justify-end mt-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => downloadCSV(filteredScans)}
-            className="flex items-center gap-1.5 h-8 hover:bg-muted hover:border-primary/50 hover:scale-[1.02] transition-all cursor-pointer"
+            className="rounded-xl border border-border bg-muted/30 px-4 py-2 h-9 text-sm font-semibold text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all cursor-pointer flex items-center gap-2 shadow-sm"
           >
             <Download className="h-4 w-4" />
             Export CSV

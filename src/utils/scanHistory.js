@@ -124,6 +124,39 @@ export async function saveScanToHistory(userId, scanType, imageUrl, contentPrevi
 }
 
 /**
+ * Update an existing scan row with learn-more data (so reopening from history doesn't consume a check).
+ * @param {string} scanId - UUID of the scan_history row
+ * @param {Object} learnMoreData - Learn-more API response to store
+ * @returns {Promise<boolean>} true if updated
+ */
+export async function updateScanLearnMoreData(scanId, learnMoreData) {
+  if (!scanId || !learnMoreData) {
+    console.warn('⚠️ updateScanLearnMoreData: missing scanId or learnMoreData', { hasScanId: !!scanId, hasLearnMoreData: !!learnMoreData })
+    return false
+  }
+  try {
+    const { data: updated, error } = await supabase
+      .from('scan_history')
+      .update({ learn_more_data: learnMoreData })
+      .eq('id', scanId)
+      .select('id')
+    if (error) {
+      console.error('❌ Error updating scan learn_more_data:', error.message || error, error)
+      return false
+    }
+    if (updated && updated.length > 0) {
+      console.log('✅ [scanHistory] Learn-more saved to scan', scanId)
+      return true
+    }
+    console.warn('⚠️ updateScanLearnMoreData: no row updated (id may not exist or RLS blocked)', scanId)
+    return false
+  } catch (error) {
+    console.error('❌ Exception updating scan learn_more_data:', error?.message || error, error)
+    return false
+  }
+}
+
+/**
  * Retry failed scans stored in localStorage
  * @param {string} userId - User ID
  * @returns {Promise<number>} Number of successfully retried scans
@@ -249,7 +282,11 @@ export async function getScanHistory(userId) {
       return []
     }
 
-    return data || []
+    // Only return real scan types (image, url, text). Exclude any stray learn_more entries.
+    const list = (data || []).filter(
+      (scan) => scan.scan_type === 'image' || scan.scan_type === 'url' || scan.scan_type === 'text'
+    )
+    return list
   } catch (error) {
     console.error('Exception fetching scan history:', error)
     return []

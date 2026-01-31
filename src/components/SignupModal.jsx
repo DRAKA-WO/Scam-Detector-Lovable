@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { saveScanToHistory, uploadScanImage } from "@/utils/scanHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { syncSessionToExtension } from "@/utils/extensionSync";
+import EmailAuthModal from "@/components/EmailAuthModal";
 
 const PENDING_SCAN_KEY = 'scam_checker_pending_scan';
 
 function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchToLogin, preventRedirect = false, hideOutOfChecksMessage = false }) {
   const [error, setError] = useState("");
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -136,6 +138,8 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
   };
 
   return (
+    <>
+      {!showEmailAuth && (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ 
@@ -215,7 +219,19 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
             </div>
           )}
 
-          {/* Google Signup Button */}
+          {/* Email sign-up (isolated - remove EmailAuthModal import and this block to disable) */}
+          <div className="mb-4">
+            <Button
+              type="button"
+              onClick={() => setShowEmailAuth(true)}
+              variant="outline"
+              className="w-full h-11 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-medium"
+            >
+              Sign up with Email
+            </Button>
+          </div>
+
+          {/* Google Signup Button - unchanged */}
                 <Button
                   onClick={handleGoogleSignup}
                   variant="outline"
@@ -230,8 +246,24 @@ function SignupModal({ isOpen, onClose, onSignup, remainingChecks = 0, onSwitchT
             Continue with Google
                   </Button>
         </div>
+
       </div>
     </div>
+      )}
+      {/* Email auth modal - only this is visible when open; Sign up card is hidden */}
+      <EmailAuthModal
+        isOpen={showEmailAuth}
+        onClose={() => setShowEmailAuth(false)}
+        mode="signup"
+        preventRedirect={preventRedirect}
+        onSuccess={(payload) => {
+          if (payload?.user) handlePendingScan(payload.user.id);
+          onSignup?.();
+          setShowEmailAuth(false);
+          onClose();
+        }}
+      />
+    </>
   );
 }
 

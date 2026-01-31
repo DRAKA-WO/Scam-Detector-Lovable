@@ -6,41 +6,36 @@ Email/password login has been separated from Google OAuth login to allow indepen
 
 ## New Files Created
 
-### 1. `src/components/EmailLoginModal.jsx`
-- **Purpose**: Dedicated component for email/password authentication
+### 1. `src/components/EmailAuthModal.jsx`
+- **Purpose**: Dedicated component for email/password sign-in and sign-up
 - **Features**:
-  - Handles email/password form submission
-  - Uses Supabase `signInWithPassword` method
-  - Integrated with separate email login sync utility
-  - Comprehensive logging with `[EMAIL LOGIN]` prefix for easy debugging
-  - Independent from Google OAuth code
+  - Handles email/password form (sign in and sign up modes)
+  - Uses `signInWithEmailPassword` and `signUpWithEmailPassword` from `emailAuth.js`
+  - After success, calls `syncSessionToExtension()` (same as OAuth) so extension gets session
+  - Optional full name on sign-up; handles "confirm email" flow with a message
+  - Independent from Google OAuth code; easy to remove (delete file + remove button in LoginModal/SignupModal)
 
-### 2. `src/utils/emailLoginSync.js`
-- **Purpose**: Dedicated sync utility for email login extension synchronization
+### 2. `src/utils/emailAuth.js`
+- **Purpose**: Isolated Supabase email/password auth helpers
 - **Features**:
-  - `syncEmailLoginToExtension()` - Syncs email login session to browser extension
-  - `clearEmailLoginExtensionSession()` - Clears email login session from extension
-  - Comprehensive logging with `[EMAIL LOGIN SYNC]` prefix
-  - Separate error handling from OAuth sync
-  - Validates session and user data before syncing
-  - Fetches checks and plan from Supabase if not provided
+  - `signInWithEmailPassword(email, password)` → uses `supabase.auth.signInWithPassword`
+  - `signUpWithEmailPassword({ email, password, full_name })` → uses `supabase.auth.signUp`
+  - Logging with `[EMAIL AUTH]` prefix for debugging
+  - No side effects; callers handle sync and redirects
 
 ## Modified Files
 
 ### 1. `src/components/LoginModal.jsx`
 - **Changes**:
-  - Removed email/password form code
-  - Now only handles Google OAuth login
-  - Delegates email login to `EmailLoginModal` component
-  - Shows "Sign in with Email" button that opens `EmailLoginModal`
-  - Added `[GOOGLE OAUTH]` logging prefix for debugging
+  - Google OAuth code unchanged
+  - Added "Sign in with Email" button that opens `EmailAuthModal` (mode="signin")
+  - Email flow is isolated; removing the button and EmailAuthModal import disables email login
 
-### 2. `src/pages/ExtensionAuth.tsx`
+### 2. `src/components/SignupModal.jsx`
 - **Changes**:
-  - Added import for `EmailLoginModal` component
-  - Added import for `syncEmailLoginToExtension` utility
-  - Added state for `showEmailLoginModal` (available for direct use)
-  - Email login is handled through `LoginModal` → `EmailLoginModal` flow
+  - Google sign-up code unchanged
+  - Added "Sign up with Email" button that opens `EmailAuthModal` (mode="signup")
+  - On email sign-up success, calls `handlePendingScan(userId)` then `onSignup()` so pending scans are saved
 
 ## Debugging Features
 
@@ -68,17 +63,11 @@ All Google OAuth operations are prefixed with `[GOOGLE OAUTH]`:
 
 ## How Email Login Works Now
 
-1. **User clicks "Sign in with Email"** → Opens `EmailLoginModal`
-2. **User enters credentials** → `handleEmailLogin()` is called
-3. **Supabase authentication** → `supabase.auth.signInWithPassword()`
-4. **Session validation** → Checks for valid session and user
-5. **Extension sync** → `syncEmailLoginToExtension()` is called
-6. **Sync process**:
-   - Validates session and userId
-   - Fetches checks from Supabase (or localStorage fallback)
-   - Fetches plan from Supabase (defaults to 'FREE')
-   - Dispatches `scamChecker:syncSession` event to extension
-7. **Redirect** → User is redirected to dashboard (if `preventRedirect` is false)
+1. **User clicks "Sign in with Email"** → Opens `EmailAuthModal`
+2. **User enters credentials** → Form submit calls `signInWithEmailPassword()` from `emailAuth.js`
+3. **Supabase** → `supabase.auth.signInWithPassword()`; session is stored by Supabase client
+4. **Extension sync** → `syncSessionToExtension(session, userId, null, null, true)` (same as OAuth callback)
+5. **Close** → `onSuccess()` and `onClose()` so parent closes modals; app auth state updates via `onAuthStateChange`
 
 ## How Google OAuth Works Now
 
@@ -123,15 +112,15 @@ Open developer tools console to see all `[EMAIL LOGIN]` and `[EMAIL LOGIN SYNC]`
 ```
 src/
 ├── components/
-│   ├── EmailLoginModal.jsx      ← NEW: Email login component
-│   ├── LoginModal.jsx            ← MODIFIED: Only Google OAuth now
+│   ├── EmailAuthModal.jsx        ← NEW: Email sign-in/sign-up modal
+│   ├── LoginModal.jsx            ← MODIFIED: Added "Sign in with Email" + EmailAuthModal
+│   ├── SignupModal.jsx           ← MODIFIED: Added "Sign up with Email" + EmailAuthModal
 │   └── ...
 ├── utils/
-│   ├── emailLoginSync.js         ← NEW: Email login sync utility
-│   ├── extensionSync.js          ← EXISTING: Shared OAuth sync (still used)
+│   ├── emailAuth.js              ← NEW: signInWithEmailPassword, signUpWithEmailPassword
+│   ├── extensionSync.js          ← EXISTING: Used for both OAuth and email after login
 │   └── ...
-└── pages/
-    └── ExtensionAuth.tsx         ← MODIFIED: Uses EmailLoginModal
+└── SUPABASE_EMAIL_AUTH_SETUP.md  ← Supabase checklist + SQL for checks column
 ```
 
 ## Next Steps for Debugging

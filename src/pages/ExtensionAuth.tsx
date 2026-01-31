@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { syncSessionToExtension } from '@/utils/extensionSync'
 import LoginModal from '@/components/LoginModal'
+import SignupModal from '@/components/SignupModal'
 
 function ExtensionAuth() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [authSuccess, setAuthSuccess] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isSignup = searchParams.get('mode') === 'signup'
+  const providerGoogle = searchParams.get('provider') === 'google'
+  const [redirectingToGoogle, setRedirectingToGoogle] = useState(false)
 
   // Check if user is already logged in - sync to extension and show success
   useEffect(() => {
@@ -31,18 +36,49 @@ function ExtensionAuth() {
           return
         }
         
-        // Not logged in - show auth modal
+        // Not logged in
         setIsCheckingAuth(false)
+        if (providerGoogle) {
+          setRedirectingToGoogle(true)
+          return
+        }
         setShowAuthModal(true)
       } catch (error) {
         console.error('Error checking auth:', error)
-        // On error, show auth modal
         setIsCheckingAuth(false)
         setShowAuthModal(true)
       }
     }
     checkAuth()
-  }, [])
+  }, [providerGoogle])
+
+  // When provider=google, redirect directly to Google OAuth (no modal)
+  useEffect(() => {
+    if (!redirectingToGoogle || authSuccess) return
+    let cancelled = false
+    const run = async () => {
+      try {
+        sessionStorage.setItem('oauth_from_extension_auth', 'true')
+        const redirectUrl = `${window.location.origin}/auth/callback`
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: redirectUrl },
+        })
+        if (cancelled) return
+        if (error) {
+          setRedirectingToGoogle(false)
+          setShowAuthModal(true)
+        }
+      } catch {
+        if (!cancelled) {
+          setRedirectingToGoogle(false)
+          setShowAuthModal(true)
+        }
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [redirectingToGoogle, authSuccess])
 
   // Listen for auth state changes and check session periodically
   useEffect(() => {
@@ -150,6 +186,19 @@ function ExtensionAuth() {
     )
   }
 
+  // Redirecting to Google OAuth (no modal)
+  if (redirectingToGoogle) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+          <p className="text-foreground font-medium">Redirecting to Google...</p>
+          <p className="text-muted-foreground text-sm mt-1">You will sign in with your Google account.</p>
+        </div>
+      </div>
+    )
+  }
+
   // Show success message after authentication
   if (authSuccess) {
     return (
@@ -175,11 +224,25 @@ function ExtensionAuth() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <LoginModal
-          isOpen={showAuthModal}
-          preventRedirect={true}
-          onClose={() => setShowAuthModal(false)}
-        />
+        {isSignup ? (
+          <SignupModal
+            isOpen={showAuthModal}
+            preventRedirect={true}
+            onClose={() => { setShowAuthModal(false); navigate('/'); }}
+            onSignup={async (userId) => {
+              const { data: { session } } = await supabase.auth.getSession()
+              if (session) await syncSessionToExtension(session, userId)
+              setAuthSuccess(true)
+            }}
+            onSwitchToLogin={() => navigate('/extension-auth')}
+          />
+        ) : (
+          <LoginModal
+            isOpen={showAuthModal}
+            preventRedirect={true}
+            onClose={() => { setShowAuthModal(false); navigate('/'); }}
+          />
+        )}
       </div>
     </div>
   )

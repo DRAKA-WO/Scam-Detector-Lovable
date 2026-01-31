@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import EmailAuthModal from "@/components/EmailAuthModal";
 
 /**
- * LoginModal - Combined auth modal for both sign in and sign up with Google OAuth
+ * LoginModal - Combined auth modal for both sign in and sign up with Google OAuth.
+ * Email/password is optional and isolated in EmailAuthModal (see EMAIL_LOGIN_SEPARATION.md).
  */
 function LoginModal({ isOpen, onClose, onLogin, preventRedirect = false }) {
   const [error, setError] = useState("");
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -82,6 +85,8 @@ function LoginModal({ isOpen, onClose, onLogin, preventRedirect = false }) {
   };
 
   return (
+    <>
+      {!showEmailAuth && (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ 
@@ -143,7 +148,19 @@ function LoginModal({ isOpen, onClose, onLogin, preventRedirect = false }) {
             </div>
           )}
 
-          {/* Google Login Button */}
+          {/* Email sign-in (isolated - remove EmailAuthModal import and this block to disable) */}
+          <div className="mb-4">
+            <Button
+              type="button"
+              onClick={() => setShowEmailAuth(true)}
+              variant="outline"
+              className="w-full h-11 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-medium"
+            >
+              Sign in with Email
+            </Button>
+          </div>
+
+          {/* Google Login Button - unchanged */}
           <div className="mb-4">
             <Button
               onClick={handleGoogleLogin}
@@ -160,8 +177,19 @@ function LoginModal({ isOpen, onClose, onLogin, preventRedirect = false }) {
             </Button>
           </div>
         </div>
+
       </div>
     </div>
+      )}
+      {/* Email auth modal - only this is visible when open; Welcome card is hidden */}
+      <EmailAuthModal
+        isOpen={showEmailAuth}
+        onClose={() => setShowEmailAuth(false)}
+        mode="signin"
+        preventRedirect={preventRedirect}
+        onSuccess={() => { onLogin?.(); setShowEmailAuth(false); onClose(); }}
+      />
+    </>
   );
 }
 

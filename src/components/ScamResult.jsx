@@ -1,8 +1,17 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import getScamNextSteps from '../utils/scamNextSteps'
 import { API_ENDPOINTS } from '../config'
+import {
+  getRemainingFreeChecks,
+  useFreeCheck,
+  getRemainingUserChecks,
+  useUserCheck,
+  refundFreeCheck,
+  refundUserCheck,
+} from '../utils/checkLimits'
+import { updateScanLearnMoreData } from '../utils/scanHistory'
 
-function CategoryIcon({ category, className = 'w-16 h-16' }) {
+export function CategoryIcon({ category, className = 'w-16 h-16' }) {
   const c = category || 'generic'
   const base = 'flex-shrink-0 text-red-500'
   if (c === 'phishing') {
@@ -34,6 +43,13 @@ function CategoryIcon({ category, className = 'w-16 h-16' }) {
       </svg>
     )
   }
+  if (c === 'fake_reward') {
+    return (
+      <svg className={`${className} ${base}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12v10H4V12M2 7h20v5H2V7zm10 15V7m0 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+      </svg>
+    )
+  }
   return (
     <svg className={`${className} ${base}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -41,26 +57,122 @@ function CategoryIcon({ category, className = 'w-16 h-16' }) {
   )
 }
 
-function ScamResult({ result, onNewAnalysis }) {
-  const { reasons, explanation, scam_type, next_steps } = result
+const LAST_SAVED_SCAN_KEY = 'lastSavedScan'
+const LEARN_MORE_TIMEOUT_MS = 20000
+const LEARN_MORE_TIMEOUT_MESSAGE = "It seems like it's taking so much longer.\n\n✅ Your check has been refunded. You can try again."
+
+/** Normalize scam_type to a single primary type when API returns array or comma-separated list */
+function getPrimaryScamType(scamType) {
+  if (scamType == null || scamType === '') return null
+  if (Array.isArray(scamType)) {
+    const first = scamType[0]
+    return typeof first === 'string' ? first.trim() : null
+  }
+  const s = String(scamType).trim()
+  if (!s) return null
+  const firstSegment = s.split(',')[0].trim()
+  return firstSegment || null
+}
+
+function ScamResult({ result, onNewAnalysis, scanId, savedLearnMoreData, fromHistory }) {
+  const raw = result?.scam_type ?? result?.analysis_result?.scam_type
+  const scam_type = getPrimaryScamType(raw)
+  const { reasons, explanation, next_steps } = result
   const [showLearnMoreView, setShowLearnMoreView] = useState(false)
-  const [learnMoreData, setLearnMoreData] = useState(null)
+  const [learnMoreData, setLearnMoreData] = useState(savedLearnMoreData ?? null)
   const [learnMoreLoading, setLearnMoreLoading] = useState(false)
   const [learnMoreError, setLearnMoreError] = useState(null)
   const [learnMoreRevealed, setLearnMoreRevealed] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
+  const learnMoreTimeoutRef = useRef(null)
+  const learnMoreTimedOutRef = useRef(false)
 
   const handleLearnMore = useCallback(async () => {
     if (!scam_type) return
+
     setShowLearnMoreView(true)
     setLearnMoreRevealed(false)
-    if (learnMoreData) {
+    setLearnMoreError(null)
+
+    // If we already have learn-more data (from this session or from history), show it without consuming a check
+    const existing = learnMoreData || savedLearnMoreData
+    if (existing) {
+      if (!learnMoreData) setLearnMoreData(savedLearnMoreData)
       setLearnMoreRevealed(true)
       return
     }
-    setLearnMoreError(null)
+
+    // Opening from Scan History but this scan never had Learn more saved → don't consume a check
+    if (fromHistory) {
+      setLearnMoreError('Learn more wasn’t saved for this scan. Run a new scan and open Learn more there to save it for next time.')
+      setLearnMoreRevealed(true)
+      return
+    }
+
     setLearnMoreLoading(true)
+
+    let isLoggedIn = false
+    let userId = null
+    let checkUsed = false
+
     try {
+      // Try to detect logged-in user via Supabase, fall back to anonymous
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          isLoggedIn = true
+          userId = session.user.id
+        }
+      } catch (authError) {
+        console.warn('Supabase auth not available for learn-more, treating as anonymous:', authError)
+      }
+
+      // Consume a check (user check if logged in, free check otherwise)
+      if (isLoggedIn && userId) {
+        const current = getRemainingUserChecks(userId)
+        if (current <= 0) {
+          setLearnMoreLoading(false)
+          setLearnMoreError('You have no checks remaining. Please upgrade your plan to view more details.')
+          return
+        }
+        await useUserCheck(userId)
+        checkUsed = true
+        window.dispatchEvent(new Event('checksUpdated'))
+      } else {
+        const current = getRemainingFreeChecks()
+        if (current <= 0) {
+          setLearnMoreLoading(false)
+          setLearnMoreError('You have used all your free checks. Sign up for a free account to unlock more.')
+          return
+        }
+        useFreeCheck()
+        checkUsed = true
+        window.dispatchEvent(new Event('checksUpdated'))
+      }
+
+      learnMoreTimedOutRef.current = false
+      learnMoreTimeoutRef.current = setTimeout(async () => {
+        learnMoreTimeoutRef.current = null
+        learnMoreTimedOutRef.current = true
+        if (checkUsed) {
+          try {
+            if (isLoggedIn && userId) {
+              const refunded = await refundUserCheck(userId)
+              if (refunded) window.dispatchEvent(new Event('checksUpdated'))
+            } else {
+              const refunded = refundFreeCheck()
+              if (refunded) window.dispatchEvent(new Event('checksUpdated'))
+            }
+          } catch (refundErr) {
+            console.error('❌ Error refunding learn-more (timeout):', refundErr)
+          }
+        }
+        setLearnMoreError(LEARN_MORE_TIMEOUT_MESSAGE)
+        setLearnMoreLoading(false)
+      }, LEARN_MORE_TIMEOUT_MS)
+
+      // Fetch learn-more details
       const res = await fetch(API_ENDPOINTS.learnMore, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,18 +184,72 @@ function ScamResult({ result, onNewAnalysis }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to load')
+
+      clearTimeout(learnMoreTimeoutRef.current)
+      learnMoreTimeoutRef.current = null
+      if (learnMoreTimedOutRef.current) return
+
       setLearnMoreData(data)
       setTimeout(() => setLearnMoreRevealed(true), 100)
+
+      // Store learn-more on the existing scam scan row so reopening from history doesn't consume a check
+      let idToUpdate = scanId
+      if (!idToUpdate && typeof window !== 'undefined') {
+        try {
+          const raw = sessionStorage.getItem(LAST_SAVED_SCAN_KEY)
+          if (raw) {
+            const scan = JSON.parse(raw)
+            if (scan?.id && scan?.classification === 'scam') idToUpdate = scan.id
+          }
+        } catch (_) {}
+      }
+      if (idToUpdate && data) {
+        updateScanLearnMoreData(idToUpdate, data).then((ok) => {
+          if (ok) console.log('✅ Learn-more saved to scan record')
+          else console.warn('⚠️ Learn-more not saved to scan record (update returned false)')
+        })
+      } else if (!idToUpdate) {
+        console.warn('⚠️ Learn-more not saved: no scan id (ensure you ran the scan while logged in; scan is saved after result loads)')
+      }
     } catch (e) {
-      setLearnMoreError(e.message || 'Could not load learn more content.')
+      clearTimeout(learnMoreTimeoutRef.current)
+      learnMoreTimeoutRef.current = null
+      if (learnMoreTimedOutRef.current) return
+
+      console.error('❌ Error loading learn-more analysis:', e)
+
+      // Refund the check if we already consumed one
+      if (checkUsed) {
+        try {
+          if (isLoggedIn && userId) {
+            const refunded = await refundUserCheck(userId)
+            if (refunded) {
+              window.dispatchEvent(new Event('checksUpdated'))
+            }
+          } else {
+            const refunded = refundFreeCheck()
+            if (refunded) {
+              window.dispatchEvent(new Event('checksUpdated'))
+            }
+          }
+        } catch (refundError) {
+          console.error('❌ Error refunding learn-more check:', refundError)
+        }
+      }
+
+      setLearnMoreError(e?.message || 'Could not load learn more content.')
     } finally {
       setLearnMoreLoading(false)
     }
-  }, [scam_type, reasons, explanation, learnMoreData])
+  }, [scam_type, reasons, explanation, learnMoreData, savedLearnMoreData, scanId, fromHistory, result?.classification])
 
   useEffect(() => {
     if (!showLearnMoreView) setLearnMoreRevealed(false)
   }, [showLearnMoreView])
+
+  useEffect(() => {
+    if (savedLearnMoreData) setLearnMoreData(savedLearnMoreData)
+  }, [savedLearnMoreData])
 
   const LEARN_MORE_LOADING_STEPS = ['Fetching scam details...', 'Loading how it works...', 'Loading prevention tips...']
 
@@ -164,8 +330,12 @@ function ScamResult({ result, onNewAnalysis }) {
           {learnMoreData && !learnMoreLoading && (
             <>
               <div className="flex gap-4 mb-6">
-                <div className="flex items-center justify-center w-20 h-20 rounded-xl bg-red-500/10 border border-red-500/30 flex-shrink-0">
-                  <CategoryIcon category={learnMoreData.icon_category} className="w-12 h-12" />
+                <div className="flex items-center justify-center w-20 h-20 rounded-xl bg-red-500/10 border border-red-500/30 flex-shrink-0 overflow-hidden">
+                  {learnMoreData.icon_image_url ? (
+                    <img src={learnMoreData.icon_image_url} alt="" className="w-12 h-12 object-contain" />
+                  ) : (
+                    <CategoryIcon category={learnMoreData.icon_category} className="w-12 h-12" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-white text-lg leading-tight mb-2">{learnMoreData.title}</h3>
@@ -326,12 +496,12 @@ function ScamResult({ result, onNewAnalysis }) {
         </div>
       )}
 
-        <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 border-t border-gray-700 pt-4 sm:pt-6">
+        <p className="text-xs sm:text-sm text-gray-500 mb-2 border-t border-gray-700 pt-4 sm:pt-6">
           Remember: Scam Checker is a free tool to be used alongside your own research and best judgement.
         </p>
       </div>
 
-      <div className="flex-shrink-0 p-5 sm:p-7 md:p-9 pt-0 border-t border-border bg-card/50">
+      <div className="flex-shrink-0 px-5 sm:px-7 md:px-9 py-4 sm:py-5 border-t border-border bg-card/50">
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           {scam_type && (
             <button

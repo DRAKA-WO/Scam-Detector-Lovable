@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
-import chromeLogo from "@/assets/chrome-logo.svg"
-import edgeLogo from "@/assets/edge-logo.svg"
-import braveLogo from "@/assets/brave-logo.svg"
-import operaLogo from "@/assets/opera-logo.png"
+import { Shield, CheckCircle, AlertTriangle, Clock, TrendingUp, LogOut, User, AlertCircle, History, X, Mail, Calendar, CreditCard, Settings, Download, Puzzle, RefreshCw, Upload, Lock, Edit2, Save, XCircle, Loader2, Eye, EyeOff, ChevronDown, ChevronUp, Sparkles, ArrowRight } from 'lucide-react'
+import chromeLogo from '@/assets/chrome-logo.svg'
+import edgeLogo from '@/assets/edge-logo.svg'
+import braveLogo from '@/assets/brave-logo.svg'
+import operaLogo from '@/assets/opera-logo.png'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import Header from '@/components/landing/Header'
 import Footer from '@/components/landing/Footer'
 import ScanHistory from '@/components/ScanHistory'
 import ResultCard from '@/components/ResultCard'
+import UnlockedScamLearning from '@/components/UnlockedScamLearning'
 import { getRemainingUserChecks } from '@/utils/checkLimits'
 import { syncSessionToExtension, clearExtensionSession } from '@/utils/extensionSync'
 import { supabase } from '@/integrations/supabase/client'
@@ -111,6 +112,7 @@ function Dashboard() {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedScan, setSelectedScan] = useState(null)
   const [scanHistoryFilter, setScanHistoryFilter] = useState('all') // 'all', 'safe', 'suspicious', 'scam'
+  const [scanHistoryScamTypeFilter, setScanHistoryScamTypeFilter] = useState('all') // 'all' or specific scam type
   const [scanHistoryDateRange, setScanHistoryDateRange] = useState<string | null>(null) // Date range to apply when navigating from stat cards
   const statCardClickKeyRef = useRef(0) // Key to force filter update when clicking stat cards
   const [scamTypeBreakdown, setScamTypeBreakdown] = useState<Record<string, number>>({})
@@ -135,6 +137,9 @@ function Dashboard() {
   const [isRefreshingHistory, setIsRefreshingHistory] = useState(false)
   const [scanHistoryKey, setScanHistoryKey] = useState(0) // Key to force re-render
   const [highlightAccountInfo, setHighlightAccountInfo] = useState(false) // Track if account info should be highlighted
+  const [highlightScanHistory, setHighlightScanHistory] = useState(false) // Track if scan history section should be highlighted
+  const [highlightScamLibrary, setHighlightScamLibrary] = useState(false) // Track if scam library section should be highlighted
+  const [browserExtensionExpanded, setBrowserExtensionExpanded] = useState(false)
   
   // Cache for stats to reduce Supabase requests
   const statsCache = useRef<{ data: any; timestamp: number } | null>(null)
@@ -245,6 +250,12 @@ function Dashboard() {
   const [accountSuccess, setAccountSuccess] = useState('')
   const [accountLoading, setAccountLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Email users: change password (same box as username, no section resize)
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const isEmailUser = (user?.identities?.some((i: { provider?: string }) => i?.provider === 'email') ?? false) || (user as { app_metadata?: { provider?: string } } | undefined)?.app_metadata?.provider === 'email'
 
   // Initial avatar marker and helper functions (defined before useMemo that uses them)
   const INITIAL_AVATAR_MARKER = 'INITIAL_AVATAR:'
@@ -339,6 +350,12 @@ function Dashboard() {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (session && session.user && !error) {
+          // Validate with server so we don't sync if user was deleted in Supabase
+          const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+          if (getUserError || !user) {
+            await supabase.auth.signOut();
+            return;
+          }
           // Fetch user data from database (plan, full_name, avatar_url) - database is source of truth
           try {
             const { data: userData, error: userError } = await (supabase as any)
@@ -450,26 +467,73 @@ function Dashboard() {
     }, 100); // Small delay to ensure DOM is ready
   }, []);
 
-  // Handle hash navigation to highlight Account Information section
+  // Helper function to scroll and highlight Scan History section
+  const scrollToScanHistory = useCallback(() => {
+    setShowHistory(true); // Ensure section is visible
+    setTimeout(() => {
+      const scanHistoryElement = document.getElementById('scan-history-section');
+      if (scanHistoryElement) {
+        const elementPosition = scanHistoryElement.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - 100; // 100px offset from top (match account-info)
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+        setHighlightScanHistory(true);
+        setTimeout(() => {
+          setHighlightScanHistory(false);
+          window.history.replaceState(null, '', window.location.pathname);
+        }, 3000);
+      }
+    }, 150); // Allow DOM to show section first
+  }, []);
+
+  // Helper function to scroll and highlight Scam Library section
+  const scrollToScamLibrary = useCallback(() => {
+    setTimeout(() => {
+      const scamLibraryElement = document.getElementById('unlocked-scam-learning');
+      if (scamLibraryElement) {
+        const elementPosition = scamLibraryElement.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - 100; // 100px offset from top (match account-info)
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+        setHighlightScamLibrary(true);
+        setTimeout(() => {
+          setHighlightScamLibrary(false);
+          window.history.replaceState(null, '', window.location.pathname);
+        }, 3000);
+      }
+    }, 100);
+  }, []);
+
+  // Handle hash navigation to highlight Account Information, Scan History, or Scam Library section
   useEffect(() => {
-    // Check if URL has #account-info hash on mount
     if (window.location.hash === '#account-info') {
       scrollToAccountInfo();
+    } else if (window.location.hash === '#scan-history-section') {
+      scrollToScanHistory();
+    } else if (window.location.hash === '#unlocked-scam-learning') {
+      scrollToScamLibrary();
     }
 
-    // Also listen for hash changes (when clicking link while already on dashboard)
     const handleHashChange = () => {
       if (window.location.hash === '#account-info') {
         scrollToAccountInfo();
+      } else if (window.location.hash === '#scan-history-section') {
+        scrollToScanHistory();
+      } else if (window.location.hash === '#unlocked-scam-learning') {
+        scrollToScamLibrary();
       }
     };
 
     window.addEventListener('hashchange', handleHashChange);
-    
+
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [scrollToAccountInfo]); // Include scrollToAccountInfo in dependencies
+  }, [scrollToAccountInfo, scrollToScanHistory, scrollToScamLibrary]);
 
   // Load and manage user-specific alert expanded states
   useEffect(() => {
@@ -926,6 +990,9 @@ function Dashboard() {
     if (!user?.id) return
     
     try {
+      // Ensure current user exists in public.users (fixes email confirmation flow when trigger missed)
+      await (supabase as any).rpc('ensure_public_user')
+      
       const now = Date.now()
       
       // Check cache for stats (unless forced refresh)
@@ -1588,7 +1655,7 @@ function Dashboard() {
       return true
     }
     
-    // Check session immediately and synchronously
+    // Check session immediately and synchronously; validate with server so deleted users are logged out
     const checkSessionImmediately = async () => {
       try {
         const { supabase } = await import('@/integrations/supabase/client')
@@ -1600,6 +1667,13 @@ function Dashboard() {
         }
         
         if (session?.user) {
+          // Validate with server so we log out if user was deleted in Supabase
+          const { data: { user }, error: getUserError } = await supabase.auth.getUser()
+          if (getUserError || !user) {
+            console.warn('⚠️ Dashboard: User no longer valid (deleted or revoked), signing out')
+            await supabase.auth.signOut()
+            return false
+          }
           return updateUserData(session)
         }
         
@@ -1774,9 +1848,45 @@ function Dashboard() {
     setAvatarImageError(false)
     setAccountError('')
     setAccountSuccess('')
+    setShowPasswordForm(false)
     setEditingSection('profile')
   }
 
+  // Email users only: update password (Supabase updateUser)
+  const updatePassword = async () => {
+    if (!user?.email) return
+    setAccountError('')
+    setAccountSuccess('')
+    if (newPassword.length < 6) {
+      setAccountError('New password must be at least 6 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setAccountError('New password and confirmation do not match.')
+      return
+    }
+    setAccountLoading(true)
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
+      if (signInError) {
+        setAccountError('Current password is incorrect.')
+        setAccountLoading(false)
+        return
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      setAccountSuccess('Password updated successfully.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setShowPasswordForm(false)
+      setTimeout(() => { setAccountSuccess('') }, 3000)
+    } catch (err: any) {
+      setAccountError(err?.message || 'Failed to update password.')
+    } finally {
+      setAccountLoading(false)
+    }
+  }
 
   const cancelEditing = () => {
     setEditingSection('none')
@@ -1786,6 +1896,10 @@ function Dashboard() {
     setShouldRemoveAvatar(false)
     setAccountError('')
     setAccountSuccess('')
+    setShowPasswordForm(false)
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -2451,18 +2565,18 @@ function Dashboard() {
         {/* Welcome Section */}
         <div className="mb-10">
           <div className="flex items-start justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-1 text-foreground">
+            <div className="space-y-1.5">
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
                 Welcome back{(dbUserData?.full_name || user?.user_metadata?.full_name) ? `, ${(dbUserData?.full_name || user?.user_metadata?.full_name || '').split(' ')[0]}` : ''}! 👋
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-zinc-400 text-sm leading-relaxed">
                 Manage your scam detection activity and track your protection stats
               </p>
             </div>
             <Button
               onClick={handleLogout}
               variant="outline"
-              className="flex items-center gap-2 border-border hover:bg-muted hover:border-primary/50 hover:scale-[1.02] transition-all cursor-pointer"
+              className="flex items-center gap-2 rounded-xl border-border hover:bg-muted hover:border-primary/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-sm"
             >
               <LogOut className="w-4 h-4" />
               Logout
@@ -2474,8 +2588,8 @@ function Dashboard() {
         <div className="mb-8">
           {/* Time Filter Buttons */}
           <div className="flex items-center gap-3 mb-6">
-            <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
-            <div className="flex gap-2 p-1 bg-card/50 rounded-lg border border-border">
+            <span className="text-sm font-medium text-zinc-400">Filter by:</span>
+            <div className="flex gap-2 p-1.5 bg-card/50 rounded-xl border border-border shadow-sm">
               <button
                 onClick={() => {
                   setStatsTimeFilter('today')
@@ -2485,10 +2599,10 @@ function Dashboard() {
                     // Ignore localStorage errors
                   }
                 }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${
                   statsTimeFilter === 'today'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/25'
+                    : 'text-zinc-400 hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 Today
@@ -2502,10 +2616,10 @@ function Dashboard() {
                     // Ignore localStorage errors
                   }
                 }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${
                   statsTimeFilter === 'thisWeek'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/25'
+                    : 'text-zinc-400 hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 This Week
@@ -2519,10 +2633,10 @@ function Dashboard() {
                     // Ignore localStorage errors
                   }
                 }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${
                   statsTimeFilter === 'thisMonth'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/25'
+                    : 'text-zinc-400 hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 This Month
@@ -2534,22 +2648,25 @@ function Dashboard() {
         {/* Stat Cards - Beautiful gradient-accented cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
           {/* Remaining Checks Card */}
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-card to-card border border-purple-500/20 p-5 group hover:border-purple-500/40 transition-all hover:shadow-lg hover:shadow-purple-500/10">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-2xl"></div>
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500/10 via-card to-card border border-purple-500/20 p-5 pl-6 group hover:border-purple-500/40 transition-all hover:shadow-lg hover:shadow-purple-500/10">
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500/80 group-hover:bg-purple-500 rounded-l-xl" aria-hidden />
+            <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-2xl" aria-hidden />
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Remaining Checks</span>
-              <Shield className="h-5 w-5 text-purple-400" />
+              <span className="text-sm font-medium text-zinc-400">Remaining Checks</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                <Shield className="h-5 w-5 text-purple-400" />
+              </span>
             </div>
             <div className="text-3xl font-bold text-foreground mb-1">{remainingChecks}</div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {remainingChecks > 0 ? 'Ready to scan' : 'Upgrade for more'}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-zinc-400">
+                {remainingChecks > 0 ? 'Ready to scan' : 'Upgrade now'}
               </p>
               <a
                 href="/pricing"
-                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-medium transition-all hover:scale-105 shadow-md"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md whitespace-nowrap border border-purple-500/30"
               >
-                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 Get more
@@ -2559,7 +2676,7 @@ function Dashboard() {
 
           {/* Scans This Month Card */}
           <div 
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 via-card to-card border border-blue-500/20 p-5 cursor-pointer group hover:border-blue-500/40 transition-all hover:shadow-lg hover:shadow-blue-500/10"
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 via-card to-card border border-blue-500/20 p-5 pl-6 cursor-pointer group hover:border-blue-500/40 transition-all hover:shadow-lg hover:shadow-blue-500/10 active:scale-[0.99]"
             onClick={() => {
               // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
               const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
@@ -2600,17 +2717,20 @@ function Dashboard() {
               })
             }}
           >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500/80 group-hover:bg-blue-500 rounded-l-xl" aria-hidden />
+            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl" aria-hidden />
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">
+              <span className="text-sm font-medium text-zinc-400">
                 {statsTimeFilter === 'today' ? 'Scans Today' : 
                  statsTimeFilter === 'thisWeek' ? 'Scans This Week' : 
                  'Scans This Month'}
               </span>
-              <TrendingUp className="h-5 w-5 text-blue-400" />
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                <TrendingUp className="h-5 w-5 text-blue-400" />
+              </span>
             </div>
             <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.totalScans}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-zinc-400">
               {statsTimeFilter === 'today' ? 'Today' : 
                statsTimeFilter === 'thisWeek' ? 'This week' : 
                'This month'}
@@ -2622,7 +2742,7 @@ function Dashboard() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div 
-                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/10 via-card to-card border border-red-500/20 p-5 cursor-pointer group hover:border-red-500/40 transition-all hover:shadow-lg hover:shadow-red-500/10"
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/10 via-card to-card border border-red-500/20 p-5 pl-6 cursor-pointer group hover:border-red-500/40 transition-all hover:shadow-lg hover:shadow-red-500/10 active:scale-[0.99]"
                   onClick={() => {
                     // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
                     const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
@@ -2663,13 +2783,16 @@ function Dashboard() {
                     })
                   }}
                 >
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-2xl"></div>
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500/80 group-hover:bg-red-500 rounded-l-xl" aria-hidden />
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-2xl" aria-hidden />
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-muted-foreground">Scams Detected</span>
-                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    <span className="text-sm font-medium text-zinc-400">Scams Detected</span>
+                    <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/20 border border-red-500/30">
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
+                    </span>
                   </div>
                   <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.scamsDetected}</div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-zinc-400">
                     Threats identified
                   </p>
                 </div>
@@ -2700,7 +2823,7 @@ function Dashboard() {
 
           {/* Suspicious Results Card */}
           <div 
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-500/10 via-card to-card border border-yellow-500/20 p-5 cursor-pointer group hover:border-yellow-500/40 transition-all hover:shadow-lg hover:shadow-yellow-500/10"
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-500/10 via-card to-card border border-yellow-500/20 p-5 pl-6 cursor-pointer group hover:border-yellow-500/40 transition-all hover:shadow-lg hover:shadow-yellow-500/10 active:scale-[0.99]"
             onClick={() => {
               // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
               const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
@@ -2741,20 +2864,23 @@ function Dashboard() {
               })
             }}
           >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/5 rounded-full blur-2xl"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500/80 group-hover:bg-amber-500 rounded-l-xl" aria-hidden />
+            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/5 rounded-full blur-2xl" aria-hidden />
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Suspicious Results</span>
-              <AlertCircle className="h-5 w-5 text-yellow-400" />
+              <span className="text-sm font-medium text-zinc-400">Suspicious Results</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                <AlertCircle className="h-5 w-5 text-yellow-400" />
+              </span>
             </div>
             <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.suspiciousResults}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-zinc-400">
               Potentially risky content
             </p>
           </div>
 
           {/* Safe Results Card */}
           <div 
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-500/10 via-card to-card border border-green-500/20 p-5 cursor-pointer group hover:border-green-500/40 transition-all hover:shadow-lg hover:shadow-green-500/10"
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-500/10 via-card to-card border border-green-500/20 p-5 pl-6 cursor-pointer group hover:border-green-500/40 transition-all hover:shadow-lg hover:shadow-green-500/10 active:scale-[0.99]"
             onClick={() => {
               // Map statsTimeFilter to dateRange: 'today' -> '0', 'thisWeek' -> '7', 'thisMonth' -> '30'
               const dateRangeMap: Record<string, string> = { 'today': '0', 'thisWeek': '7', 'thisMonth': '30' }
@@ -2795,13 +2921,16 @@ function Dashboard() {
               })
             }}
           >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full blur-2xl"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-green-500/80 group-hover:bg-green-500 rounded-l-xl" aria-hidden />
+            <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full blur-2xl" aria-hidden />
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Safe Results</span>
-              <CheckCircle className="h-5 w-5 text-green-400" />
+              <span className="text-sm font-medium text-zinc-400">Safe Results</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-green-500/20 border border-green-500/30">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+              </span>
             </div>
             <div className="text-3xl font-bold text-foreground mb-1">{filteredStats.safeResults}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-zinc-400">
               Verified safe content
             </p>
           </div>
@@ -2810,20 +2939,18 @@ function Dashboard() {
         {/* Quick Actions & Account Info */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
           <Card className="border-border bg-card/50 backdrop-blur-sm">
-            <CardHeader>
-              <div>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Start scanning or manage your activity</CardDescription>
+            <CardHeader className="pb-3">
+              <div className="space-y-1.5">
+                <CardTitle className="text-foreground text-xl sm:text-2xl font-bold tracking-tight">Quick Actions</CardTitle>
+                <CardDescription className="text-zinc-400 text-sm leading-relaxed">Start scanning or manage your activity</CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-0">
               {/* First Scan Encouragement Card - Show when user has 0 scans (only after scan history is loaded) */}
               {isScanHistoryLoaded && (!scanHistory || scanHistory.length === 0) && (
-                <div className="relative overflow-hidden rounded-lg border p-4 bg-gradient-to-br from-purple-500/10 via-card to-card border-purple-500/20 shadow-lg shadow-purple-500/10">
-                  {/* Decorative background pattern */}
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-2xl"></div>
-                  
-                  <div className="relative space-y-3">
+                <div className="relative overflow-hidden rounded-xl border border-purple-500/30 flex gap-0 bg-gradient-to-br from-purple-500/12 via-purple-500/8 to-transparent shadow-lg shadow-purple-500/10">
+                  <div className="w-1.5 flex-shrink-0 bg-purple-500 opacity-90" />
+                  <div className="relative flex-1 min-w-0 p-4 space-y-3">
                     {/* First Scan Header - Clickable to toggle tip */}
                     <button
                       onClick={() => {
@@ -2845,7 +2972,7 @@ function Dashboard() {
                           <Sparkles className="w-4 h-4 text-purple-300" />
                         </div>
                         <div className="flex-1 text-left">
-                          <h4 className="text-sm font-semibold text-purple-400">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-purple-400">
                             Ready to Get Started?
                           </h4>
                         </div>
@@ -2856,15 +2983,13 @@ function Dashboard() {
                         <ChevronDown className="w-4 h-4 text-purple-400" />
                       )}
                     </button>
-                    
-                    {/* First Scan Tip - Collapsible */}
                     {isFirstScanTipExpanded && (
-                      <div className="flex items-start gap-2.5 pt-2 border-t animate-in slide-in-from-top-2 duration-200 border-purple-500/20">
+                      <div className="flex items-start gap-2.5 pt-2 border-t border-purple-500/20 animate-in slide-in-from-top-2 duration-200">
                         <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs bg-purple-500/20 text-purple-300">
                           💡
                         </div>
-                        <p className="text-xs leading-relaxed text-purple-300/90">
-                          Welcome to ScamGuard! Start protecting yourself by scanning your first link, image, or text. Click "Start New Scan" below to begin your security journey!
+                        <p className="text-xs leading-relaxed text-zinc-300">
+                          Welcome to ScamGuard! Start protecting yourself by scanning your first link, image, or text. Click &quot;Start New Scan&quot; below to begin your security journey!
                         </p>
                       </div>
                     )}
@@ -2874,22 +2999,18 @@ function Dashboard() {
               
               {/* Risk Pattern Level Metric */}
               {currentRiskLevel && (
-                <div className={`relative overflow-hidden rounded-lg border p-4 ${
+                <div className={`relative overflow-hidden rounded-xl border flex gap-0 ${
                   currentRiskLevel === 'high' 
-                    ? 'bg-gradient-to-br from-red-500/15 via-red-500/10 to-red-500/5 border-red-500/30 shadow-lg shadow-red-500/10' 
+                    ? 'border-red-500/30 shadow-lg shadow-red-500/10 bg-gradient-to-br from-red-500/12 via-red-500/8 to-transparent' 
                     : currentRiskLevel === 'medium'
-                    ? 'bg-gradient-to-br from-yellow-500/15 via-yellow-500/10 to-yellow-500/5 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
-                    : 'bg-gradient-to-br from-green-500/15 via-green-500/10 to-green-500/5 border-green-500/30 shadow-lg shadow-green-500/10'
+                    ? 'border-amber-500/30 shadow-lg shadow-amber-500/10 bg-gradient-to-br from-amber-500/12 via-amber-500/8 to-transparent'
+                    : 'border-emerald-500/30 shadow-lg shadow-emerald-500/10 bg-gradient-to-br from-emerald-500/12 via-emerald-500/8 to-transparent'
                 }`}>
-                  {/* Decorative background pattern */}
-                  <div className={`absolute inset-0 opacity-5 ${
-                    currentRiskLevel === 'high' 
-                      ? 'bg-[radial-gradient(circle_at_50%_50%,_var(--tw-gradient-stops))] from-red-400 to-transparent' 
-                      : currentRiskLevel === 'medium'
-                      ? 'bg-[radial-gradient(circle_at_50%_50%,_var(--tw-gradient-stops))] from-yellow-400 to-transparent'
-                      : 'bg-[radial-gradient(circle_at_50%_50%,_var(--tw-gradient-stops))] from-green-400 to-transparent'
-                  }`}></div>
-                  
+                  {/* Left accent bar */}
+                  <div className={`w-1.5 flex-shrink-0 ${
+                    currentRiskLevel === 'high' ? 'bg-red-500' : currentRiskLevel === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'
+                  } opacity-90`} />
+                  <div className="relative flex-1 min-w-0 p-4">
                   <div className="relative space-y-3">
                     {/* Risk Level Header - Clickable to toggle tip */}
                     <button
@@ -2934,12 +3055,12 @@ function Dashboard() {
                           )}
                         </div>
                         <div className="flex-1 text-left">
-                          <h4 className={`text-sm font-semibold capitalize ${
+                          <h4 className={`text-sm font-bold uppercase tracking-wider ${
                             currentRiskLevel === 'high' 
                               ? 'text-red-400' 
                               : currentRiskLevel === 'medium'
-                              ? 'text-yellow-400'
-                              : 'text-green-400'
+                              ? 'text-amber-400'
+                              : 'text-emerald-400'
                           }`}>
                             {currentRiskLevel === 'high' ? 'High' : currentRiskLevel === 'medium' ? 'Medium' : 'Low'} Risk Pattern Detected
                           </h4>
@@ -2947,19 +3068,11 @@ function Dashboard() {
                       </div>
                       {isTipExpanded ? (
                         <ChevronUp className={`w-4 h-4 ${
-                          currentRiskLevel === 'high' 
-                            ? 'text-red-400' 
-                            : currentRiskLevel === 'medium'
-                            ? 'text-yellow-400'
-                            : 'text-green-400'
+                          currentRiskLevel === 'high' ? 'text-red-400' : currentRiskLevel === 'medium' ? 'text-amber-400' : 'text-emerald-400'
                         }`} />
                       ) : (
                         <ChevronDown className={`w-4 h-4 ${
-                          currentRiskLevel === 'high' 
-                            ? 'text-red-400' 
-                            : currentRiskLevel === 'medium'
-                            ? 'text-yellow-400'
-                            : 'text-green-400'
+                          currentRiskLevel === 'high' ? 'text-red-400' : currentRiskLevel === 'medium' ? 'text-amber-400' : 'text-emerald-400'
                         }`} />
                       )}
                     </button>
@@ -2970,24 +3083,24 @@ function Dashboard() {
                         currentRiskLevel === 'high' 
                           ? 'border-red-500/20' 
                           : currentRiskLevel === 'medium'
-                          ? 'border-yellow-500/20'
-                          : 'border-green-500/20'
+                          ? 'border-amber-500/20'
+                          : 'border-emerald-500/20'
                       }`}>
                         <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs ${
                           currentRiskLevel === 'high' 
                             ? 'bg-red-500/20 text-red-300' 
                             : currentRiskLevel === 'medium'
-                            ? 'bg-yellow-500/20 text-yellow-300'
-                            : 'bg-green-500/20 text-green-300'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-emerald-500/20 text-emerald-300'
                         }`}>
                           💡
                         </div>
                         <p className={`text-xs leading-relaxed ${
                           currentRiskLevel === 'high' 
-                            ? 'text-red-300/90' 
+                            ? 'text-zinc-300' 
                             : currentRiskLevel === 'medium'
-                            ? 'text-yellow-300/90'
-                            : 'text-green-300/90'
+                            ? 'text-zinc-300'
+                            : 'text-zinc-300'
                         }`}>
                           {currentRiskLevel === 'high' 
                             ? 'You\'re encountering many scams. Be extra cautious with links, emails, and requests for personal information. Verify sources before clicking or sharing data.'
@@ -2998,24 +3111,20 @@ function Dashboard() {
                       </div>
                     )}
                   </div>
+                  </div>
                 </div>
               )}
               
               <Button
                 onClick={() => {
-                  // Navigate to home page with hash, then scroll smoothly
                   if (window.location.pathname === '/') {
-                    // Already on home page, just scroll
                     const detectorSection = document.getElementById('detector')
-                    if (detectorSection) {
-                      detectorSection.scrollIntoView({ behavior: 'smooth' })
-                    }
+                    if (detectorSection) detectorSection.scrollIntoView({ behavior: 'smooth' })
                   } else {
-                    // Navigate to home page with hash
                     window.location.href = '/#detector'
                   }
                 }}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold text-base h-14 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] border-0"
+                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-base h-14 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.99] border-0"
                 size="lg"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3025,24 +3134,17 @@ function Dashboard() {
               </Button>
               <Button
                 variant="outline"
-                className="w-full h-12"
+                className="w-full h-12 rounded-xl border border-border bg-muted/30 font-semibold text-foreground hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-400 transition-all active:scale-[0.98]"
                 size="lg"
                 onClick={() => {
                   const willShow = !showHistory
-                  // Toggle history visibility
                   setShowHistory(willShow)
-                  
-                  // If showing, scroll to scan history section after a short delay to ensure it's rendered
                   if (willShow) {
                     setTimeout(() => {
                       const scanHistorySection = document.getElementById('scan-history-section')
                       if (scanHistorySection) {
                         const elementTop = scanHistorySection.getBoundingClientRect().top + window.pageYOffset
-                        const offset = 80 // Account for fixed header
-                        window.scrollTo({
-                          top: elementTop - offset,
-                          behavior: 'smooth'
-                        })
+                        window.scrollTo({ top: elementTop - 80, behavior: 'smooth' })
                       }
                     }, 100)
                   }
@@ -3056,38 +3158,54 @@ function Dashboard() {
 
           <Card 
             id="account-info" 
-            className={`border-border bg-card/50 backdrop-blur-sm transition-all duration-1000 ${
+            className={`border-border bg-card/50 backdrop-blur-sm transition-all duration-1000 overflow-hidden ${
               highlightAccountInfo 
                 ? 'border-primary shadow-lg shadow-primary/50 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]' 
                 : ''
             }`}
           >
-            <CardHeader className="relative">
+            <CardHeader className="relative pb-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Account Information</CardTitle>
-                  <CardDescription>Manage your account settings and subscription</CardDescription>
+                <div className="space-y-1.5">
+                  <CardTitle className="text-foreground text-xl sm:text-2xl font-bold tracking-tight">
+                    Account Information
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400 text-sm leading-relaxed">
+                    Manage your account settings and subscription
+                  </CardDescription>
                 </div>
                 {editingSection === 'none' && (
                   <button
                     type="button"
                     onClick={startEditingProfile}
-                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="absolute top-4 right-4 rounded-xl border border-border bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-all cursor-pointer p-2 shadow-sm hover:shadow hover:scale-105 active:scale-95"
                     title="Edit Account"
                   >
-                    <Settings className="h-5 w-5 transition-transform hover:rotate-90 hover:scale-110" />
+                    <Settings className="h-5 w-5 transition-transform hover:rotate-90" />
+                  </button>
+                )}
+                {editingSection === 'profile' && showPasswordForm && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowPasswordForm(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setAccountError(''); }}
+                    title="Back to username"
+                    className="absolute top-4 right-4 h-8 w-8 rounded-xl border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center justify-center cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                  >
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            {/* Thin gradient divider */}
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent mx-4" aria-hidden />
+            <CardContent className="space-y-4 pt-4">
               {/* User Profile Section */}
               <div className={`flex items-start gap-4 ${editingSection === 'none' ? 'pb-6 border-b border-border' : 'pb-4'}`}>
                 <div className="flex-shrink-0 flex flex-col items-center">
                   <div className="relative">
                     {avatarUrl && !avatarImageError ? (
                       /* Avatar image - Gmail picture or custom upload */
-                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
+                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600 shadow-md ring-2 ring-purple-500/20">
                         <img
                           src={getInitialAvatarDataUrl(avatarUrl) || avatarUrl}
                           alt="Avatar"
@@ -3099,7 +3217,7 @@ function Dashboard() {
                       </div>
                     ) : (
                       /* No avatar or image failed - show initial only */
-                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600">
+                      <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-r from-purple-600 to-pink-600 shadow-md ring-2 ring-purple-500/20">
                         <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-lg">
                           <span>{userInitial}</span>
                         </div>
@@ -3162,33 +3280,78 @@ function Dashboard() {
                 <div className="flex-1">
                   {editingSection === 'profile' ? (
                     <div className="space-y-3">
+                      {/* Username OR change-password (email users only); no extra gap in username view */}
                       <div>
-                        <Label htmlFor="username" className="text-xs mb-1.5 block">Username</Label>
-                        <div className="relative max-w-[280px]">
-                          <Input
-                            id="username"
-                            type="text"
-                            value={editingUsername}
-                            onChange={(e) => setEditingUsername(e.target.value)}
-                            placeholder="Enter your username"
-                            className="h-8 pr-9 text-sm px-3 py-1.5 w-full"
-                            style={{
-                              backgroundColor: 'hsl(var(--input))',
-                              color: 'hsl(var(--foreground))',
-                              borderColor: 'hsl(var(--input))'
-                            }}
-                          />
-                          {editingUsername && (
-                            <button
-                              type="button"
-                              onClick={() => setEditingUsername('')}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
-                              title="Clear"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                        {showPasswordForm ? (
+                          <div className="space-y-2">
+                            <Label className="text-xs mb-1.5 block">Change password</Label>
+                            <Input
+                              type="password"
+                              value={currentPassword}
+                              onChange={(e) => setCurrentPassword(e.target.value)}
+                              placeholder="Current password"
+                              className="h-8 text-sm px-3 py-1.5 max-w-[280px]"
+                              style={{ backgroundColor: 'hsl(var(--input))', color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--input))' }}
+                            />
+                            <Input
+                              type="password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              placeholder="New password (min 6 characters)"
+                              className="h-8 text-sm px-3 py-1.5 max-w-[280px]"
+                              style={{ backgroundColor: 'hsl(var(--input))', color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--input))' }}
+                            />
+                            <Input
+                              type="password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              placeholder="Confirm new password"
+                              className="h-8 text-sm px-3 py-1.5 max-w-[280px]"
+                              style={{ backgroundColor: 'hsl(var(--input))', color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--input))' }}
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <Label htmlFor="username" className="text-xs mb-1.5 block">Username</Label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1 max-w-[280px]">
+                                <Input
+                                  id="username"
+                                  type="text"
+                                  value={editingUsername}
+                                  onChange={(e) => setEditingUsername(e.target.value)}
+                                  placeholder="Enter your username"
+                                  className="h-8 pr-9 text-sm px-3 py-1.5 w-full"
+                                  style={{
+                                    backgroundColor: 'hsl(var(--input))',
+                                    color: 'hsl(var(--foreground))',
+                                    borderColor: 'hsl(var(--input))'
+                                  }}
+                                />
+                                {editingUsername && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingUsername('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                                    title="Clear"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                              {isEmailUser && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPasswordForm(true)}
+                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 shrink-0"
+                                >
+                                  <Lock className="w-3 h-3" />
+                                  Change password
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Mail className="w-3.5 h-3.5" />
@@ -3207,15 +3370,15 @@ function Dashboard() {
                     </div>
                   ) : (
                     <>
-                      <h3 className="font-semibold text-lg mb-1">
+                      <h3 className="font-bold text-lg sm:text-xl text-foreground mb-2">
                         {dbUserData?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                        <Mail className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                        <Mail className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                         <span>{user?.email}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-2 text-sm text-zinc-400">
+                        <Calendar className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                         <span>Member since {user?.created_at
                           ? new Date(user.created_at).toLocaleDateString('en-US', {
                               year: 'numeric',
@@ -3246,13 +3409,13 @@ function Dashboard() {
                 <div className="flex gap-2 pt-3">
                   <Button
                     type="button"
-                    onClick={saveProfileChanges}
+                    onClick={showPasswordForm ? updatePassword : saveProfileChanges}
                     disabled={accountLoading}
                     className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                   >
                     {accountLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     {!accountLoading && <Save className="w-4 h-4 mr-2" />}
-                    Save Changes
+                    {showPasswordForm ? 'Update password' : 'Save Changes'}
                   </Button>
                   <Button
                     type="button"
@@ -3271,15 +3434,14 @@ function Dashboard() {
               {editingSection === 'none' && (
                 <div className="space-y-4 pt-4 border-t border-border">
                   <div>
-                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-muted-foreground" />
+                    <h4 className="text-base font-bold text-foreground mb-3">
                       Subscription Plan
                     </h4>
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-muted/20 border border-border shadow-sm">
+                      <div className="flex items-center gap-3 flex-wrap">
                         {planLoaded && userPlan ? (
                           <>
-                            <div className={`px-3 py-1.5 rounded-md border ${
+                            <div className={`px-4 py-2 rounded-xl border shadow-sm ${
                               userPlan.toUpperCase() === 'FREE'
                                 ? 'bg-gradient-to-r from-slate-500/20 to-slate-600/20 border-slate-500/40'
                                 : userPlan.toUpperCase() === 'PRO' 
@@ -3305,18 +3467,18 @@ function Dashboard() {
                               </span>
                             </div>
                         {planLoaded && userPlan && userPlan.toUpperCase() === 'FREE' && (
-                          <span className="text-xs text-muted-foreground">Free tier with limited features</span>
+                          <span className="text-xs text-zinc-400">Free tier with limited features</span>
                         )}
                           </>
                         ) : (
-                          <div className="px-3 py-1.5 rounded-md border bg-muted/50 animate-pulse">
+                          <div className="px-4 py-2 rounded-xl border border-border bg-muted/50 animate-pulse">
                             <span className="text-sm font-bold text-muted-foreground">Loading...</span>
                           </div>
                         )}
                       </div>
                       <a
                         href="/pricing"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold transition-all hover:scale-105 shadow-md"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg border border-purple-500/30 shrink-0"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -3332,12 +3494,29 @@ function Dashboard() {
         </div>
 
         {/* Scan History Section */}
-        <Card id="scan-history-section" className={`mb-10 border-border bg-card/50 backdrop-blur-sm ${!showHistory ? 'hidden' : ''}`}>
-          <CardHeader>
+        <Card id="scan-history-section" className={`mb-10 border-border bg-card/50 backdrop-blur-sm transition-all duration-1000 overflow-hidden ${!showHistory ? 'hidden' : ''} ${
+              highlightScanHistory
+                ? 'border-primary shadow-lg shadow-primary/50 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
+                : ''
+            }`}>
+          {/* Gradient accent bar */}
+          <div className="h-1 w-full bg-gradient-to-r from-amber-500 via-primary to-red-500/80" />
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <CardTitle>Scan History</CardTitle>
-                <CardDescription>View your scan history (last 30 days)</CardDescription>
+              <div className="space-y-1.5">
+                <CardTitle className="flex items-center gap-3 text-foreground text-xl sm:text-2xl font-bold tracking-tight">
+                  <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/25 to-primary/25 border border-amber-500/40 shadow-sm">
+                    <History className="h-5 w-5 text-amber-500" />
+                  </span>
+                  Scan History
+                </CardTitle>
+                <CardDescription className="text-zinc-400 text-sm leading-relaxed">
+                  {scanHistoryDateRange === '0'
+                    ? 'View your scan history (today)'
+                    : scanHistoryDateRange === '7'
+                      ? 'View your scan history (last 7 days)'
+                      : 'View your scan history (last 30 days)'}
+                </CardDescription>
               </div>
               {/* Refresh button - only show when viewing list, not single result */}
               {!selectedScan && (
@@ -3370,6 +3549,7 @@ function Dashboard() {
                 </Button>
               )}
             </div>
+            <div className="h-px bg-gradient-to-r from-border via-amber-500/20 to-border mt-2" />
           </CardHeader>
           <CardContent>
             {selectedScan ? (
@@ -3390,6 +3570,9 @@ function Dashboard() {
                     isRestoringScroll.current = true
                     setSelectedScan(null)
                   }}
+                  scanId={selectedScan.id}
+                  savedLearnMoreData={selectedScan.learn_more_data ?? undefined}
+                  fromHistory={true}
                 />
               </div>
             ) : (
@@ -3409,8 +3592,11 @@ function Dashboard() {
                 onRefresh={() => refreshStats(0, true)} // Force refresh on manual refresh
                 initialFilter={scanHistoryFilter}
                 onFilterChange={setScanHistoryFilter}
+                initialScamTypeFilter={scanHistoryScamTypeFilter}
+                onScamTypeFilterChange={setScanHistoryScamTypeFilter}
                 scans={scanHistory}
                 initialDateRange={scanHistoryDateRange || undefined}
+                onDateRangeChange={setScanHistoryDateRange}
                 savedScrollPosition={isRestoringScroll.current ? scanHistoryScrollPosition.current : undefined}
                 onScrollRestored={() => {
                   isRestoringScroll.current = false
@@ -3420,86 +3606,129 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Browser Extension Section */}
-        <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
-          <CardHeader>
-            <div>
-              <CardTitle>Browser Extension</CardTitle>
-              <CardDescription>Download our extension to browse securely and scan content on the go</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <a
-              href="https://chrome.google.com/webstore"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-4 w-full px-6 py-4 rounded-xl bg-gradient-to-r from-card to-muted/30 border border-border hover:border-primary/50 shadow-lg hover:shadow-primary/20 transition-all duration-300 group hover:scale-[1.02]"
-            >
-              <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
-                Download our extension and browse securely
-              </span>
-              
-              {/* Browser Logos */}
-              <div className="flex items-center gap-2">
-                <img src={chromeLogo} alt="Chrome" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
-                <img src={edgeLogo} alt="Edge" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
-                <img src={braveLogo} alt="Brave" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
-                <img src={operaLogo} alt="Opera" className="w-7 h-7 opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </a>
-          </CardContent>
-        </Card>
+        {/* Unlocked Scam Learning (Your Scam Library) - includes Download extension button in lower right */}
+        <UnlockedScamLearning
+          scanHistory={scanHistory}
+          highlight={highlightScamLibrary}
+          onViewScan={(scan) => {
+            setSelectedScan(scan)
+            setShowHistory(true)
+            setTimeout(() => {
+              const el = document.getElementById('scan-history-section')
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }, 100)
+          }}
+        />
 
-        {/* Features Section */}
+        {/* Dashboard Features Section - extension button in upper right */}
         <Card className="mb-10 border-border bg-card/50 backdrop-blur-sm">
-          <CardHeader>
-            <div>
-              <CardTitle>Dashboard Features</CardTitle>
-              <CardDescription>What you can do with your account</CardDescription>
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1.5">
+                <CardTitle className="text-foreground text-xl sm:text-2xl font-bold tracking-tight">
+                  Dashboard Features
+                </CardTitle>
+                <CardDescription className="text-zinc-400 text-sm leading-relaxed">
+                  What you can do with your account
+                </CardDescription>
+              </div>
+              {/* Download extension button - upper right */}
+              <div
+                className={`inline-flex items-center rounded-xl border border-border bg-card/80 backdrop-blur-sm transition-all duration-200 flex-shrink-0 shadow-sm ${
+                  browserExtensionExpanded ? 'shadow-md ring-1 ring-border' : 'hover:border-primary/50 hover:bg-muted/30 hover:shadow hover:scale-[1.02] active:scale-[0.98]'
+                }`}
+              >
+                {browserExtensionExpanded ? (
+                  <>
+                    <a
+                      href="https://chrome.google.com/webstore"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 rounded-l-xl transition-colors hover:bg-muted/20"
+                    >
+                      <img src={chromeLogo} alt="Chrome" className="h-4 w-4 opacity-90" />
+                      <img src={edgeLogo} alt="Edge" className="h-4 w-4 opacity-90" />
+                      <img src={braveLogo} alt="Brave" className="h-4 w-4 opacity-90" />
+                      <img src={operaLogo} alt="Opera" className="h-4 w-4 opacity-90" />
+                      <span className="flex flex-col items-start text-left pr-1">
+                        <span className="text-xs font-medium text-foreground whitespace-nowrap">Download extension</span>
+                        <span className="text-[10px] font-normal text-muted-foreground whitespace-nowrap">browse securely on the go</span>
+                      </span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setBrowserExtensionExpanded(false)}
+                      className="p-1.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-r-xl transition-colors"
+                      aria-label="Collapse"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setBrowserExtensionExpanded(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                  >
+                    <img src={chromeLogo} alt="Chrome" className="h-4 w-4 opacity-85" />
+                    <img src={edgeLogo} alt="Edge" className="h-4 w-4 opacity-85" />
+                    <img src={braveLogo} alt="Brave" className="h-4 w-4 opacity-85" />
+                    <img src={operaLogo} alt="Opera" className="h-4 w-4 opacity-85" />
+                    <span className="text-xs font-medium text-foreground whitespace-nowrap">Download extension</span>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground ml-0.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
+          {/* Thin gradient divider */}
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent mx-4" aria-hidden />
+          <CardContent className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-green-500/5 to-transparent border border-green-500/10 hover:border-green-500/30 transition-all group">
-                <div className="p-2.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
+              <div className="relative flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-green-500/5 to-transparent border border-green-500/20 hover:border-green-500/40 transition-all group overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-green-500/80 group-hover:bg-green-500 rounded-l-xl" aria-hidden />
+                <div className="p-2.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors flex-shrink-0">
                   <CheckCircle className="w-5 h-5 text-green-400" />
                 </div>
-                <div>
-                  <h4 className="font-semibold mb-1 text-foreground">Unlimited Analysis</h4>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-foreground mb-1.5">Unlimited Analysis</h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed border-l-2 border-green-500/30 pl-3">
                     Get 5 free checks on signup, then upgrade for unlimited scans
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-purple-500/5 to-transparent border border-purple-500/10 hover:border-purple-500/30 transition-all group">
-                <div className="p-2.5 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+              <div className="relative flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-purple-500/5 to-transparent border border-purple-500/20 hover:border-purple-500/40 transition-all group overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500/80 group-hover:bg-purple-500 rounded-l-xl" aria-hidden />
+                <div className="p-2.5 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors flex-shrink-0">
                   <Shield className="w-5 h-5 text-purple-400" />
                 </div>
-                <div>
-                  <h4 className="font-semibold mb-1 text-foreground">Full Detailed Reports</h4>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-foreground mb-1.5">Full Detailed Reports</h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed border-l-2 border-purple-500/30 pl-3">
                     Access comprehensive analysis reports for every scan
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-blue-500/5 to-transparent border border-blue-500/10 hover:border-blue-500/30 transition-all group">
-                <div className="p-2.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+              <div className="relative flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-blue-500/5 to-transparent border border-blue-500/20 hover:border-blue-500/40 transition-all group overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500/80 group-hover:bg-blue-500 rounded-l-xl" aria-hidden />
+                <div className="p-2.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors flex-shrink-0">
                   <Clock className="w-5 h-5 text-blue-400" />
                 </div>
-                <div>
-                  <h4 className="font-semibold mb-1 text-foreground">Priority Processing</h4>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-foreground mb-1.5">Priority Processing</h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed border-l-2 border-blue-500/30 pl-3">
                     Faster analysis times for logged-in users
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-orange-500/5 to-transparent border border-orange-500/10 hover:border-orange-500/30 transition-all group">
-                <div className="p-2.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
+              <div className="relative flex items-start gap-4 p-5 rounded-xl bg-gradient-to-br from-orange-500/5 to-transparent border border-orange-500/20 hover:border-orange-500/40 transition-all group overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500/80 group-hover:bg-orange-500 rounded-l-xl" aria-hidden />
+                <div className="p-2.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors flex-shrink-0">
                   <TrendingUp className="w-5 h-5 text-orange-400" />
                 </div>
-                <div>
-                  <h4 className="font-semibold mb-1 text-foreground">Analysis History</h4>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-foreground mb-1.5">Analysis History</h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed border-l-2 border-orange-500/30 pl-3">
                     Track all your scans and results
                   </p>
                 </div>
